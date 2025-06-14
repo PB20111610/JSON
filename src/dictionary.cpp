@@ -1,5 +1,6 @@
 #include "../include/dictionary.h"
 #include <algorithm>
+#include <unordered_map>
 
 namespace json2 {
 
@@ -113,13 +114,23 @@ void Dictionary::addFieldValue(const std::string& field_name, const std::string&
         [&field_name](const FieldStats& stats) { return stats.name == field_name; });
     
     if (it == field_stats.end()) {
+        // 新字段，创建统计信息
         FieldStats stats;
         stats.name = field_name;
-        stats.type = type;
+        stats.type = type;  // 记录字段使用的字典类型
         stats.value_count = 0;
+        stats.occurrence_count = 0;
         field_stats.push_back(stats);
         it = field_stats.end() - 1;
+    } else {
+        // 检查字段类型是否匹配
+        if (it->type != type) {
+            throw std::runtime_error("Field type mismatch for field: " + field_name);
+        }
     }
+    
+    // 增加出现次数
+    it->occurrence_count++;
     
     // 如果值不在字段的值域中，添加它
     if (it->value_codes.find(value) == it->value_codes.end()) {
@@ -129,20 +140,45 @@ void Dictionary::addFieldValue(const std::string& field_name, const std::string&
 }
 
 std::vector<std::string> Dictionary::getOrderedFields() const {
-    // 创建字段名和值域大小的对
-    std::vector<std::pair<std::string, size_t>> field_sizes;
+    // 计算总记录数（使用最大出现次数作为估计）
+    size_t total_records = 0;
     for (const auto& stats : field_stats) {
-        field_sizes.emplace_back(stats.name, stats.value_count);
+        total_records = std::max(total_records, stats.occurrence_count);
     }
     
-    // 按值域大小排序（值域小的在上层）
-    std::sort(field_sizes.begin(), field_sizes.end(),
-        [](const auto& a, const auto& b) { return a.second < b.second; });
+    // 创建字段统计信息的索引映射
+    std::unordered_map<std::string, const FieldStats*> field_index;
+    for (const auto& stats : field_stats) {
+        field_index[stats.name] = &stats;
+    }
+    
+    // 创建字段名和冗余度因子的对
+    std::vector<std::pair<std::string, double>> field_redundancy;
+    for (const auto& stats : field_stats) {
+        // 计算冗余度因子：出现次数 / (值域大小 × 总记录数)
+        // 添加小量值(1e-6)防止除以0
+        double redundancy_factor = static_cast<double>(stats.occurrence_count) / 
+                                  ((stats.value_count + 1e-6) * total_records);
+        field_redundancy.emplace_back(stats.name, redundancy_factor);
+    }
+    
+    // 按冗余度因子从高到低排序
+    std::sort(field_redundancy.begin(), field_redundancy.end(),
+        [&field_index](const auto& a, const auto& b) { 
+            // 首先按冗余度因子排序
+            if (std::abs(a.second - b.second) > 1e-6) {
+                return a.second > b.second;
+            }
+            // 冗余度因子相同时，按值域大小排序（值域小的优先）
+            auto it_a = field_index.find(a.first);
+            auto it_b = field_index.find(b.first);
+            return it_a->second->value_count < it_b->second->value_count;
+        });
     
     // 提取排序后的字段名
     std::vector<std::string> ordered_fields;
-    ordered_fields.reserve(field_sizes.size());
-    for (const auto& pair : field_sizes) {
+    ordered_fields.reserve(field_redundancy.size());
+    for (const auto& pair : field_redundancy) {
         ordered_fields.push_back(pair.first);
     }
     

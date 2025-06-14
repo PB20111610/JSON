@@ -16,9 +16,10 @@ enum class DictType {
 // 字段值域统计
 struct FieldStats {
     std::string name;
-    DictType type;
+    DictType type;  // 字段使用的字典类型
     size_t value_count;
-    std::unordered_map<std::string, uint32_t> value_codes;
+    size_t occurrence_count;  // 字段出现的次数
+    std::unordered_map<std::string, uint32_t> value_codes;  // 存储字段的每个值对应的编码
 };
 
 class Dictionary {

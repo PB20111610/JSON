@@ -441,9 +441,12 @@ void JsonParser::parseAndCollect(
 
     std::string line;
     std::unordered_map<std::string, DictType> field_types;  // 用于收集所有字段及其类型
+    size_t total_records = 0;  // 总记录数
 
     while (std::getline(file, line)) {
         if (line.empty()) continue;
+        total_records++;  // 增加记录计数
+        
         std::unordered_map<std::string, std::string> kvs = parseFlatJson(line);
 
         // 处理每个字段
@@ -463,7 +466,7 @@ void JsonParser::parseAndCollect(
         }
     }
 
-    // 根据值域大小重新排序字段（值域小的在上层）
+    // 根据冗余度因子重新排序字段
     std::vector<std::string> ordered_fields = dict.getOrderedFields();
     std::vector<ParsedField> new_field_order;
     new_field_order.reserve(ordered_fields.size());

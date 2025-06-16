@@ -4,6 +4,8 @@
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
+#include <fstream>
+#include <cctype>
 
 using namespace json2;
 
@@ -137,6 +139,21 @@ void printSerializedData(const std::vector<uint8_t>& data) {
     std::cout << std::dec << "\n";
 }
 
+// 辅助函数：比较两个JSON字符串（忽略空白字符）
+bool compareJsonStrings(const std::string& json1, const std::string& json2) {
+    std::string clean1, clean2;
+    
+    // 移除所有空白字符
+    for (char c : json1) {
+        if (!std::isspace(c)) clean1 += c;
+    }
+    for (char c : json2) {
+        if (!std::isspace(c)) clean2 += c;
+    }
+    
+    return clean1 == clean2;
+}
+
 int main() {
     try {
         // 1. 创建字典和字段列表
@@ -146,45 +163,30 @@ int main() {
         // 2. 解析并收集字段信息
         JsonParser::parseAndCollect("test_data.json", dict, fieldOrder);
         
-        // 3. 打印字段顺序
-        std::cout << "=== Field Order ===\n";
-        for (const auto& field : fieldOrder) {
-            std::cout << field.name << " (Type: ";
-            switch (field.dictType) {
-                case DictType::TIMESTAMP_DICT: std::cout << "TIMESTAMP"; break;
-                case DictType::LOG_DICT: std::cout << "LOG"; break;
-                case DictType::VARIABLE_DICT: std::cout << "VARIABLE"; break;
-            }
-            std::cout << ")\n";
-        }
-        
-        // 4. 打印字典内容
-        printDictionary(dict);
-        
-        // 5. 创建Trie树
+        // 3. 创建Trie树
         Trie trie(fieldOrder);
         
-        // 6. 解析并插入记录
+        // 4. 解析并插入记录
         auto records = JsonParser::parseLogFile("test_data.json");
         for (const auto& record : records) {
             trie.insert(record, dict);
         }
         
-        // 7. 打印Trie树结构
-        std::cout << "\n=== Trie Tree Structure ===\n";
-        printTrieNode(trie.getRoot(), 0, fieldOrder, dict);
+        // 5. 将Trie树转换回JSON
+        std::string reconstructed_json = trie.toJson(dict);
         
-        // 8. 序列化Trie树
-        auto serialized = trie.serialize();
-        printSerializedData(serialized);
+        // 6. 将重建的JSON保存到文件
+        std::ofstream out_file("reconstructed.json");
+        if (!out_file.is_open()) {
+            throw std::runtime_error("Cannot open reconstructed.json for writing");
+        }
+        out_file << reconstructed_json;
+        out_file.close();
         
-        // 9. 反序列化Trie树
-        Trie newTrie(fieldOrder);
-        newTrie.deserialize(serialized);
-        
-        // 10. 验证反序列化后的树结构
-        std::cout << "\n=== Deserialized Trie Tree Structure ===\n";
-        printTrieNode(newTrie.getRoot(), 0, fieldOrder, dict);
+        std::cout << "\n✅ JSON reconstruction completed!\n";
+        std::cout << "Original JSON: test_data.json\n";
+        std::cout << "Reconstructed JSON: reconstructed.json\n";
+        std::cout << "Please compare these files manually to verify the reconstruction.\n";
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

@@ -2,6 +2,8 @@
 #include <cstring>
 #include <algorithm>
 #include <stdexcept>
+#include <sstream>
+#include <functional>
 
 namespace json2 {
 
@@ -172,6 +174,130 @@ void Trie::deserialize(const std::vector<uint8_t>& data) {
 
 const std::vector<ParsedField>& Trie::getOrderedFields() const {
     return ordered_fields_;
+}
+
+// 辅助函数：将带"."的字段名拆分为路径
+std::vector<std::string> splitFieldName(const std::string& fieldName) {
+    std::vector<std::string> parts;
+    std::string current;
+    for (char c : fieldName) {
+        if (c == '.') {
+            if (!current.empty()) {
+                parts.push_back(current);
+                current.clear();
+            }
+        } else {
+            current += c;
+        }
+    }
+    if (!current.empty()) {
+        parts.push_back(current);
+    }
+    return parts;
+}
+
+// 辅助函数：递归构建JSON对象
+std::shared_ptr<JsonObject> Trie::buildJsonObject(
+    const TrieNode* node,
+    const std::vector<std::string>& fieldPath,
+    size_t depth,
+    const Dictionary& dict
+) const {
+    if (!node) return nullptr;
+    
+    auto result = std::make_shared<JsonObject>();
+    
+    // 如果当前节点有值，添加到结果中
+    if (!node->isPlaceholder() && depth < ordered_fields_.size()) {
+        const auto& field = ordered_fields_[depth];
+        const std::string& value = dict.getString(node->getCode(), field.dictType);
+        // 确保所有值都用双引号包住
+        result->addField(field.name, std::make_shared<JsonString>("\"" + value + "\""));
+    }
+    
+    // 处理子节点
+    for (const auto& [code, child] : node->getChildren()) {
+        if (depth + 1 < ordered_fields_.size()) {
+            const auto& field = ordered_fields_[depth + 1];
+            std::vector<std::string> parts = splitFieldName(field.name);
+            
+            // 如果字段名包含点号，需要创建嵌套对象
+            if (parts.size() > 1) {
+                auto current = result;
+                // 创建或获取嵌套对象
+                for (size_t i = 0; i < parts.size() - 1; ++i) {
+                    auto nested = current->getField(parts[i]);
+                    if (!nested) {
+                        nested = std::make_shared<JsonObject>();
+                        current->addField(parts[i], nested);
+                    }
+                    current = std::static_pointer_cast<JsonObject>(nested);
+                }
+                // 递归处理子节点
+                auto child_obj = buildJsonObject(child.get(), parts, depth + 1, dict);
+                if (child_obj) {
+                    // 合并子节点的字段到当前对象
+                    for (const auto& [key, value] : child_obj->getFields()) {
+                        current->addField(key, value);
+                    }
+                }
+            } else {
+                // 递归处理子节点
+                auto child_obj = buildJsonObject(child.get(), {field.name}, depth + 1, dict);
+                if (child_obj) {
+                    // 合并子节点的字段到当前对象
+                    for (const auto& [key, value] : child_obj->getFields()) {
+                        result->addField(key, value);
+                    }
+                }
+            }
+        }
+    }
+    
+    return result;
+}
+
+std::string Trie::toJson(const Dictionary& dict) const {
+    std::stringstream ss;
+    bool first = true;
+    
+    // 递归遍历所有路径
+    std::function<void(const TrieNode*, std::vector<std::pair<std::string, std::string>>, size_t)> traverse = 
+        [&](const TrieNode* node, std::vector<std::pair<std::string, std::string>> currentRecord, size_t depth) {
+        if (!node) return;
+        
+        // 如果不是根节点，添加当前字段到记录中
+        if (depth > 0 && !node->isPlaceholder()) {
+            // 根据深度获取字段名
+            std::string fieldName = ordered_fields_[depth - 1].name;
+            // 从字典中获取原始值
+            std::string value = dict.getString(node->getCode(), ordered_fields_[depth - 1].dictType);
+            currentRecord.push_back({fieldName, value});
+        }
+        
+        // 如果是叶子节点，输出完整记录
+        if (node->getChildren().empty() && !currentRecord.empty()) {
+            if (!first) {
+                ss << "\n";
+            }
+            ss << "{";
+            for (size_t i = 0; i < currentRecord.size(); ++i) {
+                if (i > 0) ss << ",";
+                ss << "\"" << currentRecord[i].first << "\":\"" << currentRecord[i].second << "\"";
+            }
+            ss << "}";
+            first = false;
+        }
+        
+        // 递归处理所有子节点
+        for (const auto& [code, child] : node->getChildren()) {
+            traverse(child.get(), currentRecord, depth + 1);
+        }
+    };
+    
+    // 从根节点开始遍历
+    traverse(root_.get(), {}, 0);
+    return ss.str();
 }
 
 } // namespace json2

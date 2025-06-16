@@ -52,6 +52,9 @@ public:
     
     // 获取根节点（用于测试和调试）
     const TrieNode* getRoot() const { return root_.get(); }
+    
+    // 将Trie树转换为JSON字符串
+    std::string toJson(const Dictionary& dict) const;
 
 private:
     std::unique_ptr<TrieNode> root_;  // 根节点
@@ -65,6 +68,14 @@ private:
     
     // 递归复制子节点
     void copyChildren(const TrieNode* src, TrieNode* dest);
+    
+    // 辅助函数：递归构建JSON对象
+    std::shared_ptr<JsonObject> buildJsonObject(
+        const TrieNode* node,
+        const std::vector<std::string>& fieldPath,
+        size_t depth,
+        const Dictionary& dict
+    ) const;
 };
 
 } // namespace json2

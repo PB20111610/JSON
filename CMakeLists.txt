@@ -13,6 +13,7 @@ set(SOURCES
     src/main.cpp
     src/parser.cpp
     src/dictionary.cpp
+    src/trie.cpp
 )
 
 # 创建可执行文件

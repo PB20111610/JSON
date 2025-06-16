@@ -163,6 +163,12 @@ int main() {
         // 2. 解析并收集字段信息
         JsonParser::parseAndCollect("test_data.json", dict, fieldOrder);
         
+        // 打印字典统计信息
+        printDictionaryStats(dict);
+        
+        // 打印字典内容
+        printDictionary(dict);
+        
         // 3. 创建Trie树
         Trie trie(fieldOrder);
         
@@ -171,6 +177,10 @@ int main() {
         for (const auto& record : records) {
             trie.insert(record, dict);
         }
+        
+        // 打印Trie树结构
+        std::cout << "\n=== Trie Tree Structure ===\n";
+        printTrieNode(trie.getRoot(), 0, fieldOrder, dict);
         
         // 5. 将Trie树转换回JSON
         std::string reconstructed_json = trie.toJson(dict);

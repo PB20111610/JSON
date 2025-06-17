@@ -16,7 +16,10 @@ void printDictionaryStats(const Dictionary& dict) {
     // 打印每种类型的字典大小
     std::cout << "Timestamp Dictionary Size: " << dict.size(DictType::TIMESTAMP_DICT) << "\n";
     std::cout << "Log Dictionary Size: " << dict.size(DictType::LOG_DICT) << "\n";
-    std::cout << "Variable Dictionary Size: " << dict.size(DictType::VARIABLE_DICT) << "\n\n";
+    std::cout << "Variable Dictionary Size: " << dict.size(DictType::VARIABLE_DICT) << "\n";
+    std::cout << "Integer Dictionary Size: " << dict.size(DictType::INTEGER_DICT) << "\n";
+    std::cout << "Float Dictionary Size: " << dict.size(DictType::FLOAT_DICT) << "\n";
+    std::cout << "Boolean Dictionary Size: " << dict.size(DictType::RAW_BOOLEAN) << "\n\n";
     
     // 计算总记录数（使用最大出现次数作为估计）
     size_t total_records = 0;
@@ -57,7 +60,11 @@ void printDictionaryStats(const Dictionary& dict) {
         std::cout << std::setw(15) << stats.name 
                   << std::setw(15) 
                   << (stats.type == DictType::TIMESTAMP_DICT ? "TIMESTAMP" :
-                      stats.type == DictType::LOG_DICT ? "LOG" : "VARIABLE")
+                      stats.type == DictType::LOG_DICT ? "LOG" :
+                      stats.type == DictType::VARIABLE_DICT ? "VARIABLE" :
+                      stats.type == DictType::INTEGER_DICT ? "INTEGER" :
+                      stats.type == DictType::FLOAT_DICT ? "FLOAT" :
+                      stats.type == DictType::RAW_BOOLEAN ? "BOOLEAN" : "UNKNOWN")
                   << std::setw(15) << stats.value_count
                   << std::setw(15) << stats.occurrence_count
                   << std::setw(15) << redundancy_factor
@@ -96,6 +103,25 @@ void printDictionary(const Dictionary& dict) {
     const auto& variable_codes = dict.getCodes(DictType::VARIABLE_DICT);
     for (size_t i = 0; i < variable_codes.size(); ++i) {
         std::cout << "Code " << (i + 1) << ": " << variable_codes[i] << "\n";
+    }
+    
+    // 打印布尔值字典
+    std::cout << "\nBoolean Dictionary:\n";
+    std::cout << "Code 1: true\n";
+    std::cout << "Code 0: false\n";
+    
+    // 打印整型字典
+    std::cout << "\nInteger Dictionary:\n";
+    const auto& integer_codes = dict.getIntegerCodes();
+    for (size_t i = 0; i < integer_codes.size(); ++i) {
+        std::cout << "Code " << (i + 1) << ": " << integer_codes[i] << "\n";
+    }
+    
+    // 打印浮点型字典
+    std::cout << "\nFloat Dictionary:\n";
+    const auto& float_codes = dict.getFloatCodes();
+    for (size_t i = 0; i < float_codes.size(); ++i) {
+        std::cout << "Code " << (i + 1) << ": " << float_codes[i] << "\n";
     }
 }
 
@@ -173,7 +199,8 @@ int main() {
                       << ", Type: " << (stats.type == DictType::TIMESTAMP_DICT ? "TIMESTAMP" :
                                        stats.type == DictType::LOG_DICT ? "LOG" :
                                        stats.type == DictType::VARIABLE_DICT ? "VARIABLE" :
-                                       stats.type == DictType::RAW_NUMBER ? "RAW_NUMBER" :
+                                       stats.type == DictType::INTEGER_DICT ? "INTEGER" :
+                                       stats.type == DictType::FLOAT_DICT ? "FLOAT" :
                                        stats.type == DictType::RAW_BOOLEAN ? "RAW_BOOLEAN" : "UNKNOWN")
                       << ", Value Count: " << stats.value_count
                       << ", Occurrences: " << stats.occurrence_count << "\n";
@@ -185,7 +212,8 @@ int main() {
                       << " (" << (fieldOrder[i].dictType == DictType::TIMESTAMP_DICT ? "TIMESTAMP" :
                                   fieldOrder[i].dictType == DictType::LOG_DICT ? "LOG" :
                                   fieldOrder[i].dictType == DictType::VARIABLE_DICT ? "VARIABLE" :
-                                  fieldOrder[i].dictType == DictType::RAW_NUMBER ? "RAW_NUMBER" :
+                                  fieldOrder[i].dictType == DictType::INTEGER_DICT ? "INTEGER" :
+                                  fieldOrder[i].dictType == DictType::FLOAT_DICT ? "FLOAT" :
                                   fieldOrder[i].dictType == DictType::RAW_BOOLEAN ? "RAW_BOOLEAN" : "UNKNOWN")
                       << ")\n";
         }

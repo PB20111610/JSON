@@ -43,13 +43,16 @@ private:
 // 数字类型的JSON值
 class JsonNumber : public JsonValue {
 public:
-    explicit JsonNumber(double value) : value_(value) {}
+    explicit JsonNumber(double value) : value_(value), original_str_(std::to_string(value)) {}
+    JsonNumber(double value, const std::string& original_str) : value_(value), original_str_(original_str) {}
     JsonType getType() const override { return JsonType::NUMBER; }
-    std::string toString() const override { return std::to_string(value_); }
+    std::string toString() const override { return original_str_; }
     double getValue() const { return value_; }
+    const std::string& getOriginalString() const { return original_str_; }
 
 private:
     double value_;
+    std::string original_str_;  // 存储原始的字符串表示
 };
 
 // 布尔类型的JSON值
@@ -148,7 +151,7 @@ public:
 private:
     static std::shared_ptr<JsonValue> parseValue(const std::string& jsonStr, size_t& pos);
     static std::string parseString(const std::string& jsonStr, size_t& pos);
-    static double parseNumber(const std::string& jsonStr, size_t& pos);
+    static std::string parseNumber(const std::string& jsonStr, size_t& pos);
     static std::shared_ptr<JsonArray> parseArray(const std::string& jsonStr, size_t& pos);
     static void skipWhitespace(const std::string& jsonStr, size_t& pos);
 };

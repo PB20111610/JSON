@@ -1,6 +1,7 @@
 #include "../include/dictionary.h"
 #include <algorithm>
 #include <unordered_map>
+#include <iostream>
 
 namespace json2 {
 
@@ -33,26 +34,31 @@ uint32_t Dictionary::add(const std::string& str, DictType type) {
             variable_codes.push_back(str);
             return next_variable_code++;
         }
-        case DictType::RAW_NUMBER:
         case DictType::RAW_BOOLEAN:
-            // 对于原始数值和布尔值，直接返回原始值，不进行编码
-            if (type == DictType::RAW_BOOLEAN) {
-                // 布尔值：true = 1, false = 0
-                return (str == "true") ? 1 : 0;
-            } else {
-                // 数值：尝试转换为数值，保持原始精度
-                try {
-                    double num = std::stod(str);
-                    // 对于浮点数，我们需要一个更好的编码方案
-                    // 这里我们使用一个简单的方案：将浮点数乘以1000后转为整数
-                    // 这样可以保持3位小数的精度
-                    return static_cast<uint32_t>(num * 1000);
-                } catch (const std::exception&) {
-                    return 0;
-                }
-            }
+            // 布尔值：true = 1, false = 0
+            return (str == "true") ? 1 : 0;
     }
     return 0;
+}
+
+uint32_t Dictionary::addInteger(int64_t value) {
+    auto it = integer_dict.find(value);
+    if (it != integer_dict.end()) {
+        return it->second;
+    }
+    integer_dict[value] = next_integer_code;
+    integer_codes.push_back(value);
+    return next_integer_code++;
+}
+
+uint32_t Dictionary::addFloat(double value) {
+    auto it = float_dict.find(value);
+    if (it != float_dict.end()) {
+        return it->second;
+    }
+    float_dict[value] = next_float_code;
+    float_codes.push_back(value);
+    return next_float_code++;
 }
 
 uint32_t Dictionary::getCode(const std::string& str, DictType type) const {
@@ -69,24 +75,9 @@ uint32_t Dictionary::getCode(const std::string& str, DictType type) const {
             auto it = variable_dict.find(str);
             return (it != variable_dict.end()) ? it->second : 0;
         }
-        case DictType::RAW_NUMBER:
         case DictType::RAW_BOOLEAN:
-            // 对于原始数值和布尔值，直接返回原始值，不进行编码
-            if (type == DictType::RAW_BOOLEAN) {
-                // 布尔值：true = 1, false = 0
-                return (str == "true") ? 1 : 0;
-            } else {
-                // 数值：尝试转换为数值，保持原始精度
-                try {
-                    double num = std::stod(str);
-                    // 对于浮点数，我们需要一个更好的编码方案
-                    // 这里我们使用一个简单的方案：将浮点数乘以1000后转为整数
-                    // 这样可以保持3位小数的精度
-                    return static_cast<uint32_t>(num * 1000);
-                } catch (const std::exception&) {
-                    return 0;
-                }
-            }
+            // 布尔值：true = 1, false = 0
+            return (str == "true") ? 1 : 0;
     }
     return 0;
 }
@@ -103,23 +94,6 @@ const std::string& Dictionary::getString(uint32_t code, DictType type) const {
         case DictType::VARIABLE_DICT:
             return (code > 0 && code <= variable_codes.size()) ? 
                 variable_codes[code-1] : empty;
-        case DictType::RAW_NUMBER:
-            // 对于数值，将编码转换回原始字符串
-            if (code >= 0) {  // 修改：允许编码为0的数值
-                static std::string num_str;
-                // 将编码除以1000得到原始浮点数
-                double num = static_cast<double>(code) / 1000.0;
-                num_str = std::to_string(num);
-                // 移除末尾的0（如1.000变成1）
-                while (num_str.back() == '0' && num_str.find('.') != std::string::npos) {
-                    num_str.pop_back();
-                }
-                if (num_str.back() == '.') {
-                    num_str.pop_back();
-                }
-                return num_str;
-            }
-            return empty;
         case DictType::RAW_BOOLEAN:
             // 对于布尔值，将编码转换回字符串
             if (code == 1) {
@@ -142,10 +116,13 @@ size_t Dictionary::size(DictType type) const {
             return log_codes.size();
         case DictType::VARIABLE_DICT:
             return variable_codes.size();
-        case DictType::RAW_NUMBER:
+        case DictType::INTEGER_DICT:
+            return integer_codes.size();
+        case DictType::FLOAT_DICT:
+            return float_codes.size();
         case DictType::RAW_BOOLEAN:
-            // 对于原始数值和布尔值，返回0，因为不需要存储
-            return 0;
+            // 布尔值只有两种可能的值
+            return 2;
     }
     return 0;
 }
@@ -154,12 +131,18 @@ void Dictionary::clear() {
     timestamp_dict.clear();
     log_dict.clear();
     variable_dict.clear();
+    integer_dict.clear();
+    float_dict.clear();
     timestamp_codes.clear();
     log_codes.clear();
     variable_codes.clear();
+    integer_codes.clear();
+    float_codes.clear();
     next_timestamp_code = 1;
     next_log_code = 1;
     next_variable_code = 1;
+    next_integer_code = 1;
+    next_float_code = 1;
 }
 
 const std::vector<std::string>& Dictionary::getCodes(DictType type) const {
@@ -170,9 +153,8 @@ const std::vector<std::string>& Dictionary::getCodes(DictType type) const {
             return log_codes;
         case DictType::VARIABLE_DICT:
             return variable_codes;
-        case DictType::RAW_NUMBER:
         case DictType::RAW_BOOLEAN:
-            // 对于原始数值和布尔值，返回空向量，因为不需要存储
+            // 布尔值返回空向量，因为不需要存储
             static const std::vector<std::string> empty;
             return empty;
     }
@@ -204,28 +186,21 @@ void Dictionary::addFieldValue(const std::string& field_name, const std::string&
     // 增加出现次数
     it->occurrence_count++;
     
-    // 对于原始数值和布尔值，仍然需要统计不同值的数量
-    if (type == DictType::RAW_BOOLEAN) {
-        // 布尔值只有两种可能的值
-        if (it->value_codes.empty()) {
-            it->value_codes[value] = 1;
-            it->value_count = 1;
-        } else if (it->value_codes.size() == 1 && it->value_codes.find(value) == it->value_codes.end()) {
-            it->value_codes[value] = 2;
-            it->value_count = 2;
-        }
-    } else if (type == DictType::RAW_NUMBER) {
-        // 对于数值，统计不同值的数量
-        if (it->value_codes.find(value) == it->value_codes.end()) {
-            it->value_codes[value] = it->value_count + 1;
-            it->value_count++;
-        }
-    } else {
-        // 对于其他类型，使用字典编码
-        if (it->value_codes.find(value) == it->value_codes.end()) {
+    // 对于所有类型，都存储原始的字符串值以保持精度
+    if (it->value_codes.find(value) == it->value_codes.end()) {
+        if (type == DictType::RAW_BOOLEAN) {
+            // 布尔值：true = 1, false = 0
+            it->value_codes[value] = (value == "true") ? 1 : 0;
+        } else if (type == DictType::INTEGER_DICT || type == DictType::FLOAT_DICT) {
+            // 对于数值类型，生成一个编码但不进行数值转换
+            uint32_t code = it->value_count + 1;
+            it->value_codes[value] = code;
+            std::cout << "Adding field: " << field_name << ", value: " << value << ", code: " << code << std::endl;
+        } else {
+            // 对于其他类型，使用字典编码
             it->value_codes[value] = add(value, type);
-            it->value_count++;
         }
+        it->value_count++;
     }
 }
 
@@ -273,6 +248,126 @@ std::vector<std::string> Dictionary::getOrderedFields() const {
     }
     
     return ordered_fields;
+}
+
+uint32_t Dictionary::getIntegerCode(int64_t value) const {
+    auto it = integer_dict.find(value);
+    return (it != integer_dict.end()) ? it->second : 0;
+}
+
+uint32_t Dictionary::getFloatCode(double value) const {
+    auto it = float_dict.find(value);
+    return (it != float_dict.end()) ? it->second : 0;
+}
+
+int64_t Dictionary::getInteger(uint32_t code) const {
+    return (code > 0 && code <= integer_codes.size()) ? 
+        integer_codes[code-1] : 0;
+}
+
+double Dictionary::getFloat(uint32_t code) const {
+    return (code > 0 && code <= float_codes.size()) ? 
+        float_codes[code-1] : 0.0;
+}
+
+void Dictionary::addIntegerFieldValue(const std::string& field_name, int64_t value) {
+    // 查找或创建字段统计
+    auto it = std::find_if(field_stats.begin(), field_stats.end(),
+        [&field_name](const FieldStats& stats) { return stats.name == field_name; });
+    
+    if (it == field_stats.end()) {
+        // 新字段，创建统计信息
+        FieldStats stats;
+        stats.name = field_name;
+        stats.type = DictType::INTEGER_DICT;
+        stats.value_count = 0;
+        stats.occurrence_count = 0;
+        field_stats.push_back(stats);
+        it = field_stats.end() - 1;
+    } else {
+        // 检查字段类型是否匹配
+        if (it->type != DictType::INTEGER_DICT) {
+            throw std::runtime_error("Field type mismatch for field: " + field_name);
+        }
+    }
+    
+    // 增加出现次数
+    it->occurrence_count++;
+    
+    // 统计不同值的数量并添加到字典
+    std::string value_str = std::to_string(value);
+    if (it->value_codes.find(value_str) == it->value_codes.end()) {
+        it->value_codes[value_str] = addInteger(value);
+        it->value_count++;
+    }
+}
+
+void Dictionary::addFloatFieldValue(const std::string& field_name, double value) {
+    // 查找或创建字段统计
+    auto it = std::find_if(field_stats.begin(), field_stats.end(),
+        [&field_name](const FieldStats& stats) { return stats.name == field_name; });
+    
+    if (it == field_stats.end()) {
+        // 新字段，创建统计信息
+        FieldStats stats;
+        stats.name = field_name;
+        stats.type = DictType::FLOAT_DICT;
+        stats.value_count = 0;
+        stats.occurrence_count = 0;
+        field_stats.push_back(stats);
+        it = field_stats.end() - 1;
+    } else {
+        // 检查字段类型是否匹配
+        if (it->type != DictType::FLOAT_DICT) {
+            throw std::runtime_error("Field type mismatch for field: " + field_name);
+        }
+    }
+    
+    // 增加出现次数
+    it->occurrence_count++;
+    
+    // 统计不同值的数量并添加到字典
+    std::string value_str = std::to_string(value);
+    if (it->value_codes.find(value_str) == it->value_codes.end()) {
+        it->value_codes[value_str] = addFloat(value);
+        it->value_count++;
+    }
+}
+
+std::string Dictionary::getOriginalString(const std::string& field_name, uint32_t code) const {
+    // 查找字段统计信息
+    auto it = std::find_if(field_stats.begin(), field_stats.end(),
+        [&field_name](const FieldStats& stats) { return stats.name == field_name; });
+    
+    if (it == field_stats.end()) {
+        return "";
+    }
+    
+    // 从value_codes中查找对应的原始字符串值
+    for (const auto& [value_str, value_code] : it->value_codes) {
+        if (value_code == code) {
+            return value_str;
+        }
+    }
+    
+    return "";
+}
+
+uint32_t Dictionary::getFieldValueCode(const std::string& field_name, const std::string& value) const {
+    // 查找字段统计信息
+    auto it = std::find_if(field_stats.begin(), field_stats.end(),
+        [&field_name](const FieldStats& stats) { return stats.name == field_name; });
+    
+    if (it == field_stats.end()) {
+        std::cout << "Field not found: " << field_name << std::endl;
+        return 0;
+    }
+    
+    // 从value_codes中查找对应的编码
+    auto code_it = it->value_codes.find(value);
+    uint32_t code = (code_it != it->value_codes.end()) ? code_it->second : 0;
+    std::cout << "Looking up field: " << field_name << ", value: " << value << ", found code: " << code << std::endl;
+    return code;
 }
 
 } // namespace json2

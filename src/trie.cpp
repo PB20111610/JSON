@@ -58,12 +58,20 @@ void Trie::insert(const std::shared_ptr<JsonObject>& record, Dictionary& dict) {
         }
         
         // 获取字段值的编码
-        uint32_t code = dict.getCode(value->toString(), field.dictType);
+        uint32_t code;
+        if (field.dictType == DictType::INTEGER_DICT || field.dictType == DictType::FLOAT_DICT) {
+            // 对于数值类型，使用原始字符串值获取编码
+            code = dict.getFieldValueCode(field.name, value->toString());
+        } else {
+            // 对于其他类型，使用字符串编码
+            code = dict.getCode(value->toString(), field.dictType);
+        }
         
         // 调试信息
         std::cout << "Inserting field: " << field.name 
                   << ", value: " << value->toString() 
-                  << ", type: " << (field.dictType == DictType::RAW_NUMBER ? "RAW_NUMBER" :
+                  << ", type: " << (field.dictType == DictType::INTEGER_DICT ? "INTEGER_DICT" :
+                                   field.dictType == DictType::FLOAT_DICT ? "FLOAT_DICT" :
                                    field.dictType == DictType::RAW_BOOLEAN ? "RAW_BOOLEAN" :
                                    field.dictType == DictType::VARIABLE_DICT ? "VARIABLE_DICT" :
                                    field.dictType == DictType::TIMESTAMP_DICT ? "TIMESTAMP_DICT" :
@@ -231,7 +239,7 @@ std::shared_ptr<JsonObject> Trie::buildJsonObject(
         const auto& field = ordered_fields_[depth];
         const std::string& value = dict.getString(node->getCode(), field.dictType);
         // 根据字段类型决定是否需要加引号
-        if (field.dictType == DictType::RAW_NUMBER || field.dictType == DictType::RAW_BOOLEAN) {
+        if (field.dictType == DictType::INTEGER_DICT || field.dictType == DictType::FLOAT_DICT || field.dictType == DictType::RAW_BOOLEAN) {
             // 数值和布尔值不加引号
             result->addField(field.name, std::make_shared<JsonString>(value));
         } else {
@@ -296,11 +304,18 @@ std::string Trie::toJson(const Dictionary& dict) const {
             // 根据深度获取字段名和类型
             std::string fieldName = ordered_fields_[depth - 1].name;
             DictType fieldType = ordered_fields_[depth - 1].dictType;
+            
             // 从字典中获取原始值
-            std::string value = dict.getString(node->getCode(), fieldType);
+            std::string value;
+            if (fieldType == DictType::INTEGER_DICT || fieldType == DictType::FLOAT_DICT) {
+                // 对于数值类型，使用原始字符串值以保持精度
+                value = dict.getOriginalString(fieldName, node->getCode());
+            } else {
+                value = dict.getString(node->getCode(), fieldType);
+            }
             
             // 根据字段类型决定是否需要加引号
-            if (fieldType == DictType::RAW_NUMBER || fieldType == DictType::RAW_BOOLEAN) {
+            if (fieldType == DictType::INTEGER_DICT || fieldType == DictType::FLOAT_DICT || fieldType == DictType::RAW_BOOLEAN) {
                 // 数值和布尔值不加引号
                 currentRecord.push_back({fieldName, value});
             } else {

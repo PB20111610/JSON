@@ -21,8 +21,19 @@ bool isTimestamp(const std::string& str) {
 
 // 检查是否是日志类型（长句子）
 bool isLogType(const std::string& str) {
-    // 如果字符串包含多个单词（包含空格），且不是时间戳格式，则认为是日志类型
-    return str.find(' ') != std::string::npos && !isTimestamp(str);
+    return str.find(' ') != std::string::npos;
+}
+
+// 检查是否是整型数值
+bool isInteger(const std::string& str) {
+    static const std::regex integer_pattern(R"(^-?\d+$)");
+    return std::regex_match(str, integer_pattern);
+}
+
+// 检查是否是浮点型数值
+bool isFloat(const std::string& str) {
+    static const std::regex float_pattern(R"(^-?\d+\.\d+$)");
+    return std::regex_match(str, float_pattern);
 }
 
 // 辅助：判断字段值类型
@@ -41,10 +52,14 @@ DictType getDictType(const std::string& value) {
         return DictType::RAW_BOOLEAN;
     }
     
-    // 检查是否是数值（必须是纯数字格式，包括小数点和负号）
-    static const std::regex number_pattern(R"(^-?\d+(\.\d+)?$)");
-    if (std::regex_match(value, number_pattern)) {
-        return DictType::RAW_NUMBER;
+    // 检查是否是整型数值
+    if (isInteger(value)) {
+        return DictType::INTEGER_DICT;
+    }
+    
+    // 检查是否是浮点型数值
+    if (isFloat(value)) {
+        return DictType::FLOAT_DICT;
     }
     
     // 检查是否是日志类型（长句子）
@@ -265,10 +280,18 @@ std::vector<std::shared_ptr<JsonObject>> JsonParser::parseLogFile(const std::str
                 std::shared_ptr<JsonValue> jsonValue;
                 
                 switch (type) {
-                    case DictType::RAW_NUMBER:
+                    case DictType::INTEGER_DICT:
+                        try {
+                            int64_t num = std::stoll(value);
+                            jsonValue = std::make_shared<JsonNumber>(static_cast<double>(num), value);
+                        } catch (const std::exception&) {
+                            jsonValue = std::make_shared<JsonString>(value);
+                        }
+                        break;
+                    case DictType::FLOAT_DICT:
                         try {
                             double num = std::stod(value);
-                            jsonValue = std::make_shared<JsonNumber>(num);
+                            jsonValue = std::make_shared<JsonNumber>(num, value);
                         } catch (const std::exception&) {
                             jsonValue = std::make_shared<JsonString>(value);
                         }
@@ -349,7 +372,13 @@ std::shared_ptr<JsonValue> JsonParser::parseValue(const std::string& jsonStr, si
             break;
         default:
             if (c == '-' || std::isdigit(c)) {
-                return std::make_shared<JsonNumber>(parseNumber(jsonStr, pos));
+                std::string numStr = parseNumber(jsonStr, pos);
+                try {
+                    double num = std::stod(numStr);
+                    return std::make_shared<JsonNumber>(num, numStr);
+                } catch (const std::exception&) {
+                    return std::make_shared<JsonString>(numStr);
+                }
             }
     }
     
@@ -392,7 +421,7 @@ std::string JsonParser::parseString(const std::string& jsonStr, size_t& pos) {
     throw std::runtime_error("Invalid JSON: unexpected end of string");
 }
 
-double JsonParser::parseNumber(const std::string& jsonStr, size_t& pos) {
+std::string JsonParser::parseNumber(const std::string& jsonStr, size_t& pos) {
     size_t start = pos;
     bool hasDecimal = false;
     bool hasExponent = false;
@@ -438,13 +467,8 @@ double JsonParser::parseNumber(const std::string& jsonStr, size_t& pos) {
         }
     }
     
-    // 提取数字字符串并转换为double
-    std::string numStr = jsonStr.substr(start, pos - start);
-    try {
-        return std::stod(numStr);
-    } catch (const std::exception& e) {
-        throw std::runtime_error("Invalid JSON: invalid number format");
-    }
+    // 返回原始的数字字符串
+    return jsonStr.substr(start, pos - start);
 }
 
 std::shared_ptr<JsonArray> JsonParser::parseArray(const std::string& jsonStr, size_t& pos) {
@@ -523,9 +547,17 @@ void JsonParser::parseAndCollect(
                 DictType current_type = getDictType(value);
                 if (field_types[field_name] != current_type) {
                     // 类型不一致，使用更通用的类型
-                    if (field_types[field_name] == DictType::RAW_NUMBER && current_type == DictType::VARIABLE_DICT) {
-                        // 保持RAW_NUMBER类型
-                    } else if (field_types[field_name] == DictType::VARIABLE_DICT && current_type == DictType::RAW_NUMBER) {
+                    if (field_types[field_name] == DictType::INTEGER_DICT && current_type == DictType::FLOAT_DICT) {
+                        // 整型遇到浮点型，升级为浮点型
+                        field_types[field_name] = DictType::FLOAT_DICT;
+                    } else if (field_types[field_name] == DictType::FLOAT_DICT && current_type == DictType::INTEGER_DICT) {
+                        // 浮点型遇到整型，保持浮点型
+                    } else if (field_types[field_name] == DictType::INTEGER_DICT && current_type == DictType::VARIABLE_DICT) {
+                        // 保持INTEGER_DICT类型
+                    } else if (field_types[field_name] == DictType::FLOAT_DICT && current_type == DictType::VARIABLE_DICT) {
+                        // 保持FLOAT_DICT类型
+                    } else if (field_types[field_name] == DictType::VARIABLE_DICT && 
+                               (current_type == DictType::INTEGER_DICT || current_type == DictType::FLOAT_DICT)) {
                         // 保持VARIABLE_DICT类型
                     } else if (field_types[field_name] == DictType::RAW_BOOLEAN && current_type == DictType::VARIABLE_DICT) {
                         // 保持RAW_BOOLEAN类型

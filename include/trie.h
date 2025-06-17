@@ -13,7 +13,7 @@ namespace json2 {
 class TrieNode {
 public:
     // 构造函数
-    explicit TrieNode(uint32_t code = 0);
+    explicit TrieNode(uint32_t code, bool is_placeholder = false);
     
     // 获取节点编码
     uint32_t getCode() const;
@@ -27,9 +27,12 @@ public:
     // 获取所有子节点
     const std::unordered_map<uint32_t, std::unique_ptr<TrieNode>>& getChildren() const;
 
+    void setPlaceholder(bool is_placeholder);  // 新增：设置占位标志
+
 private:
-    uint32_t code_;  // 节点的编码值，0表示占位节点
+    uint32_t code_;  // 节点的编码值
     std::unordered_map<uint32_t, std::unique_ptr<TrieNode>> children_;  // 子节点映射
+    bool is_placeholder_;  // 新增：占位标志位
 };
 
 // Trie树

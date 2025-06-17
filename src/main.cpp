@@ -166,6 +166,30 @@ int main() {
         // 打印字典统计信息
         printDictionaryStats(dict);
         
+        // 添加调试信息：打印所有字段
+        std::cout << "\n=== All Fields Debug Info ===\n";
+        for (const auto& stats : dict.getFieldStats()) {
+            std::cout << "Field: " << stats.name 
+                      << ", Type: " << (stats.type == DictType::TIMESTAMP_DICT ? "TIMESTAMP" :
+                                       stats.type == DictType::LOG_DICT ? "LOG" :
+                                       stats.type == DictType::VARIABLE_DICT ? "VARIABLE" :
+                                       stats.type == DictType::RAW_NUMBER ? "RAW_NUMBER" :
+                                       stats.type == DictType::RAW_BOOLEAN ? "RAW_BOOLEAN" : "UNKNOWN")
+                      << ", Value Count: " << stats.value_count
+                      << ", Occurrences: " << stats.occurrence_count << "\n";
+        }
+        
+        std::cout << "\n=== Field Order ===\n";
+        for (size_t i = 0; i < fieldOrder.size(); ++i) {
+            std::cout << (i + 1) << ". " << fieldOrder[i].name 
+                      << " (" << (fieldOrder[i].dictType == DictType::TIMESTAMP_DICT ? "TIMESTAMP" :
+                                  fieldOrder[i].dictType == DictType::LOG_DICT ? "LOG" :
+                                  fieldOrder[i].dictType == DictType::VARIABLE_DICT ? "VARIABLE" :
+                                  fieldOrder[i].dictType == DictType::RAW_NUMBER ? "RAW_NUMBER" :
+                                  fieldOrder[i].dictType == DictType::RAW_BOOLEAN ? "RAW_BOOLEAN" : "UNKNOWN")
+                      << ")\n";
+        }
+        
         // 打印字典内容
         printDictionary(dict);
         

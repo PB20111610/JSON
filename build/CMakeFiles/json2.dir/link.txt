@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/json2.dir/src/main.cpp.o CMakeFiles/json2.dir/src/parser.cpp.o CMakeFiles/json2.dir/src/dictionary.cpp.o CMakeFiles/json2.dir/src/trie.cpp.o  -o json2 

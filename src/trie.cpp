@@ -4,17 +4,18 @@
 #include <stdexcept>
 #include <sstream>
 #include <functional>
+#include <iostream>
 
 namespace json2 {
 
 // TrieNode实现
-TrieNode::TrieNode(uint32_t code)
-    : code_(code) {}
+TrieNode::TrieNode(uint32_t code, bool is_placeholder)
+    : code_(code), is_placeholder_(is_placeholder) {}
 
 TrieNode* TrieNode::getOrCreateChild(uint32_t code) {
     auto it = children_.find(code);
     if (it == children_.end()) {
-        auto [new_it, _] = children_.emplace(code, std::make_unique<TrieNode>(code));
+        auto [new_it, _] = children_.emplace(code, std::make_unique<TrieNode>(code, false));
         return new_it->second.get();
     }
     return it->second.get();
@@ -29,12 +30,16 @@ uint32_t TrieNode::getCode() const {
 }
 
 bool TrieNode::isPlaceholder() const {
-    return code_ == 0;
+    return is_placeholder_;
+}
+
+void TrieNode::setPlaceholder(bool is_placeholder) {
+    is_placeholder_ = is_placeholder;
 }
 
 // Trie实现
 Trie::Trie(const std::vector<ParsedField>& fields) 
-    : ordered_fields_(fields), root_(std::make_unique<TrieNode>(0)) {
+    : ordered_fields_(fields), root_(std::make_unique<TrieNode>(0, true)) {
 }
 
 void Trie::insert(const std::shared_ptr<JsonObject>& record, Dictionary& dict) {
@@ -48,18 +53,25 @@ void Trie::insert(const std::shared_ptr<JsonObject>& record, Dictionary& dict) {
         if (!value) {
             // 如果字段不存在，创建占位符节点
             current = current->getOrCreateChild(0);
+            current->setPlaceholder(true);  // 设置占位标志
             continue;
         }
         
         // 获取字段值的编码
         uint32_t code = dict.getCode(value->toString(), field.dictType);
-        if (code == 0) {
-            // 如果编码为0，说明是无效值，创建占位符节点
-            current = current->getOrCreateChild(0);
-        } else {
-            // 创建或获取子节点
-            current = current->getOrCreateChild(code);
-        }
+        
+        // 调试信息
+        std::cout << "Inserting field: " << field.name 
+                  << ", value: " << value->toString() 
+                  << ", type: " << (field.dictType == DictType::RAW_NUMBER ? "RAW_NUMBER" :
+                                   field.dictType == DictType::RAW_BOOLEAN ? "RAW_BOOLEAN" :
+                                   field.dictType == DictType::VARIABLE_DICT ? "VARIABLE_DICT" :
+                                   field.dictType == DictType::TIMESTAMP_DICT ? "TIMESTAMP_DICT" :
+                                   field.dictType == DictType::LOG_DICT ? "LOG_DICT" : "UNKNOWN")
+                  << ", code: " << code << std::endl;
+        
+        // 创建或获取子节点（不再检查编码是否为0）
+        current = current->getOrCreateChild(code);
     }
 }
 
@@ -108,6 +120,9 @@ void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const
     // 写入节点编码（使用varint）
     writeVarint(data, node->getCode());
     
+    // 写入占位标志（1字节）
+    data.push_back(node->isPlaceholder() ? 1 : 0);
+    
     // 收集并排序子节点
     std::vector<std::pair<uint32_t, const TrieNode*>> children;
     for (const auto& [code, child] : node->getChildren()) {
@@ -136,8 +151,12 @@ TrieNode* Trie::deserializeNode(const std::vector<uint8_t>& data, size_t& pos) {
     // 读取节点编码
     uint32_t code = readVarint(data, pos);
     
+    // 读取占位标志
+    if (pos >= data.size()) return nullptr;
+    bool is_placeholder = (data[pos++] == 1);
+    
     // 创建节点
-    auto node = std::make_unique<TrieNode>(code);
+    auto node = std::make_unique<TrieNode>(code, is_placeholder);
     
     // 读取子节点数量
     uint32_t child_count = readVarint(data, pos);
@@ -211,8 +230,14 @@ std::shared_ptr<JsonObject> Trie::buildJsonObject(
     if (!node->isPlaceholder() && depth < ordered_fields_.size()) {
         const auto& field = ordered_fields_[depth];
         const std::string& value = dict.getString(node->getCode(), field.dictType);
-        // 确保所有值都用双引号包住
-        result->addField(field.name, std::make_shared<JsonString>("\"" + value + "\""));
+        // 根据字段类型决定是否需要加引号
+        if (field.dictType == DictType::RAW_NUMBER || field.dictType == DictType::RAW_BOOLEAN) {
+            // 数值和布尔值不加引号
+            result->addField(field.name, std::make_shared<JsonString>(value));
+        } else {
+            // 其他类型加引号
+            result->addField(field.name, std::make_shared<JsonString>("\"" + value + "\""));
+        }
     }
     
     // 处理子节点
@@ -268,11 +293,20 @@ std::string Trie::toJson(const Dictionary& dict) const {
         
         // 如果不是根节点，添加当前字段到记录中
         if (depth > 0 && !node->isPlaceholder()) {
-            // 根据深度获取字段名
+            // 根据深度获取字段名和类型
             std::string fieldName = ordered_fields_[depth - 1].name;
+            DictType fieldType = ordered_fields_[depth - 1].dictType;
             // 从字典中获取原始值
-            std::string value = dict.getString(node->getCode(), ordered_fields_[depth - 1].dictType);
-            currentRecord.push_back({fieldName, value});
+            std::string value = dict.getString(node->getCode(), fieldType);
+            
+            // 根据字段类型决定是否需要加引号
+            if (fieldType == DictType::RAW_NUMBER || fieldType == DictType::RAW_BOOLEAN) {
+                // 数值和布尔值不加引号
+                currentRecord.push_back({fieldName, value});
+            } else {
+                // 其他类型加引号
+                currentRecord.push_back({fieldName, "\"" + value + "\""});
+            }
         }
         
         // 如果是叶子节点，输出完整记录
@@ -280,11 +314,75 @@ std::string Trie::toJson(const Dictionary& dict) const {
             if (!first) {
                 ss << "\n";
             }
-            ss << "{";
-            for (size_t i = 0; i < currentRecord.size(); ++i) {
-                if (i > 0) ss << ",";
-                ss << "\"" << currentRecord[i].first << "\":\"" << currentRecord[i].second << "\"";
+            
+            // 构建嵌套的JSON结构
+            std::unordered_map<std::string, std::shared_ptr<JsonObject>> nested_objects;
+            std::vector<std::pair<std::string, std::string>> flat_fields;
+            
+            // 分离嵌套字段和普通字段
+            for (const auto& [fieldName, value] : currentRecord) {
+                size_t dot_pos = fieldName.find('.');
+                if (dot_pos != std::string::npos) {
+                    // 嵌套字段
+                    std::string outer_key = fieldName.substr(0, dot_pos);
+                    std::string inner_key = fieldName.substr(dot_pos + 1);
+                    
+                    // 创建或获取嵌套对象
+                    if (nested_objects.find(outer_key) == nested_objects.end()) {
+                        nested_objects[outer_key] = std::make_shared<JsonObject>();
+                    }
+                    
+                    // 处理多层嵌套
+                    auto current_obj = nested_objects[outer_key];
+                    std::string remaining_key = inner_key;
+                    
+                    while (true) {
+                        size_t next_dot = remaining_key.find('.');
+                        if (next_dot == std::string::npos) {
+                            // 最后一层，添加字段
+                            current_obj->addField(remaining_key, std::make_shared<JsonString>(value));
+                            break;
+                        } else {
+                            // 还有嵌套层
+                            std::string current_key = remaining_key.substr(0, next_dot);
+                            std::string next_key = remaining_key.substr(next_dot + 1);
+                            
+                            // 检查是否已存在这个嵌套对象
+                            auto existing = current_obj->getField(current_key);
+                            if (!existing) {
+                                auto new_nested = std::make_shared<JsonObject>();
+                                current_obj->addField(current_key, new_nested);
+                                current_obj = new_nested;
+                            } else {
+                                current_obj = std::static_pointer_cast<JsonObject>(existing);
+                            }
+                            remaining_key = next_key;
+                        }
+                    }
+                } else {
+                    // 普通字段
+                    flat_fields.push_back({fieldName, value});
+                }
             }
+            
+            // 输出JSON
+            ss << "{";
+            bool first_field = true;
+            
+            // 先输出普通字段
+            for (const auto& [fieldName, value] : flat_fields) {
+                if (!first_field) ss << ",";
+                ss << "\"" << fieldName << "\":" << value;
+                first_field = false;
+            }
+            
+            // 再输出嵌套对象
+            for (const auto& [outer_key, nested_obj] : nested_objects) {
+                if (!first_field) ss << ",";
+                ss << "\"" << outer_key << "\":" << nested_obj->toString();
+                first_field = false;
+            }
+            
             ss << "}";
             first = false;
         }

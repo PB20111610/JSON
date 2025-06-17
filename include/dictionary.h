@@ -4,13 +4,16 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <variant>
 
 namespace json2 {
 
 enum class DictType {
     TIMESTAMP_DICT,
     LOG_DICT,
-    VARIABLE_DICT
+    VARIABLE_DICT,
+    RAW_NUMBER,    // 新增：直接存储数值
+    RAW_BOOLEAN    // 新增：直接存储布尔值
 };
 
 // 字段值域统计

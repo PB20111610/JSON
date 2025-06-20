@@ -13,15 +13,24 @@ TrieNode::TrieNode(uint32_t code, bool is_placeholder)
     : code_(code), is_placeholder_(is_placeholder) {}
 
 TrieNode* TrieNode::getOrCreateChild(uint32_t code) {
-    auto it = children_.find(code);
-    if (it == children_.end()) {
-        auto [new_it, _] = children_.emplace(code, std::make_unique<TrieNode>(code, false));
-        return new_it->second.get();
+    // 二分查找子节点
+    auto it = std::lower_bound(children_.begin(), children_.end(), code,
+        [](const auto& pair, uint32_t value) {
+            return pair.first < value;
+        });
+    
+    if (it != children_.end() && it->first == code) {
+        return it->second.get();
     }
-    return it->second.get();
+    
+    // 创建新节点并保持有序
+    auto new_node = std::make_unique<TrieNode>(code, false);
+    TrieNode* result = new_node.get();
+    children_.insert(it, std::make_pair(code, std::move(new_node)));
+    return result;
 }
 
-const std::unordered_map<uint32_t, std::unique_ptr<TrieNode>>& TrieNode::getChildren() const {
+const std::vector<std::pair<uint32_t, std::unique_ptr<TrieNode>>>& TrieNode::getChildren() const {
     return children_;
 }
 
@@ -38,8 +47,38 @@ void TrieNode::setPlaceholder(bool is_placeholder) {
 }
 
 // Trie实现
+void Trie::preprocessFieldPaths() {
+    field_paths_.clear();
+    field_paths_.reserve(ordered_fields_.size());
+    
+    for (const auto& field : ordered_fields_) {
+        FieldPath path;
+        path.original_name = field.name;
+        
+        // 拆分字段路径
+        std::string current;
+        for (char c : field.name) {
+            if (c == '.') {
+                if (!current.empty()) {
+                    path.parts.push_back(current);
+                    current.clear();
+                }
+            } else {
+                current += c;
+            }
+        }
+        if (!current.empty()) {
+            path.parts.push_back(current);
+        }
+        
+        path.is_nested = path.parts.size() > 1;
+        field_paths_.push_back(std::move(path));
+    }
+}
+
 Trie::Trie(const std::vector<ParsedField>& fields) 
     : ordered_fields_(fields), root_(std::make_unique<TrieNode>(0, true)) {
+    preprocessFieldPaths();
 }
 
 void Trie::insert(const std::shared_ptr<JsonObject>& record, Dictionary& dict) {
@@ -48,37 +87,26 @@ void Trie::insert(const std::shared_ptr<JsonObject>& record, Dictionary& dict) {
     TrieNode* current = root_.get();
     
     // 按照字段顺序遍历记录
-    for (const auto& field : ordered_fields_) {
+    for (size_t i = 0; i < ordered_fields_.size(); ++i) {
+        const auto& field = ordered_fields_[i];
+        // 直接用扁平字段名
         const auto& value = record->getField(field.name);
+        
         if (!value) {
             // 如果字段不存在，创建占位符节点
             current = current->getOrCreateChild(0);
-            current->setPlaceholder(true);  // 设置占位标志
+            current->setPlaceholder(true);
             continue;
         }
         
         // 获取字段值的编码
         uint32_t code;
         if (field.dictType == DictType::INTEGER_DICT || field.dictType == DictType::FLOAT_DICT) {
-            // 对于数值类型，使用原始字符串值获取编码
             code = dict.getFieldValueCode(field.name, value->toString());
         } else {
-            // 对于其他类型，使用字符串编码
             code = dict.getCode(value->toString(), field.dictType);
         }
         
-        // 调试信息
-        std::cout << "Inserting field: " << field.name 
-                  << ", value: " << value->toString() 
-                  << ", type: " << (field.dictType == DictType::INTEGER_DICT ? "INTEGER_DICT" :
-                                   field.dictType == DictType::FLOAT_DICT ? "FLOAT_DICT" :
-                                   field.dictType == DictType::RAW_BOOLEAN ? "RAW_BOOLEAN" :
-                                   field.dictType == DictType::VARIABLE_DICT ? "VARIABLE_DICT" :
-                                   field.dictType == DictType::TIMESTAMP_DICT ? "TIMESTAMP_DICT" :
-                                   field.dictType == DictType::LOG_DICT ? "LOG_DICT" : "UNKNOWN")
-                  << ", code: " << code << std::endl;
-        
-        // 创建或获取子节点（不再检查编码是否为0）
         current = current->getOrCreateChild(code);
     }
 }
@@ -201,6 +229,10 @@ void Trie::deserialize(const std::vector<uint8_t>& data) {
 
 const std::vector<ParsedField>& Trie::getOrderedFields() const {
     return ordered_fields_;
+}
+
+void Trie::setOrderedFields(const std::vector<ParsedField>& fields) {
+    ordered_fields_ = fields;
 }
 
 // 辅助函数：将带"."的字段名拆分为路径

@@ -21,18 +21,25 @@ public:
     // 是否为占位节点
     bool isPlaceholder() const;
     
-    // 获取子节点
+    // 获取或创建子节点
     TrieNode* getOrCreateChild(uint32_t code);
     
     // 获取所有子节点
-    const std::unordered_map<uint32_t, std::unique_ptr<TrieNode>>& getChildren() const;
+    const std::vector<std::pair<uint32_t, std::unique_ptr<TrieNode>>>& getChildren() const;
 
-    void setPlaceholder(bool is_placeholder);  // 新增：设置占位标志
+    void setPlaceholder(bool is_placeholder);
 
 private:
     uint32_t code_;  // 节点的编码值
-    std::unordered_map<uint32_t, std::unique_ptr<TrieNode>> children_;  // 子节点映射
-    bool is_placeholder_;  // 新增：占位标志位
+    std::vector<std::pair<uint32_t, std::unique_ptr<TrieNode>>> children_;  // 子节点列表
+    bool is_placeholder_;  // 占位标志位
+};
+
+// 预处理的字段路径信息
+struct FieldPath {
+    std::string original_name;  // 原始字段名
+    std::vector<std::string> parts;  // 拆分后的路径
+    bool is_nested;  // 是否是嵌套字段
 };
 
 // Trie树
@@ -53,6 +60,9 @@ public:
     // 获取有序字段列表
     const std::vector<ParsedField>& getOrderedFields() const;
     
+    // 设置有序字段列表（用于解压缩）
+    void setOrderedFields(const std::vector<ParsedField>& fields);
+    
     // 获取根节点（用于测试和调试）
     const TrieNode* getRoot() const { return root_.get(); }
     
@@ -62,6 +72,10 @@ public:
 private:
     std::unique_ptr<TrieNode> root_;  // 根节点
     std::vector<ParsedField> ordered_fields_;  // 按冗余度排序的字段列表
+    std::vector<FieldPath> field_paths_;  // 预处理的字段路径
+    
+    // 预处理字段路径
+    void preprocessFieldPaths();
     
     // 递归序列化节点
     void serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const;

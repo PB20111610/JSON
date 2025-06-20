@@ -16,10 +16,7 @@ void printDictionaryStats(const Dictionary& dict) {
     // 打印每种类型的字典大小
     std::cout << "Timestamp Dictionary Size: " << dict.size(DictType::TIMESTAMP_DICT) << "\n";
     std::cout << "Log Dictionary Size: " << dict.size(DictType::LOG_DICT) << "\n";
-    std::cout << "Variable Dictionary Size: " << dict.size(DictType::VARIABLE_DICT) << "\n";
-    std::cout << "Integer Dictionary Size: " << dict.size(DictType::INTEGER_DICT) << "\n";
-    std::cout << "Float Dictionary Size: " << dict.size(DictType::FLOAT_DICT) << "\n";
-    std::cout << "Boolean Dictionary Size: " << dict.size(DictType::RAW_BOOLEAN) << "\n\n";
+    std::cout << "Variable Dictionary Size: " << dict.size(DictType::VARIABLE_DICT) << "\n\n";
     
     // 计算总记录数（使用最大出现次数作为估计）
     size_t total_records = 0;
@@ -60,11 +57,7 @@ void printDictionaryStats(const Dictionary& dict) {
         std::cout << std::setw(15) << stats.name 
                   << std::setw(15) 
                   << (stats.type == DictType::TIMESTAMP_DICT ? "TIMESTAMP" :
-                      stats.type == DictType::LOG_DICT ? "LOG" :
-                      stats.type == DictType::VARIABLE_DICT ? "VARIABLE" :
-                      stats.type == DictType::INTEGER_DICT ? "INTEGER" :
-                      stats.type == DictType::FLOAT_DICT ? "FLOAT" :
-                      stats.type == DictType::RAW_BOOLEAN ? "BOOLEAN" : "UNKNOWN")
+                      stats.type == DictType::LOG_DICT ? "LOG" : "VARIABLE")
                   << std::setw(15) << stats.value_count
                   << std::setw(15) << stats.occurrence_count
                   << std::setw(15) << redundancy_factor
@@ -104,25 +97,6 @@ void printDictionary(const Dictionary& dict) {
     for (size_t i = 0; i < variable_codes.size(); ++i) {
         std::cout << "Code " << (i + 1) << ": " << variable_codes[i] << "\n";
     }
-    
-    // 打印布尔值字典
-    std::cout << "\nBoolean Dictionary:\n";
-    std::cout << "Code 1: true\n";
-    std::cout << "Code 0: false\n";
-    
-    // 打印整型字典
-    std::cout << "\nInteger Dictionary:\n";
-    const auto& integer_codes = dict.getIntegerCodes();
-    for (size_t i = 0; i < integer_codes.size(); ++i) {
-        std::cout << "Code " << (i + 1) << ": " << integer_codes[i] << "\n";
-    }
-    
-    // 打印浮点型字典
-    std::cout << "\nFloat Dictionary:\n";
-    const auto& float_codes = dict.getFloatCodes();
-    for (size_t i = 0; i < float_codes.size(); ++i) {
-        std::cout << "Code " << (i + 1) << ": " << float_codes[i] << "\n";
-    }
 }
 
 // 递归打印Trie树结构
@@ -134,12 +108,35 @@ void printTrieNode(const TrieNode* node, int depth, const std::vector<ParsedFiel
     if (node->isPlaceholder()) {
         std::cout << "[PLACEHOLDER]\n";
     } else {
-        std::cout << "Code " << node->getCode() << " -> ";
         if (depth < fields.size()) {
             const auto& field = fields[depth];
-            std::cout << dict.getString(node->getCode(), field.dictType) << "\n";
+            std::string dictTypeStr =
+                field.dictType == DictType::TIMESTAMP_DICT ? "TIMESTAMP" :
+                field.dictType == DictType::LOG_DICT ? "LOG" :
+                field.dictType == DictType::VARIABLE_DICT ? "VARIABLE" :
+                field.dictType == DictType::INTEGER_DICT ? "INTEGER" :
+                field.dictType == DictType::FLOAT_DICT ? "FLOAT" :
+                field.dictType == DictType::RAW_BOOLEAN ? "BOOLEAN" : "UNKNOWN";
+            std::cout << "[Field: " << field.name << ", Type: " << dictTypeStr << "] ";
+            std::cout << "Code " << node->getCode() << " -> ";
+            // 根据类型打印值
+            switch (field.dictType) {
+                case DictType::INTEGER_DICT:
+                    std::cout << dict.getInteger(node->getCode());
+                    break;
+                case DictType::FLOAT_DICT:
+                    std::cout << dict.getFloat(node->getCode());
+                    break;
+                case DictType::RAW_BOOLEAN:
+                    std::cout << (node->getCode() == 1 ? "true" : "false");
+                    break;
+                default:
+                    std::cout << dict.getString(node->getCode(), field.dictType);
+                    break;
+            }
+            std::cout << "\n";
         } else {
-            std::cout << "Unknown\n";
+            std::cout << "Code " << node->getCode() << " -> Unknown\n";
         }
     }
     
@@ -165,21 +162,6 @@ void printSerializedData(const std::vector<uint8_t>& data) {
     std::cout << std::dec << "\n";
 }
 
-// 辅助函数：比较两个JSON字符串（忽略空白字符）
-bool compareJsonStrings(const std::string& json1, const std::string& json2) {
-    std::string clean1, clean2;
-    
-    // 移除所有空白字符
-    for (char c : json1) {
-        if (!std::isspace(c)) clean1 += c;
-    }
-    for (char c : json2) {
-        if (!std::isspace(c)) clean2 += c;
-    }
-    
-    return clean1 == clean2;
-}
-
 int main() {
     try {
         // 1. 创建字典和字段列表
@@ -191,32 +173,6 @@ int main() {
         
         // 打印字典统计信息
         printDictionaryStats(dict);
-        
-        // 添加调试信息：打印所有字段
-        std::cout << "\n=== All Fields Debug Info ===\n";
-        for (const auto& stats : dict.getFieldStats()) {
-            std::cout << "Field: " << stats.name 
-                      << ", Type: " << (stats.type == DictType::TIMESTAMP_DICT ? "TIMESTAMP" :
-                                       stats.type == DictType::LOG_DICT ? "LOG" :
-                                       stats.type == DictType::VARIABLE_DICT ? "VARIABLE" :
-                                       stats.type == DictType::INTEGER_DICT ? "INTEGER" :
-                                       stats.type == DictType::FLOAT_DICT ? "FLOAT" :
-                                       stats.type == DictType::RAW_BOOLEAN ? "RAW_BOOLEAN" : "UNKNOWN")
-                      << ", Value Count: " << stats.value_count
-                      << ", Occurrences: " << stats.occurrence_count << "\n";
-        }
-        
-        std::cout << "\n=== Field Order ===\n";
-        for (size_t i = 0; i < fieldOrder.size(); ++i) {
-            std::cout << (i + 1) << ". " << fieldOrder[i].name 
-                      << " (" << (fieldOrder[i].dictType == DictType::TIMESTAMP_DICT ? "TIMESTAMP" :
-                                  fieldOrder[i].dictType == DictType::LOG_DICT ? "LOG" :
-                                  fieldOrder[i].dictType == DictType::VARIABLE_DICT ? "VARIABLE" :
-                                  fieldOrder[i].dictType == DictType::INTEGER_DICT ? "INTEGER" :
-                                  fieldOrder[i].dictType == DictType::FLOAT_DICT ? "FLOAT" :
-                                  fieldOrder[i].dictType == DictType::RAW_BOOLEAN ? "RAW_BOOLEAN" : "UNKNOWN")
-                      << ")\n";
-        }
         
         // 打印字典内容
         printDictionary(dict);

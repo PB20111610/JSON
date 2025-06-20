@@ -8,30 +8,30 @@ namespace json2 {
 uint32_t Dictionary::add(const std::string& str, DictType type) {
     switch (type) {
         case DictType::TIMESTAMP_DICT: {
-            auto it = timestamp_dict.find(str);
-            if (it != timestamp_dict.end()) {
+            auto it = timestamp_index.find(str);
+            if (it != timestamp_index.end()) {
                 return it->second;
             }
-            timestamp_dict[str] = next_timestamp_code;
-            timestamp_codes.push_back(str);
+            timestamp_values.push_back(str);
+            timestamp_index[str] = next_timestamp_code;
             return next_timestamp_code++;
         }
         case DictType::LOG_DICT: {
-            auto it = log_dict.find(str);
-            if (it != log_dict.end()) {
+            auto it = log_index.find(str);
+            if (it != log_index.end()) {
                 return it->second;
             }
-            log_dict[str] = next_log_code;
-            log_codes.push_back(str);
+            log_values.push_back(str);
+            log_index[str] = next_log_code;
             return next_log_code++;
         }
         case DictType::VARIABLE_DICT: {
-            auto it = variable_dict.find(str);
-            if (it != variable_dict.end()) {
+            auto it = variable_index.find(str);
+            if (it != variable_index.end()) {
                 return it->second;
             }
-            variable_dict[str] = next_variable_code;
-            variable_codes.push_back(str);
+            variable_values.push_back(str);
+            variable_index[str] = next_variable_code;
             return next_variable_code++;
         }
         case DictType::RAW_BOOLEAN:
@@ -42,38 +42,38 @@ uint32_t Dictionary::add(const std::string& str, DictType type) {
 }
 
 uint32_t Dictionary::addInteger(int64_t value) {
-    auto it = integer_dict.find(value);
-    if (it != integer_dict.end()) {
+    auto it = integer_index.find(value);
+    if (it != integer_index.end()) {
         return it->second;
     }
-    integer_dict[value] = next_integer_code;
-    integer_codes.push_back(value);
+    integer_values.push_back(value);
+    integer_index[value] = next_integer_code;
     return next_integer_code++;
 }
 
 uint32_t Dictionary::addFloat(double value) {
-    auto it = float_dict.find(value);
-    if (it != float_dict.end()) {
+    auto it = float_index.find(value);
+    if (it != float_index.end()) {
         return it->second;
     }
-    float_dict[value] = next_float_code;
-    float_codes.push_back(value);
+    float_values.push_back(value);
+    float_index[value] = next_float_code;
     return next_float_code++;
 }
 
 uint32_t Dictionary::getCode(const std::string& str, DictType type) const {
     switch (type) {
         case DictType::TIMESTAMP_DICT: {
-            auto it = timestamp_dict.find(str);
-            return (it != timestamp_dict.end()) ? it->second : 0;
+            auto it = timestamp_index.find(str);
+            return (it != timestamp_index.end()) ? it->second : 0;
         }
         case DictType::LOG_DICT: {
-            auto it = log_dict.find(str);
-            return (it != log_dict.end()) ? it->second : 0;
+            auto it = log_index.find(str);
+            return (it != log_index.end()) ? it->second : 0;
         }
         case DictType::VARIABLE_DICT: {
-            auto it = variable_dict.find(str);
-            return (it != variable_dict.end()) ? it->second : 0;
+            auto it = variable_index.find(str);
+            return (it != variable_index.end()) ? it->second : 0;
         }
         case DictType::RAW_BOOLEAN:
             // 布尔值：true = 1, false = 0
@@ -86,14 +86,14 @@ const std::string& Dictionary::getString(uint32_t code, DictType type) const {
     static const std::string empty;
     switch (type) {
         case DictType::TIMESTAMP_DICT:
-            return (code > 0 && code <= timestamp_codes.size()) ? 
-                timestamp_codes[code-1] : empty;
+            return (code > 0 && code <= timestamp_values.size()) ? 
+                timestamp_values[code-1] : empty;
         case DictType::LOG_DICT:
-            return (code > 0 && code <= log_codes.size()) ? 
-                log_codes[code-1] : empty;
+            return (code > 0 && code <= log_values.size()) ? 
+                log_values[code-1] : empty;
         case DictType::VARIABLE_DICT:
-            return (code > 0 && code <= variable_codes.size()) ? 
-                variable_codes[code-1] : empty;
+            return (code > 0 && code <= variable_values.size()) ? 
+                variable_values[code-1] : empty;
         case DictType::RAW_BOOLEAN:
             // 对于布尔值，将编码转换回字符串
             if (code == 1) {
@@ -111,15 +111,15 @@ const std::string& Dictionary::getString(uint32_t code, DictType type) const {
 size_t Dictionary::size(DictType type) const {
     switch (type) {
         case DictType::TIMESTAMP_DICT:
-            return timestamp_codes.size();
+            return timestamp_values.size();
         case DictType::LOG_DICT:
-            return log_codes.size();
+            return log_values.size();
         case DictType::VARIABLE_DICT:
-            return variable_codes.size();
+            return variable_values.size();
         case DictType::INTEGER_DICT:
-            return integer_codes.size();
+            return integer_values.size();
         case DictType::FLOAT_DICT:
-            return float_codes.size();
+            return float_values.size();
         case DictType::RAW_BOOLEAN:
             // 布尔值只有两种可能的值
             return 2;
@@ -128,16 +128,16 @@ size_t Dictionary::size(DictType type) const {
 }
 
 void Dictionary::clear() {
-    timestamp_dict.clear();
-    log_dict.clear();
-    variable_dict.clear();
-    integer_dict.clear();
-    float_dict.clear();
-    timestamp_codes.clear();
-    log_codes.clear();
-    variable_codes.clear();
-    integer_codes.clear();
-    float_codes.clear();
+    timestamp_index.clear();
+    log_index.clear();
+    variable_index.clear();
+    integer_index.clear();
+    float_index.clear();
+    timestamp_values.clear();
+    log_values.clear();
+    variable_values.clear();
+    integer_values.clear();
+    float_values.clear();
     next_timestamp_code = 1;
     next_log_code = 1;
     next_variable_code = 1;
@@ -148,11 +148,11 @@ void Dictionary::clear() {
 const std::vector<std::string>& Dictionary::getCodes(DictType type) const {
     switch (type) {
         case DictType::TIMESTAMP_DICT:
-            return timestamp_codes;
+            return timestamp_values;
         case DictType::LOG_DICT:
-            return log_codes;
+            return log_values;
         case DictType::VARIABLE_DICT:
-            return variable_codes;
+            return variable_values;
         case DictType::RAW_BOOLEAN:
             // 布尔值返回空向量，因为不需要存储
             static const std::vector<std::string> empty;
@@ -195,7 +195,7 @@ void Dictionary::addFieldValue(const std::string& field_name, const std::string&
             // 对于数值类型，生成一个编码但不进行数值转换
             uint32_t code = it->value_count + 1;
             it->value_codes[value] = code;
-            std::cout << "Adding field: " << field_name << ", value: " << value << ", code: " << code << std::endl;
+            // std::cout << "Adding field: " << field_name << ", value: " << value << ", code: " << code << std::endl;
         } else {
             // 对于其他类型，使用字典编码
             it->value_codes[value] = add(value, type);
@@ -251,23 +251,23 @@ std::vector<std::string> Dictionary::getOrderedFields() const {
 }
 
 uint32_t Dictionary::getIntegerCode(int64_t value) const {
-    auto it = integer_dict.find(value);
-    return (it != integer_dict.end()) ? it->second : 0;
+    auto it = integer_index.find(value);
+    return (it != integer_index.end()) ? it->second : 0;
 }
 
 uint32_t Dictionary::getFloatCode(double value) const {
-    auto it = float_dict.find(value);
-    return (it != float_dict.end()) ? it->second : 0;
+    auto it = float_index.find(value);
+    return (it != float_index.end()) ? it->second : 0;
 }
 
 int64_t Dictionary::getInteger(uint32_t code) const {
-    return (code > 0 && code <= integer_codes.size()) ? 
-        integer_codes[code-1] : 0;
+    return (code > 0 && code <= integer_values.size()) ? 
+        integer_values[code-1] : 0;
 }
 
 double Dictionary::getFloat(uint32_t code) const {
-    return (code > 0 && code <= float_codes.size()) ? 
-        float_codes[code-1] : 0.0;
+    return (code > 0 && code <= float_values.size()) ? 
+        float_values[code-1] : 0.0;
 }
 
 void Dictionary::addIntegerFieldValue(const std::string& field_name, int64_t value) {
@@ -297,7 +297,8 @@ void Dictionary::addIntegerFieldValue(const std::string& field_name, int64_t val
     // 统计不同值的数量并添加到字典
     std::string value_str = std::to_string(value);
     if (it->value_codes.find(value_str) == it->value_codes.end()) {
-        it->value_codes[value_str] = addInteger(value);
+        uint32_t code = addInteger(value);
+        it->value_codes[value_str] = code;
         it->value_count++;
     }
 }
@@ -329,7 +330,8 @@ void Dictionary::addFloatFieldValue(const std::string& field_name, double value)
     // 统计不同值的数量并添加到字典
     std::string value_str = std::to_string(value);
     if (it->value_codes.find(value_str) == it->value_codes.end()) {
-        it->value_codes[value_str] = addFloat(value);
+        uint32_t code = addFloat(value);
+        it->value_codes[value_str] = code;
         it->value_count++;
     }
 }
@@ -359,15 +361,79 @@ uint32_t Dictionary::getFieldValueCode(const std::string& field_name, const std:
         [&field_name](const FieldStats& stats) { return stats.name == field_name; });
     
     if (it == field_stats.end()) {
-        std::cout << "Field not found: " << field_name << std::endl;
+        // std::cout << "Field not found: " << field_name << std::endl;
         return 0;
     }
     
     // 从value_codes中查找对应的编码
     auto code_it = it->value_codes.find(value);
     uint32_t code = (code_it != it->value_codes.end()) ? code_it->second : 0;
-    std::cout << "Looking up field: " << field_name << ", value: " << value << ", found code: " << code << std::endl;
+    // std::cout << "Looking up field: " << field_name << ", value: " << value << ", found code: " << code << std::endl;
     return code;
+}
+
+void Dictionary::setFieldValueCode(const std::string& field_name, const std::string& value, uint32_t code) {
+    // 查找字段统计信息
+    auto it = std::find_if(field_stats.begin(), field_stats.end(),
+        [&field_name](const FieldStats& stats) { return stats.name == field_name; });
+    
+    if (it == field_stats.end()) {
+        // 如果字段不存在，创建一个新的字段统计
+        FieldStats stats;
+        stats.name = field_name;
+        stats.type = DictType::VARIABLE_DICT; // 默认类型，会在后续设置中更新
+        stats.value_count = 0;
+        stats.occurrence_count = 0;
+        field_stats.push_back(stats);
+        it = field_stats.end() - 1;
+    }
+    
+    // 直接设置值编码映射
+    it->value_codes[value] = code;
+    it->value_count = std::max(it->value_count, static_cast<size_t>(code));
+
+    // 同步重建主字典和编码表
+    DictType type = it->type;
+    switch (type) {
+        case DictType::VARIABLE_DICT:
+            variable_index[value] = code;
+            if (variable_values.size() < code) variable_values.resize(code);
+            variable_values[code-1] = value;
+            break;
+        case DictType::LOG_DICT:
+            log_index[value] = code;
+            if (log_values.size() < code) log_values.resize(code);
+            log_values[code-1] = value;
+            break;
+        case DictType::TIMESTAMP_DICT:
+            timestamp_index[value] = code;
+            if (timestamp_values.size() < code) timestamp_values.resize(code);
+            timestamp_values[code-1] = value;
+            break;
+        default:
+            break;
+    }
+}
+
+void Dictionary::setFieldStats(const std::string& field_name, DictType type, size_t value_count, size_t occurrence_count) {
+    // 查找字段统计信息
+    auto it = std::find_if(field_stats.begin(), field_stats.end(),
+        [&field_name](const FieldStats& stats) { return stats.name == field_name; });
+    
+    if (it == field_stats.end()) {
+        // 字段不存在，创建新的字段统计
+        FieldStats stats;
+        stats.name = field_name;
+        stats.type = type;
+        stats.value_count = value_count;
+        stats.occurrence_count = occurrence_count;
+        field_stats.push_back(stats);
+    } else {
+        // 字段已存在，更新统计信息
+        it->type = type;
+        it->value_count = value_count;
+        it->occurrence_count = occurrence_count;
+    }
 }
 
 } // namespace json2

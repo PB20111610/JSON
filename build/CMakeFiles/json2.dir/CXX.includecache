@@ -7,23 +7,17 @@
 #IncludeRegexTransform: 
 
 /workspaces/JSON/include/dictionary.h
-cstdint
--
 string
--
-vector
 -
 unordered_map
 -
-variant
+vector
 -
 
 /workspaces/JSON/include/parser.h
 string
 -
 vector
--
-unordered_map
 -
 memory
 -
@@ -33,25 +27,27 @@ dictionary.h
 /workspaces/JSON/include/trie.h
 memory
 -
-unordered_map
--
 vector
 -
-cstdint
+string
+-
+unordered_map
 -
 parser.h
 /workspaces/JSON/include/parser.h
 dictionary.h
 /workspaces/JSON/include/dictionary.h
+nlohmann/json.hpp
+-
 
 /workspaces/JSON/src/dictionary.cpp
 ../include/dictionary.h
 /workspaces/JSON/include/dictionary.h
-algorithm
+string
 -
 unordered_map
 -
-iostream
+vector
 -
 
 /workspaces/JSON/src/main.cpp
@@ -71,19 +67,21 @@ fstream
 -
 cctype
 -
+nlohmann/json.hpp
+-
 
 /workspaces/JSON/src/parser.cpp
 ../include/parser.h
 /workspaces/JSON/include/parser.h
+nlohmann/json.hpp
+-
 fstream
 -
-sstream
+set
 -
-stdexcept
+unordered_map
 -
-cctype
--
-regex
+algorithm
 -
 iostream
 -
@@ -102,5 +100,9 @@ sstream
 functional
 -
 iostream
+-
+nlohmann/json.hpp
+-
+cctype
 -
 

@@ -1,11 +1,12 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 #include <vector>
-#include <cstdint>
+#include <string>
+#include <unordered_map>
 #include "parser.h"
 #include "dictionary.h"
+#include <nlohmann/json.hpp>
 
 namespace json2 {
 
@@ -46,10 +47,10 @@ struct FieldPath {
 class Trie {
 public:
     // 构造函数
-    explicit Trie(const std::vector<ParsedField>& fields);
+    explicit Trie(const std::vector<std::string>& fields);
     
     // 插入一条记录
-    void insert(const std::shared_ptr<JsonObject>& record, Dictionary& dict);
+    void insert(const nlohmann::json& record, Dictionary& dict);
     
     // 序列化树结构
     std::vector<uint8_t> serialize() const;
@@ -58,10 +59,10 @@ public:
     void deserialize(const std::vector<uint8_t>& data);
     
     // 获取有序字段列表
-    const std::vector<ParsedField>& getOrderedFields() const;
+    const std::vector<std::string>& getOrderedFields() const;
     
     // 设置有序字段列表（用于解压缩）
-    void setOrderedFields(const std::vector<ParsedField>& fields);
+    void setOrderedFields(const std::vector<std::string>& fields);
     
     // 获取根节点（用于测试和调试）
     const TrieNode* getRoot() const { return root_.get(); }
@@ -71,7 +72,7 @@ public:
 
 private:
     std::unique_ptr<TrieNode> root_;  // 根节点
-    std::vector<ParsedField> ordered_fields_;  // 按冗余度排序的字段列表
+    std::vector<std::string> ordered_fields_;  // 只存字段名
     std::vector<FieldPath> field_paths_;  // 预处理的字段路径
     
     // 预处理字段路径
@@ -85,14 +86,6 @@ private:
     
     // 递归复制子节点
     void copyChildren(const TrieNode* src, TrieNode* dest);
-    
-    // 辅助函数：递归构建JSON对象
-    std::shared_ptr<JsonObject> buildJsonObject(
-        const TrieNode* node,
-        const std::vector<std::string>& fieldPath,
-        size_t depth,
-        const Dictionary& dict
-    ) const;
 };
 
 } // namespace json2

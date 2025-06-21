@@ -36,13 +36,6 @@ private:
     bool is_placeholder_;  // 占位标志位
 };
 
-// 预处理的字段路径信息
-struct FieldPath {
-    std::string original_name;  // 原始字段名
-    std::vector<std::string> parts;  // 拆分后的路径
-    bool is_nested;  // 是否是嵌套字段
-};
-
 // Trie树
 class Trie {
 public:
@@ -73,10 +66,6 @@ public:
 private:
     std::unique_ptr<TrieNode> root_;  // 根节点
     std::vector<std::string> ordered_fields_;  // 只存字段名
-    std::vector<FieldPath> field_paths_;  // 预处理的字段路径
-    
-    // 预处理字段路径
-    void preprocessFieldPaths();
     
     // 递归序列化节点
     void serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const;

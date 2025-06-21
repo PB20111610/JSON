@@ -1,6 +1,5 @@
 #include "../include/parser.h"
 #include <nlohmann/json.hpp>
-#include <fstream>
 #include <set>
 #include <unordered_map>
 #include <algorithm>
@@ -31,24 +30,14 @@ void collectFields(const json& j, const std::string& prefix, std::set<std::strin
     }
 }
 
-void JsonParser::parseAndCollect(const std::string& filename, Dictionary& dict, std::vector<std::string>& ordered_fields) {
-    std::ifstream in(filename);
-    if (!in.is_open()) throw std::runtime_error("Cannot open file: " + filename);
-    std::string line;
+void JsonParser::analyzeAndSortFields(const std::vector<nlohmann::json>& records, Dictionary& dict, std::vector<std::string>& ordered_fields) {
     std::set<std::string> all_fields;
     std::unordered_map<std::string, size_t> value_counts;
-    while (std::getline(in, line)) {
-        if (line.empty()) continue;
-        json j;
-        try {
-            j = json::parse(line);
-        } catch (const std::exception& e) {
-            std::cerr << "JSON parse error: " << e.what() << "\n";
-            continue;
-        }
+
+    for (const auto& j : records) {
         collectFields(j, "", all_fields, value_counts, dict);
     }
-    in.close();
+
     // 字段冗余度排序（出现次数/不同值数量，降序）
     std::vector<std::pair<std::string, double>> redundancy;
     for (const auto& field : all_fields) {
@@ -58,27 +47,11 @@ void JsonParser::parseAndCollect(const std::string& filename, Dictionary& dict, 
         redundancy.emplace_back(field, factor);
     }
     std::sort(redundancy.begin(), redundancy.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+
     ordered_fields.clear();
     for (const auto& [field, _] : redundancy) {
         ordered_fields.push_back(field);
     }
-}
-
-// 你可以自定义返回类型，这里只返回原始json对象
-std::vector<std::shared_ptr<void>> JsonParser::parseLogFile(const std::string& filename) {
-    std::vector<std::shared_ptr<void>> records;
-    std::ifstream in(filename);
-    if (!in.is_open()) throw std::runtime_error("Cannot open file: " + filename);
-    std::string line;
-    while (std::getline(in, line)) {
-        if (line.empty()) continue;
-        try {
-            auto j = std::make_shared<json>(json::parse(line));
-            records.push_back(j);
-        } catch (...) {}
-    }
-    in.close();
-    return records;
 }
 
 }

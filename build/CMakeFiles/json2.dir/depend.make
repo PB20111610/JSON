@@ -4,15 +4,18 @@
 CMakeFiles/json2.dir/src/dictionary.cpp.o: ../include/dictionary.h
 CMakeFiles/json2.dir/src/dictionary.cpp.o: ../src/dictionary.cpp
 
+CMakeFiles/json2.dir/src/main.cpp.o: ../include/nlohmann/json.hpp
 CMakeFiles/json2.dir/src/main.cpp.o: ../include/dictionary.h
 CMakeFiles/json2.dir/src/main.cpp.o: ../include/parser.h
 CMakeFiles/json2.dir/src/main.cpp.o: ../include/trie.h
 CMakeFiles/json2.dir/src/main.cpp.o: ../src/main.cpp
 
+CMakeFiles/json2.dir/src/parser.cpp.o: ../include/nlohmann/json.hpp
 CMakeFiles/json2.dir/src/parser.cpp.o: ../include/dictionary.h
 CMakeFiles/json2.dir/src/parser.cpp.o: ../include/parser.h
 CMakeFiles/json2.dir/src/parser.cpp.o: ../src/parser.cpp
 
+CMakeFiles/json2.dir/src/trie.cpp.o: ../include/nlohmann/json.hpp
 CMakeFiles/json2.dir/src/trie.cpp.o: ../include/dictionary.h
 CMakeFiles/json2.dir/src/trie.cpp.o: ../include/parser.h
 CMakeFiles/json2.dir/src/trie.cpp.o: ../include/trie.h

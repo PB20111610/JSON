@@ -55,46 +55,55 @@ void printTrieNode(const TrieNode* node, int depth, const std::vector<std::strin
 
 int main() {
     try {
-        Dictionary dict;
-        std::vector<std::string> fieldOrder;
-        // 解析并收集字段信息（假设 parser 负责排序字段）
-        JsonParser::parseAndCollect("test_data.json", dict, fieldOrder);
-        // 打印字段顺序
-        printFieldOrder(fieldOrder);
-        // 打印字典内容
-        printDictionary(dict, fieldOrder);
-        // 创建Trie树
-        Trie trie(fieldOrder);
-        // 解析并插入记录
+        // Step 1: Load the entire file into memory
         std::vector<json> records;
         std::ifstream in("test_data.json");
+        if (!in.is_open()) {
+            throw std::runtime_error("Cannot open test_data.json for reading");
+        }
         std::string line;
         while (std::getline(in, line)) {
             if (line.empty()) continue;
             try {
                 records.push_back(json::parse(line));
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "JSON parse error in line: " << line << " - " << e.what() << "\n";
+            }
         }
         in.close();
+
+        // Step 2: Analyze records from memory
+        Dictionary dict;
+        std::vector<std::string> fieldOrder;
+        JsonParser::analyzeAndSortFields(records, dict, fieldOrder);
+        
+        // Print field order and dictionary (optional)
+        printFieldOrder(fieldOrder);
+        printDictionary(dict, fieldOrder);
+        
+        // Step 3: Build the Trie from memory
+        Trie trie(fieldOrder);
         for (const auto& record : records) {
             trie.insert(record, dict);
         }
-        // 打印Trie树结构
+        
+        // Step 4: Verify and reconstruct
         std::cout << "\n=== Trie Tree Structure ===\n";
         printTrieNode(trie.getRoot(), 0, fieldOrder, dict);
-        // 将Trie树转换回JSON
+        
         std::string reconstructed_json = trie.toJson(dict);
-        // 保存重建的JSON
         std::ofstream out_file("reconstructed.json");
         if (!out_file.is_open()) {
             throw std::runtime_error("Cannot open reconstructed.json for writing");
         }
         out_file << reconstructed_json;
         out_file.close();
+
         std::cout << "\n✅ JSON reconstruction completed!\n";
         std::cout << "Original JSON: test_data.json\n";
         std::cout << "Reconstructed JSON: reconstructed.json\n";
         std::cout << "Please compare these files manually to verify the reconstruction.\n";
+
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;

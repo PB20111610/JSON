@@ -8,8 +8,8 @@
 {"browser":"Safari","ip":"192.168.1.1","level":"ERROR","message":"Card expired","os":"MacOS","service":"payment","timestamp":"2024-03-20 10:39:52.123 EDT","user_id":"user123","version":"1.0.0"}
 {"browser":"Firefox","ip":"192.168.1.2","level":"WARN","message":"Low balance","os":"Linux","service":"payment","timestamp":"2024-03-20 10:37:25.456 EDT","user_id":"user456","version":"1.0.0"}
 {"browser":"Safari","ip":"192.168.1.1","level":"WARN","message":"Payment declined","os":"MacOS","service":"payment","timestamp":"2024-03-20 10:33:22.123 EDT","user_id":"user123","version":"1.0.0"}
-{"count":42,"level":"INFO","message":"System startup","metrics":{"cpu_usage":75.5,"error_count":0,"is_healthy":true,"memory_usage":1024.8},"status":true,"timestamp":"2024-03-20 10:30:45 EDT","version":1.0}
-{"count":45,"level":"INFO","message":"System recovered","metrics":{"cpu_usage":45.2,"error_count":0,"is_healthy":true,"memory_usage":1024.5},"status":true,"timestamp":"2024-03-20 10:31:30 EDT","version":1.0}
-{"count":44,"level":"ERROR","message":"Memory allocation failed","metrics":{"cpu_usage":98.5,"error_count":2,"is_healthy":false,"memory_usage":2048.0},"status":false,"timestamp":"2024-03-20 10:31:15 EDT","version":1.0}
-{"count":43,"level":"WARN","message":"High CPU usage detected","metrics":{"cpu_usage":95.2,"error_count":1,"is_healthy":false,"memory_usage":1024.9},"status":false,"timestamp":"2024-03-20 10:31:00 EDT","version":1.0}
-{"count":46,"level":"DEBUG","message":"Performance check","metrics":{"cpu_usage":35.8,"error_count":0,"is_healthy":true,"memory_usage":1024.2},"status":true,"timestamp":"2024-03-20 10:31:45 EDT","version":1.0}
+{"count":42,"level":"INFO","message":"System startup","metrics":{"cpu_usage":75.5,"error_count":0,"is_healthy":true,"memory_usage":1024.8},"status":true,"timestamp":"2024-03-20 10:30:45 EDT","version":1}
+{"count":45,"level":"INFO","message":"System recovered","metrics":{"cpu_usage":45.2,"error_count":0,"is_healthy":true,"memory_usage":1024.5},"status":true,"timestamp":"2024-03-20 10:31:30 EDT","version":1}
+{"count":44,"level":"ERROR","message":"Memory allocation failed","metrics":{"cpu_usage":98.5,"error_count":2,"is_healthy":false,"memory_usage":2048},"status":false,"timestamp":"2024-03-20 10:31:15 EDT","version":1}
+{"count":43,"level":"WARN","message":"High CPU usage detected","metrics":{"cpu_usage":95.2,"error_count":1,"is_healthy":false,"memory_usage":1024.9},"status":false,"timestamp":"2024-03-20 10:31:00 EDT","version":1}
+{"count":46,"level":"DEBUG","message":"Performance check","metrics":{"cpu_usage":35.8,"error_count":0,"is_healthy":true,"memory_usage":1024.2},"status":true,"timestamp":"2024-03-20 10:31:45 EDT","version":1}

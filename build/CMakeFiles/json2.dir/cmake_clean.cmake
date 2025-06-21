@@ -2,7 +2,9 @@ file(REMOVE_RECURSE
   "CMakeFiles/json2.dir/src/dictionary.cpp.o"
   "CMakeFiles/json2.dir/src/main.cpp.o"
   "CMakeFiles/json2.dir/src/parser.cpp.o"
+  "CMakeFiles/json2.dir/src/reconstruct.cpp.o"
   "CMakeFiles/json2.dir/src/trie.cpp.o"
+  "CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o"
   "json2"
   "json2.pdb"
 )

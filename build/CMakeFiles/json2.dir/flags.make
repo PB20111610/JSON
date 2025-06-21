@@ -6,5 +6,5 @@ CXX_FLAGS =   -std=gnu++17
 
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/workspaces/JSON/include 
+CXX_INCLUDES = -I/workspaces/JSON/include -I/workspaces/JSON/vendor/nlohmann -I/workspaces/JSON/vendor/simdjson 
 

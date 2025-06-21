@@ -5,9 +5,8 @@
 #include <sstream>
 #include <functional>
 #include <iostream>
-#include <nlohmann/json.hpp>
 #include <cctype>
-using nlohmann::json;
+#include <simdjson.h>
 
 namespace json2 {
 
@@ -48,47 +47,89 @@ void TrieNode::setPlaceholder(bool is_placeholder) {
 Trie::Trie(const std::vector<std::string>& fields)
     : ordered_fields_(fields), root_(std::make_unique<TrieNode>(0, true)) {}
 
-// 辅助函数：递归查找扁平字段名（支持嵌套和数组）
-static const json* getJsonField(const json& j, const std::string& field) {
-    size_t pos = 0, next;
-    const json* current = &j;
-    while (pos < field.size()) {
-        next = field.find('.', pos);
-        std::string key = field.substr(pos, next - pos);
-        // 处理数组下标
-        size_t arr_pos = key.find('[');
-        if (arr_pos != std::string::npos) {
-            std::string arr_key = key.substr(0, arr_pos);
-            size_t arr_end = key.find(']', arr_pos);
-            int idx = std::stoi(key.substr(arr_pos + 1, arr_end - arr_pos - 1));
-            if (!arr_key.empty()) {
-                if (!current->contains(arr_key)) return nullptr;
-                current = &(*current)[arr_key];
+// NEW: Helper function using simdjson to find a field by flattened path.
+static simdjson::dom::element getJsonFieldSimd(simdjson::dom::element node, const std::string& field) {
+    simdjson::dom::element current = node;
+    size_t start = 0;
+    size_t end = field.find('.');
+    
+    while (start < field.length()) {
+        std::string part = field.substr(start, end - start);
+        size_t bracket_pos = part.find('[');
+
+        if (bracket_pos != std::string::npos) {
+            // Handle array access like "field[index]"
+            std::string key = part.substr(0, bracket_pos);
+            if (!key.empty()) {
+                current = current[key];
             }
-            if (!current->is_array() || idx >= current->size()) return nullptr;
-            current = &(*current)[idx];
+            size_t end_bracket_pos = part.find(']', bracket_pos);
+            int index = std::stoi(part.substr(bracket_pos + 1, end_bracket_pos - bracket_pos - 1));
+            current = current.at(index);
         } else {
-            if (!current->contains(key)) return nullptr;
-            current = &(*current)[key];
+            // Handle object access
+            current = current[part.c_str()];
         }
-        if (next == std::string::npos) break;
-        pos = next + 1;
+        
+        if (end == std::string::npos) {
+            break;
+        }
+        
+        start = end + 1;
+        end = field.find('.', start);
     }
     return current;
 }
 
-void Trie::insert(const nlohmann::json& record, Dictionary& dict) {
-    TrieNode* current = root_.get();
+void Trie::insert(const std::string& record_string, Dictionary& dict, simdjson::dom::parser& parser) {
+    simdjson::dom::element record;
+    auto error = parser.parse(record_string).get(record);
+    if (error) { 
+        // Silently ignore parse errors for now in this high-throughput path
+        return; 
+    }
+
+    TrieNode* current_node = root_.get();
     for (const auto& field : ordered_fields_) {
-        const json* value_ptr = getJsonField(record, field);
-        if (!value_ptr || value_ptr->is_null()) {
-            current = current->getOrCreateChild(0);
-            current->setPlaceholder(true);
-            continue;
+        try {
+            simdjson::dom::element value_node = getJsonFieldSimd(record, field);
+            std::string value_str;
+            switch(value_node.type()) {
+                case simdjson::dom::element_type::STRING:
+                    value_str = std::string(value_node.get_string().value());
+                    break;
+                case simdjson::dom::element_type::INT64:
+                    value_str = std::to_string(value_node.get_int64().value());
+                    break;
+                case simdjson::dom::element_type::UINT64:
+                    value_str = std::to_string(value_node.get_uint64().value());
+                    break;
+                case simdjson::dom::element_type::DOUBLE: {
+                    std::ostringstream oss;
+                    oss << std::setprecision(17) << value_node.get_double().value();
+                    value_str = oss.str();
+                    break;
+                }
+                case simdjson::dom::element_type::BOOL:
+                    value_str = value_node.get_bool().value() ? "true" : "false";
+                    break;
+                case simdjson::dom::element_type::NULL_VALUE:
+                    value_str = "null";
+                    break;
+                default:
+                    // Should not happen for valid JSON values
+                    break;
+            }
+            uint32_t code = dict.getOrAddFieldValue(field, value_str);
+            current_node = current_node->getOrCreateChild(code);
+
+        } catch (const simdjson::simdjson_error& e) {
+            // This happens if a field does not exist (e.g., trying to access a key in an object that is not there)
+            // We treat this as a placeholder/null value.
+            uint32_t code = dict.getOrAddFieldValue(field, "null"); // Or a special placeholder value
+            current_node = current_node->getOrCreateChild(code);
+            current_node->setPlaceholder(true);
         }
-        std::string value = value_ptr->is_string() ? value_ptr->get<std::string>() : value_ptr->dump();
-        uint32_t code = dict.getOrAddFieldValue(field, value);
-        current = current->getOrCreateChild(code);
     }
 }
 
@@ -181,91 +222,6 @@ const std::vector<std::string>& Trie::getOrderedFields() const {
 
 void Trie::setOrderedFields(const std::vector<std::string>& fields) {
     ordered_fields_ = fields;
-}
-
-// 辅助函数：判断字符串是否为整数
-static bool isInteger(const std::string& s) {
-    if (s.empty()) return false;
-    size_t i = 0;
-    if (s[0] == '-' || s[0] == '+') ++i;
-    if (i == s.size()) return false;
-    for (; i < s.size(); ++i) {
-        if (!std::isdigit(s[i])) return false;
-    }
-    // 不允许前导零（除非就是"0"）
-    if (s.size() > 1 && s[0] == '0' && std::isdigit(s[1])) return false;
-    if (s.size() > 2 && (s[0] == '-' || s[0] == '+') && s[1] == '0' && std::isdigit(s[2])) return false;
-    return true;
-}
-
-// 辅助函数：判断字符串是否为浮点数
-static bool isDouble(const std::string& s) {
-    if (s.empty()) return false;
-    char* endptr = nullptr;
-    double val = std::strtod(s.c_str(), &endptr);
-    if (endptr == s.c_str() || *endptr != '\0') return false;
-    // 排除科学计数法以外的前导零
-    if (s.find('e') == std::string::npos && s.find('E') == std::string::npos) {
-        size_t dot = s.find('.');
-        if (dot != std::string::npos && dot > 0 && s[0] == '0' && dot > 1) return false;
-        if (dot == std::string::npos && s.size() > 1 && s[0] == '0') return false;
-    }
-    return true;
-}
-
-// 辅助函数：判断字符串是否为布尔值
-static bool isBool(const std::string& s) {
-    return s == "true" || s == "false";
-}
-
-// 辅助函数：将字符串转为合适的json类型
-static nlohmann::json parseValue(const std::string& s) {
-    if (isBool(s)) return s == "true";
-    if (isInteger(s)) return std::stoll(s);
-    if (isDouble(s)) return std::stod(s);
-    return s;
-}
-
-// 辅助函数：将扁平字段名嵌套赋值到json对象
-static void set_nested(nlohmann::json& j, const std::string& flat_key, const nlohmann::json& value) {
-    size_t pos = 0, next;
-    nlohmann::json* curr = &j;
-    while ((next = flat_key.find('.', pos)) != std::string::npos) {
-        std::string key = flat_key.substr(pos, next - pos);
-        curr = &(*curr)[key];
-        pos = next + 1;
-    }
-    (*curr)[flat_key.substr(pos)] = value;
-}
-
-std::string Trie::toJson(const Dictionary& dict) const {
-    std::vector<nlohmann::json> records;
-    std::function<void(const TrieNode*, std::vector<std::pair<std::string, std::string>>, size_t)> traverse =
-        [&](const TrieNode* node, std::vector<std::pair<std::string, std::string>> currentRecord, size_t depth) {
-        if (!node) return;
-        if (depth > 0 && !node->isPlaceholder()) {
-            std::string fieldName = ordered_fields_[depth - 1];
-            std::string value = dict.getFieldValueByCode(fieldName, node->getCode());
-            currentRecord.push_back({fieldName, value});
-        }
-        if (node->getChildren().empty() && !currentRecord.empty()) {
-            nlohmann::json j;
-            for (const auto& [k, v] : currentRecord) {
-                set_nested(j, k, parseValue(v));
-            }
-            records.push_back(j);
-        }
-        for (const auto& [code, child] : node->getChildren()) {
-            traverse(child.get(), currentRecord, depth + 1);
-        }
-    };
-    traverse(root_.get(), {}, 0);
-    std::stringstream ss;
-    for (size_t i = 0; i < records.size(); ++i) {
-        if (i > 0) ss << "\n";
-        ss << records[i].dump();
-    }
-    return ss.str();
 }
 
 } // namespace json2

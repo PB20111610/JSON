@@ -1,17 +1,19 @@
 #include "../include/parser.h"
 #include "../include/dictionary.h"
 #include "../include/trie.h"
+#include "../include/reconstruct.h"
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
 #include <fstream>
 #include <cctype>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json.hpp> // 只用于重建验证
+#include <simdjson.h>
 
 using namespace json2;
 using nlohmann::json;
 
-// 打印字段冗余度排序
+// Helper function to print field redundancy
 void printFieldOrder(const std::vector<std::string>& ordered_fields) {
     std::cout << "\nField Order (by redundancy factor):\n";
     std::cout << "================================\n";
@@ -54,7 +56,7 @@ void printTrieNode(const TrieNode* node, int depth, const std::vector<std::strin
 }
 
 int main() {
-    const size_t CHUNK_SIZE = 5000; // Process 10,000 records per chunk
+    const size_t CHUNK_SIZE = 10000; // Process 10,000 records per chunk
 
     try {
         Dictionary dict;
@@ -66,15 +68,18 @@ int main() {
             throw std::runtime_error("Cannot open test_data.json for reading");
         }
 
+        simdjson::dom::parser parser; // Create the parser once to be reused
         bool isFirstChunk = true;
         while (in) {
-            std::vector<json> records;
+            std::vector<std::string> records;
             records.reserve(CHUNK_SIZE);
             std::string line;
             for (size_t i = 0; i < CHUNK_SIZE && std::getline(in, line); ++i) {
                 if (line.empty()) continue;
                 try {
-                    records.push_back(json::parse(line));
+                    // Use simdjson to parse, then convert to nlohmann::json
+                    simdjson::dom::element doc = parser.parse(line).value();
+                    records.push_back(line);
                 } catch (const std::exception& e) {
                     std::cerr << "JSON parse error in line, skipping: " << e.what() << "\n";
                 }
@@ -98,7 +103,7 @@ int main() {
 
             // Insert records from the current chunk into the Trie
             for (const auto& record : records) {
-                trie->insert(record, dict);
+                trie->insert(record, dict, parser);
             }
         }
         in.close();
@@ -109,10 +114,10 @@ int main() {
         }
 
         // Verification and reconstruction steps remain the same
-        // std::cout << "\n=== Trie Tree Structure ===\n";
-        // printTrieNode(trie->getRoot(), 0, fieldOrder, dict);
+        std::cout << "\n=== Trie Tree Structure ===\n";
+        printTrieNode(trie->getRoot(), 0, fieldOrder, dict);
         
-        std::string reconstructed_json = trie->toJson(dict);
+        std::string reconstructed_json = reconstructJsonFromTrie(*trie, dict);
         std::ofstream out_file("reconstructed.json");
         if (!out_file.is_open()) {
             throw std::runtime_error("Cannot open reconstructed.json for writing");

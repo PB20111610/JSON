@@ -193,7 +193,7 @@ CMAKE_PROJECT_DESCRIPTION:STATIC=
 CMAKE_PROJECT_HOMEPAGE_URL:STATIC=
 
 //Value Computed by CMake
-CMAKE_PROJECT_NAME:STATIC=JSON2
+CMAKE_PROJECT_NAME:STATIC=json2
 
 //Value Computed by CMake
 CMAKE_PROJECT_VERSION:STATIC=3.10.5
@@ -318,6 +318,12 @@ JSON_MultipleHeaders:BOOL=OFF
 
 //Include as system headers (skip for clang-tidy).
 JSON_SystemInclude:BOOL=OFF
+
+//Value Computed by CMake
+json2_BINARY_DIR:STATIC=/workspaces/JSON/build
+
+//Value Computed by CMake
+json2_SOURCE_DIR:STATIC=/workspaces/JSON
 
 //Value Computed by CMake
 nlohmann_json_BINARY_DIR:STATIC=/workspaces/JSON/build/_deps/nlohmann_json-build

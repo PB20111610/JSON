@@ -6,7 +6,13 @@
 #include <unordered_map>
 #include "parser.h"
 #include "dictionary.h"
-#include <nlohmann/json.hpp>
+
+// Forward declare simdjson types to avoid including the full header here
+namespace simdjson {
+namespace dom {
+    class parser;
+}
+}
 
 namespace json2 {
 
@@ -43,7 +49,7 @@ public:
     explicit Trie(const std::vector<std::string>& fields);
     
     // 插入一条记录
-    void insert(const nlohmann::json& record, Dictionary& dict);
+    void insert(const std::string& record_string, Dictionary& dict, simdjson::dom::parser& parser);
     
     // 序列化树结构
     std::vector<uint8_t> serialize() const;

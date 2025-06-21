@@ -204,6 +204,33 @@ src/parser.cpp.s:
 	$(MAKE) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/parser.cpp.s
 .PHONY : src/parser.cpp.s
 
+src/reconstruct.o: src/reconstruct.cpp.o
+
+.PHONY : src/reconstruct.o
+
+# target to build an object file
+src/reconstruct.cpp.o:
+	$(MAKE) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/reconstruct.cpp.o
+.PHONY : src/reconstruct.cpp.o
+
+src/reconstruct.i: src/reconstruct.cpp.i
+
+.PHONY : src/reconstruct.i
+
+# target to preprocess a source file
+src/reconstruct.cpp.i:
+	$(MAKE) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/reconstruct.cpp.i
+.PHONY : src/reconstruct.cpp.i
+
+src/reconstruct.s: src/reconstruct.cpp.s
+
+.PHONY : src/reconstruct.s
+
+# target to generate assembly for a file
+src/reconstruct.cpp.s:
+	$(MAKE) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/reconstruct.cpp.s
+.PHONY : src/reconstruct.cpp.s
+
 src/trie.o: src/trie.cpp.o
 
 .PHONY : src/trie.o
@@ -231,6 +258,33 @@ src/trie.cpp.s:
 	$(MAKE) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/trie.cpp.s
 .PHONY : src/trie.cpp.s
 
+vendor/simdjson/simdjson.o: vendor/simdjson/simdjson.cpp.o
+
+.PHONY : vendor/simdjson/simdjson.o
+
+# target to build an object file
+vendor/simdjson/simdjson.cpp.o:
+	$(MAKE) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o
+.PHONY : vendor/simdjson/simdjson.cpp.o
+
+vendor/simdjson/simdjson.i: vendor/simdjson/simdjson.cpp.i
+
+.PHONY : vendor/simdjson/simdjson.i
+
+# target to preprocess a source file
+vendor/simdjson/simdjson.cpp.i:
+	$(MAKE) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.i
+.PHONY : vendor/simdjson/simdjson.cpp.i
+
+vendor/simdjson/simdjson.s: vendor/simdjson/simdjson.cpp.s
+
+.PHONY : vendor/simdjson/simdjson.s
+
+# target to generate assembly for a file
+vendor/simdjson/simdjson.cpp.s:
+	$(MAKE) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.s
+.PHONY : vendor/simdjson/simdjson.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -249,9 +303,15 @@ help:
 	@echo "... src/parser.o"
 	@echo "... src/parser.i"
 	@echo "... src/parser.s"
+	@echo "... src/reconstruct.o"
+	@echo "... src/reconstruct.i"
+	@echo "... src/reconstruct.s"
 	@echo "... src/trie.o"
 	@echo "... src/trie.i"
 	@echo "... src/trie.s"
+	@echo "... vendor/simdjson/simdjson.o"
+	@echo "... vendor/simdjson/simdjson.i"
+	@echo "... vendor/simdjson/simdjson.s"
 .PHONY : help
 
 

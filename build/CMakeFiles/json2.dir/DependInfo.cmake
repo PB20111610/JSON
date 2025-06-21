@@ -7,13 +7,17 @@ set(CMAKE_DEPENDS_CHECK_CXX
   "/workspaces/JSON/src/dictionary.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/dictionary.cpp.o"
   "/workspaces/JSON/src/main.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/main.cpp.o"
   "/workspaces/JSON/src/parser.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/parser.cpp.o"
+  "/workspaces/JSON/src/reconstruct.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/reconstruct.cpp.o"
   "/workspaces/JSON/src/trie.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/trie.cpp.o"
+  "/workspaces/JSON/vendor/simdjson/simdjson.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")
 
 # The include file search paths:
 set(CMAKE_CXX_TARGET_INCLUDE_PATH
   "../include"
+  "../vendor/nlohmann"
+  "../vendor/simdjson"
   )
 
 # Targets to which this target links.

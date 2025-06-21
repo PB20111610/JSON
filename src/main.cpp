@@ -54,44 +54,65 @@ void printTrieNode(const TrieNode* node, int depth, const std::vector<std::strin
 }
 
 int main() {
+    const size_t CHUNK_SIZE = 5000; // Process 10,000 records per chunk
+
     try {
-        // Step 1: Load the entire file into memory
-        std::vector<json> records;
+        Dictionary dict;
+        std::vector<std::string> fieldOrder;
+        std::unique_ptr<Trie> trie = nullptr;
+
         std::ifstream in("test_data.json");
         if (!in.is_open()) {
             throw std::runtime_error("Cannot open test_data.json for reading");
         }
-        std::string line;
-        while (std::getline(in, line)) {
-            if (line.empty()) continue;
-            try {
-                records.push_back(json::parse(line));
-            } catch (const std::exception& e) {
-                std::cerr << "JSON parse error in line: " << line << " - " << e.what() << "\n";
+
+        bool isFirstChunk = true;
+        while (in) {
+            std::vector<json> records;
+            records.reserve(CHUNK_SIZE);
+            std::string line;
+            for (size_t i = 0; i < CHUNK_SIZE && std::getline(in, line); ++i) {
+                if (line.empty()) continue;
+                try {
+                    records.push_back(json::parse(line));
+                } catch (const std::exception& e) {
+                    std::cerr << "JSON parse error in line, skipping: " << e.what() << "\n";
+                }
+            }
+
+            if (records.empty()) {
+                break;
+            }
+
+            if (isFirstChunk) {
+                // First chunk: Analyze, determine field order, and create the Trie
+                std::cout << "--- Processing First Chunk ---\n";
+                JsonParser::analyzeAndSortFields(records, dict, fieldOrder);
+                printFieldOrder(fieldOrder);
+                // printDictionary(dict, fieldOrder);
+                trie = std::make_unique<Trie>(fieldOrder);
+                isFirstChunk = false;
+            } else {
+                std::cout << "--- Processing Subsequent Chunk (" << records.size() << " records) ---\n";
+            }
+
+            // Insert records from the current chunk into the Trie
+            for (const auto& record : records) {
+                trie->insert(record, dict);
             }
         }
         in.close();
 
-        // Step 2: Analyze records from memory
-        Dictionary dict;
-        std::vector<std::string> fieldOrder;
-        JsonParser::analyzeAndSortFields(records, dict, fieldOrder);
-        
-        // Print field order and dictionary (optional)
-        printFieldOrder(fieldOrder);
-        printDictionary(dict, fieldOrder);
-        
-        // Step 3: Build the Trie from memory
-        Trie trie(fieldOrder);
-        for (const auto& record : records) {
-            trie.insert(record, dict);
+        if (!trie) {
+            std::cout << "No records processed, exiting." << std::endl;
+            return 0;
         }
+
+        // Verification and reconstruction steps remain the same
+        // std::cout << "\n=== Trie Tree Structure ===\n";
+        // printTrieNode(trie->getRoot(), 0, fieldOrder, dict);
         
-        // Step 4: Verify and reconstruct
-        std::cout << "\n=== Trie Tree Structure ===\n";
-        printTrieNode(trie.getRoot(), 0, fieldOrder, dict);
-        
-        std::string reconstructed_json = trie.toJson(dict);
+        std::string reconstructed_json = trie->toJson(dict);
         std::ofstream out_file("reconstructed.json");
         if (!out_file.is_open()) {
             throw std::runtime_error("Cannot open reconstructed.json for writing");

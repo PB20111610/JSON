@@ -87,7 +87,7 @@ void Trie::insert(const nlohmann::json& record, Dictionary& dict) {
             continue;
         }
         std::string value = value_ptr->is_string() ? value_ptr->get<std::string>() : value_ptr->dump();
-        uint32_t code = dict.getFieldValueCode(field, value);
+        uint32_t code = dict.getOrAddFieldValue(field, value);
         current = current->getOrCreateChild(code);
     }
 }

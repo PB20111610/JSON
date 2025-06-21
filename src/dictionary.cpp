@@ -17,6 +17,14 @@ uint32_t Dictionary::addFieldValue(const std::string& field_name, const std::str
     return code;
 }
 
+uint32_t Dictionary::getOrAddFieldValue(const std::string& field_name, const std::string& value) {
+    uint32_t code = getFieldValueCode(field_name, value);
+    if (code == 0) {
+        code = addFieldValue(field_name, value);
+    }
+    return code;
+}
+
 uint32_t Dictionary::getFieldValueCode(const std::string& field_name, const std::string& value) const {
     auto it = field_dicts.find(field_name);
     if (it == field_dicts.end()) return 0;

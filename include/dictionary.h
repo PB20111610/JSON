@@ -20,6 +20,9 @@ public:
     // 添加字段值，返回编码
     uint32_t addFieldValue(const std::string& field_name, const std::string& value);
 
+    // 获取编码，如果不存在则添加
+    uint32_t getOrAddFieldValue(const std::string& field_name, const std::string& value);
+
     // 获取编码
     uint32_t getFieldValueCode(const std::string& field_name, const std::string& value) const;
 

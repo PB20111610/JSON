@@ -444,6 +444,16 @@ dictionary.h
 nlohmann/json.hpp
 -
 
+/workspaces/JSON/src/dictionary.cpp
+../include/dictionary.h
+/workspaces/JSON/include/dictionary.h
+string
+-
+unordered_map
+-
+vector
+-
+
 /workspaces/JSON/src/main.cpp
 ../include/parser.h
 /workspaces/JSON/include/parser.h

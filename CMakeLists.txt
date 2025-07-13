@@ -7,13 +7,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Add our executable and the library sources
 add_executable(json2
-    src/main.cpp
+    src/main_dictionary.cpp
     src/parser.cpp
-    src/dictionary.cpp
-    src/trie.cpp
-    src/reconstruct.cpp
+    src/variable_dictionary.cpp
+    src/timestamp_dictionary.cpp
+    src/logtype_dictionary.cpp
+    src/field_dictionary_manager.cpp 
     vendor/simdjson/simdjson.cpp
 )
+
+target_include_directories(json2 PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
 
 # Include directories
 target_include_directories(json2 PRIVATE 
@@ -22,9 +25,8 @@ target_include_directories(json2 PRIVATE
     vendor/simdjson
 )
 
-# 复制测试数据到构建目录
-add_custom_command(TARGET json2 POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${CMAKE_SOURCE_DIR}/test_data.json
-    ${CMAKE_BINARY_DIR}/test_data.json
+target_include_directories(json2 PUBLIC
+    "${PROJECT_BINARY_DIR}"
+    "${PROJECT_SOURCE_DIR}/include"
+    "${PROJECT_SOURCE_DIR}/vendor"
 )

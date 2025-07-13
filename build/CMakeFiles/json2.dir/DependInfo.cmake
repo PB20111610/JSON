@@ -1,27 +1,28 @@
+
+# Consider dependencies only in project.
+set(CMAKE_DEPENDS_IN_PROJECT_ONLY OFF)
+
 # The set of languages for which implicit dependencies are needed:
 set(CMAKE_DEPENDS_LANGUAGES
-  "CXX"
-  )
-# The set of files for implicit dependencies of each language:
-set(CMAKE_DEPENDS_CHECK_CXX
-  "/workspaces/JSON/src/dictionary.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/dictionary.cpp.o"
-  "/workspaces/JSON/src/main.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/main.cpp.o"
-  "/workspaces/JSON/src/parser.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/parser.cpp.o"
-  "/workspaces/JSON/src/reconstruct.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/reconstruct.cpp.o"
-  "/workspaces/JSON/src/trie.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/src/trie.cpp.o"
-  "/workspaces/JSON/vendor/simdjson/simdjson.cpp" "/workspaces/JSON/build/CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o"
-  )
-set(CMAKE_CXX_COMPILER_ID "GNU")
-
-# The include file search paths:
-set(CMAKE_CXX_TARGET_INCLUDE_PATH
-  "../include"
-  "../vendor/nlohmann"
-  "../vendor/simdjson"
   )
 
-# Targets to which this target links.
-set(CMAKE_TARGET_LINKED_INFO_FILES
+# The set of dependency files which are needed:
+set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/workspaces/JSON/src/field_dictionary_manager.cpp" "CMakeFiles/json2.dir/src/field_dictionary_manager.cpp.o" "gcc" "CMakeFiles/json2.dir/src/field_dictionary_manager.cpp.o.d"
+  "/workspaces/JSON/src/logtype_dictionary.cpp" "CMakeFiles/json2.dir/src/logtype_dictionary.cpp.o" "gcc" "CMakeFiles/json2.dir/src/logtype_dictionary.cpp.o.d"
+  "/workspaces/JSON/src/main_dictionary.cpp" "CMakeFiles/json2.dir/src/main_dictionary.cpp.o" "gcc" "CMakeFiles/json2.dir/src/main_dictionary.cpp.o.d"
+  "/workspaces/JSON/src/parser.cpp" "CMakeFiles/json2.dir/src/parser.cpp.o" "gcc" "CMakeFiles/json2.dir/src/parser.cpp.o.d"
+  "/workspaces/JSON/src/timestamp_dictionary.cpp" "CMakeFiles/json2.dir/src/timestamp_dictionary.cpp.o" "gcc" "CMakeFiles/json2.dir/src/timestamp_dictionary.cpp.o.d"
+  "/workspaces/JSON/src/variable_dictionary.cpp" "CMakeFiles/json2.dir/src/variable_dictionary.cpp.o" "gcc" "CMakeFiles/json2.dir/src/variable_dictionary.cpp.o.d"
+  "/workspaces/JSON/vendor/simdjson/simdjson.cpp" "CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o" "gcc" "CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o.d"
+  )
+
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_LINKED_INFO_FILES
+  )
+
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_FORWARD_LINKED_INFO_FILES
   )
 
 # Fortran module output directory.

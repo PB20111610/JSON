@@ -1,2 +1,2 @@
 # JSON
-Compress Json data by trie tree
+Type aware dictionary

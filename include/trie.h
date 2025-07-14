@@ -4,8 +4,10 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include "parser.h"
-#include "dictionary.h"
+#include "variable_dictionary.h"
+#include "timestamp_dictionary.h"
 
 // Forward declare simdjson types to avoid including the full header here
 namespace simdjson {
@@ -16,29 +18,32 @@ namespace dom {
 
 namespace json2 {
 
+// 节点值类型：可以是编码值或原始值
+using NodeValue = std::variant<uint32_t, int64_t, double, bool>;
+
 // Trie树节点
 class TrieNode {
 public:
     // 构造函数
-    explicit TrieNode(uint32_t code, bool is_placeholder = false);
+    explicit TrieNode(const NodeValue& value, bool is_placeholder = false);
     
-    // 获取节点编码
-    uint32_t getCode() const;
+    // 获取节点值
+    const NodeValue& getValue() const;
     
     // 是否为占位节点
     bool isPlaceholder() const;
     
     // 获取或创建子节点
-    TrieNode* getOrCreateChild(uint32_t code);
+    TrieNode* getOrCreateChild(const NodeValue& value);
     
     // 获取所有子节点
-    const std::vector<std::pair<uint32_t, std::unique_ptr<TrieNode>>>& getChildren() const;
+    const std::vector<std::pair<NodeValue, std::unique_ptr<TrieNode>>>& getChildren() const;
 
     void setPlaceholder(bool is_placeholder);
 
 private:
-    uint32_t code_;  // 节点的编码值
-    std::vector<std::pair<uint32_t, std::unique_ptr<TrieNode>>> children_;  // 子节点列表
+    NodeValue value_;  // 节点的值（编码值或原始值）
+    std::vector<std::pair<NodeValue, std::unique_ptr<TrieNode>>> children_;  // 子节点列表
     bool is_placeholder_;  // 占位标志位
 };
 
@@ -81,6 +86,12 @@ private:
     
     // 递归复制子节点
     void copyChildren(const TrieNode* src, TrieNode* dest);
+    
+    // 根据字段类型创建节点值
+    NodeValue createNodeValue(const std::string& field, FieldType type, const Value& value, Dictionary& dict);
+    
+    // 从节点值重建字段值
+    std::string reconstructFieldValue(const std::string& field, FieldType type, const NodeValue& node_value, const Dictionary& dict) const;
 };
 
 } // namespace json2

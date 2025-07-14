@@ -43,8 +43,11 @@ public:
     bool isLogTemplate(const std::string& value) const;
 
     Dictionary& variableDict() { return variable_dict_; }
+    const Dictionary& variableDict() const { return variable_dict_; }
     TimestampDictionary& timestampDict() { return timestamp_dict_; }
+    const TimestampDictionary& timestampDict() const { return timestamp_dict_; }
     LogTypeDictionary& logtypeDict() { return logtype_dict_; }
+    const LogTypeDictionary& logtypeDict() const { return logtype_dict_; }
 
 private:
     Dictionary variable_dict_;

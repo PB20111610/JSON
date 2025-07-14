@@ -3,6 +3,10 @@
 #include <sstream>
 #include <vector>
 #include <string>
+#include <variant>
+#include "timestamp_dictionary.h"
+#include "trie.h"
+#include "field_dictionary_manager.h"
 
 namespace json2 {
 
@@ -51,16 +55,73 @@ static void set_nested(nlohmann::json& j, const std::string& flat_key, const nlo
     (*curr)[flat_key.substr(pos)] = value;
 }
 
-std::string reconstructJsonFromTrie(const Trie& trie, const Dictionary& dict) {
+static std::string epochToString(int64_t epoch, const std::string& fmt) {
+    struct tm tm = *gmtime(&epoch);
+    char buf[64];
+    strftime(buf, sizeof(buf), fmt.c_str(), &tm);
+    return std::string(buf);
+}
+
+std::string reconstructJsonFromTrie(const Trie& trie, const FieldDictionaryManager& manager) {
     using nlohmann::json;
     std::vector<json> records;
     const auto& ordered_fields = trie.getOrderedFields();
+    const auto& all_fields_and_types = manager.getAllFieldsAndTypes();
+    
+    // 构建字段类型映射
+    std::unordered_map<std::string, FieldType> field_types;
+    for (const auto& [field, type] : all_fields_and_types) {
+        field_types[field] = type;
+    }
+    
     std::function<void(const TrieNode*, std::vector<std::pair<std::string, std::string>>, size_t)> traverse =
         [&](const TrieNode* node, std::vector<std::pair<std::string, std::string>> currentRecord, size_t depth) {
         if (!node) return;
         if (depth > 0 && !node->isPlaceholder()) {
             std::string fieldName = ordered_fields[depth - 1];
-            std::string value = dict.getFieldValueByCode(fieldName, node->getCode());
+            const NodeValue& node_value = node->getValue();
+            
+            // 获取字段类型
+            FieldType fieldType = FieldType::String; // 默认类型
+            auto type_it = field_types.find(fieldName);
+            if (type_it != field_types.end()) {
+                fieldType = type_it->second;
+            }
+            
+            // 根据NodeValue的类型和字段类型来决定如何重建值
+            std::string value;
+            if (std::holds_alternative<uint32_t>(node_value)) {
+                // 这是字典编码值，需要解码
+                uint32_t code = std::get<uint32_t>(node_value);
+                
+                // 使用确切的字段类型进行解码
+                const Dictionary& dict = manager.variableDict();
+                auto opt_value = dict.getFieldValueByCode(fieldName, fieldType, code);
+                if (opt_value) {
+                    if (std::holds_alternative<std::string>(*opt_value)) {
+                        value = std::get<std::string>(*opt_value);
+                    } else if (std::holds_alternative<std::nullptr_t>(*opt_value)) {
+                        value = "null";
+                    } else {
+                        // 其他类型转换为字符串
+                        value = "UNKNOWN_TYPE";
+                    }
+                } else {
+                    // 解码失败
+                    value = "DECODE_ERROR_" + std::to_string(code);
+                }
+                
+            } else if (std::holds_alternative<int64_t>(node_value)) {
+                // 直接返回整数值（不需要解码）
+                value = std::to_string(std::get<int64_t>(node_value));
+            } else if (std::holds_alternative<double>(node_value)) {
+                // 直接返回浮点值（不需要解码）
+                value = std::to_string(std::get<double>(node_value));
+            } else if (std::holds_alternative<bool>(node_value)) {
+                // 直接返回布尔值（不需要解码）
+                value = std::get<bool>(node_value) ? "true" : "false";
+            }
+            
             currentRecord.push_back({fieldName, value});
         }
         if (node->getChildren().empty() && !currentRecord.empty()) {
@@ -70,7 +131,7 @@ std::string reconstructJsonFromTrie(const Trie& trie, const Dictionary& dict) {
             }
             records.push_back(j);
         }
-        for (const auto& [code, child] : node->getChildren()) {
+        for (const auto& [val, child] : node->getChildren()) {
             traverse(child.get(), currentRecord, depth + 1);
         }
     };

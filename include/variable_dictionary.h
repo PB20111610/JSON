@@ -9,18 +9,9 @@
 #include <optional>
 #include <ostream>
 #include <iostream>
+#include "field_key.h"
 
 namespace json2 {
-// 类型枚举
-enum class FieldType {
-    Int,
-    Double,
-    Bool,
-    String,
-    Timestamp,
-    LogType,
-    Null
-};
 // 类型敏感的值
 using Value = std::variant<int64_t, double, bool, std::string, std::nullptr_t>;
 // 哈希支持
@@ -31,19 +22,25 @@ struct ValueHash {
 class Dictionary {
 public:
     // 类型敏感添加字段值，返回编码
-    uint32_t addFieldValue(const std::string& field, FieldType type, const Value& value);
+    uint32_t addFieldValue(const FieldKey& key, const Value& value);
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, const std::string& value);
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, int64_t value);
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, double value);
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, bool value);
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, std::nullptr_t value);
     // 类型敏感获取或添加字段值，返回编码
-    uint32_t getOrAddFieldValue(const std::string& field, FieldType type, const Value& value);
+    uint32_t getOrAddFieldValue(const FieldKey& key, const Value& value);
     // 类型敏感通过原始值获取编码
-    uint32_t getFieldValueCode(const std::string& field, FieldType type, const Value& value) const;
+    uint32_t getFieldValueCode(const FieldKey& key, const Value& value) const;
     // 类型敏感通过编码获取原始值
-    std::optional<Value> getFieldValueByCode(const std::string& field, FieldType type, uint32_t code) const;
+    std::optional<Value> getFieldValueByCode(const FieldKey& key, uint32_t code) const;
     // 从code_to_value映射加载字典
-    void loadFromCodeToValue(const std::vector<std::string>& ordered_fields, const std::unordered_map<std::string, std::vector<std::string>>& field_code_to_value);
+    void loadFromCodeToValue(const std::vector<FieldKey>& ordered_fields, const std::unordered_map<FieldKey, std::vector<std::string>>& field_code_to_value);
     // 清空所有字典
     void clear();
     // 获取某类型字段值数量
-    size_t getFieldValueCount(const std::string& field, FieldType type) const;
+    size_t getFieldValueCount(const FieldKey& key) const;
+    size_t getFieldValueCount(const std::string& field, FieldType type) const { return getFieldValueCount(FieldKey{field, static_cast<FieldType>(type)}); }
 
 private:
     // 各类型分离的字典
@@ -73,7 +70,7 @@ private:
         FloatDict float_dict;
         BooleanDict boolean_dict;
     };
-    std::unordered_map<std::string, FieldDicts> field_dicts;
+    std::unordered_map<FieldKey, FieldDicts> field_dicts;
 };
 
 } // namespace json2

@@ -1,4 +1,5 @@
 #pragma once
+#include "field_key.h"
 #include "variable_dictionary.h"
 #include "timestamp_dictionary.h"
 #include "logtype_dictionary.h"
@@ -8,22 +9,30 @@
 #include <tuple>
 #include <vector>
 #include <set>
+#include <optional>
 
 namespace json2 {
 
 class FieldDictionaryManager {
 public:
     // 插入字段值，返回编码
-    uint32_t addFieldValue(const std::string& field, FieldType type, const std::string& value);
+    uint32_t addFieldValue(const FieldKey& key, const std::string& value);
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, const std::string& value) { return addFieldValue(key, value); }
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, int64_t value) { return variableDict().addFieldValue(key, type, value); }
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, double value) { return variableDict().addFieldValue(key, type, value); }
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, bool value) { return variableDict().addFieldValue(key, type, value); }
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, std::nullptr_t value) { return variableDict().addFieldValue(key, type, value); }
 
     // 获取唯一值数
-    size_t getUniqueValueCount(const std::string& field, FieldType type) const;
+    size_t getUniqueValueCount(const FieldKey& key) const;
+    size_t getUniqueValueCount(const FieldKey& key, FieldType type) const { return getUniqueValueCount(key); }
 
     // 获取总出现次数
-    size_t getTotalCount(const std::string& field, FieldType type) const;
+    size_t getTotalCount(const FieldKey& key) const;
+    size_t getTotalCount(const FieldKey& key, FieldType type) const { return getTotalCount(key); }
 
     // 获取所有出现过的字段和类型
-    std::vector<std::tuple<std::string, FieldType>> getAllFieldsAndTypes() const;
+    std::vector<FieldKey> getAllFieldsAndTypes() const;
 
     // 获取所有出现过的字段
     std::set<std::string> getAllFields() const;
@@ -49,18 +58,20 @@ public:
     LogTypeDictionary& logtypeDict() { return logtype_dict_; }
     const LogTypeDictionary& logtypeDict() const { return logtype_dict_; }
 
+    std::optional<Value> getFieldValueByCode(const FieldKey& key, uint32_t code) const;
+
 private:
     Dictionary variable_dict_;
     TimestampDictionary timestamp_dict_;
     LogTypeDictionary logtype_dict_;
     // 统计每个字段每种类型的出现次数
-    std::unordered_map<std::string, std::unordered_map<FieldType, size_t>> field_type_total_count_;
+    std::unordered_map<FieldKey, size_t> field_type_total_count_;
     // 记录所有出现过的字段和类型
-    std::vector<std::tuple<std::string, FieldType>> all_fields_and_types_;
+    std::vector<FieldKey> all_fields_and_types_;
     // 辅助去重
-    std::unordered_map<std::string, std::unordered_map<FieldType, bool>> field_type_seen_;
+    std::unordered_map<FieldKey, bool> field_type_seen_;
     // 统计每个字段每种类型的唯一值
-    std::unordered_map<std::string, std::unordered_map<FieldType, std::set<std::string>>> field_type_unique_values_;
+    std::unordered_map<FieldKey, std::set<std::string>> field_type_unique_values_;
 };
 
 } // namespace json2 

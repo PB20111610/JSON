@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <iostream> // Added for debug output
 
 namespace json2 {
 
@@ -54,89 +55,83 @@ public:
 
 static SimpleTypeDetector type_detector;
 
-uint32_t FieldDictionaryManager::addFieldValue(const std::string& field, FieldType type, const std::string& value) {
-    // 对于String类型，采用 clp_s 的简单检测方式
-    FieldType actual_type = type;
-    if (type == FieldType::String) {
-        // 1. 检查是否为时间戳字段
-        if (type_detector.isTimestampField(field) && type_detector.isTimestampValue(value)) {
+uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::string& value) {
+    FieldType actual_type = key.type;
+    if (key.type == FieldType::String) {
+        if (type_detector.isTimestampField(key.name) && type_detector.isTimestampValue(value)) {
             actual_type = FieldType::Timestamp;
-        }
-        // 2. 检查是否为日志模板（包含空格）
-        else if (type_detector.isLogTemplate(value)) {
+        } else if (type_detector.isLogTemplate(value)) {
             actual_type = FieldType::LogType;
         }
-        // 3. 默认为普通字符串
     }
-    
-    field_type_total_count_[field][actual_type]++;
-    if (!field_type_seen_[field][actual_type]) {
-        all_fields_and_types_.emplace_back(field, actual_type);
-        field_type_seen_[field][actual_type] = true;
+    FieldKey actual_key{key.name, static_cast<FieldType>(actual_type)};
+    // std::cout << "[DEBUG] field_type_total_count_++ 前, key=" << actual_key.name << ", type=" << static_cast<int>(actual_key.type) << std::endl;
+    field_type_total_count_[actual_key]++;
+    // std::cout << "[DEBUG] field_type_total_count_++ 后" << std::endl;
+    if (!field_type_seen_[actual_key]) {
+        // std::cout << "[DEBUG] all_fields_and_types_ push_back 前" << std::endl;
+        all_fields_and_types_.push_back(actual_key);
+        field_type_seen_[actual_key] = true;
+        // std::cout << "[DEBUG] all_fields_and_types_ push_back 后" << std::endl;
     }
-    
-    // 统计唯一值
-    field_type_unique_values_[field][actual_type].insert(value);
-    
+    // std::cout << "[DEBUG] field_type_unique_values_ insert 前" << std::endl;
+    field_type_unique_values_[actual_key].insert(value);
+    // std::cout << "[DEBUG] field_type_unique_values_ insert 后" << std::endl;
     switch (actual_type) {
         case FieldType::Int: {
             int64_t v = std::stoll(value);
-            return variable_dict_.addFieldValue(field, actual_type, v);
+            auto ret = variable_dict_.addFieldValue(key, actual_type, v);
+            return ret;
         }
         case FieldType::Double: {
             double v = std::stod(value);
-            return variable_dict_.addFieldValue(field, actual_type, v);
+            auto ret = variable_dict_.addFieldValue(key, actual_type, v);
+            return ret;
         }
         case FieldType::Bool: {
             bool v = (value == "true");
-            return variable_dict_.addFieldValue(field, actual_type, v);
+            auto ret = variable_dict_.addFieldValue(key, actual_type, v);
+            return ret;
         }
         case FieldType::String: {
-            return variable_dict_.addFieldValue(field, actual_type, value);
+            auto ret = variable_dict_.addFieldValue(key, actual_type, value);
+            return ret;
         }
         case FieldType::Timestamp: {
-            // 使用时间戳字典处理
-            auto encoded = timestamp_dict_.encode(field, value);
-            // 只返回pattern_id，epoch信息存储在字典内部
+            // 直接调用timestamp_dict_
+            auto encoded = timestamp_dict_.encode(key.name, value);
             return encoded.pattern_id;
         }
         case FieldType::LogType: {
-            // 使用日志类型字典处理，自动提取模板和变量
-            auto encoded = logtype_dict_.encodeLog(value, {});
+            // 直接调用logtype_dict_
+            auto encoded = logtype_dict_.encodeLog(key, value, {});
             return encoded.template_id;
         }
-        case FieldType::Null: {
-            return variable_dict_.addFieldValue(field, actual_type, nullptr);
-        }
         default:
-            return 0;
+            throw std::invalid_argument("Unsupported type in addFieldValue");
     }
 }
 
-size_t FieldDictionaryManager::getUniqueValueCount(const std::string& field, FieldType type) const {
-    auto it = field_type_unique_values_.find(field);
+size_t FieldDictionaryManager::getUniqueValueCount(const FieldKey& key) const {
+    auto it = field_type_unique_values_.find(key);
     if (it == field_type_unique_values_.end()) return 0;
-    auto it2 = it->second.find(type);
-    if (it2 == it->second.end()) return 0;
-    return it2->second.size();
+    return it->second.size();
 }
 
-size_t FieldDictionaryManager::getTotalCount(const std::string& field, FieldType type) const {
-    auto it = field_type_total_count_.find(field);
+size_t FieldDictionaryManager::getTotalCount(const FieldKey& key) const {
+    auto it = field_type_total_count_.find(key);
     if (it == field_type_total_count_.end()) return 0;
-    auto it2 = it->second.find(type);
-    if (it2 == it->second.end()) return 0;
-    return it2->second;
+    return it->second;
 }
 
-std::vector<std::tuple<std::string, FieldType>> FieldDictionaryManager::getAllFieldsAndTypes() const {
+std::vector<FieldKey> FieldDictionaryManager::getAllFieldsAndTypes() const {
     return all_fields_and_types_;
 }
 
 std::set<std::string> FieldDictionaryManager::getAllFields() const {
     std::set<std::string> fields;
     for (const auto& [field, _] : field_type_total_count_) {
-        fields.insert(field);
+        fields.insert(field.name);
     }
     return fields;
 }
@@ -144,8 +139,8 @@ std::set<std::string> FieldDictionaryManager::getAllFields() const {
 void FieldDictionaryManager::printRedundancyStats(std::ostream& out) const {
     out << std::setw(30) << "Field" << std::setw(12) << "Type" << std::setw(12) << "Total" << std::setw(12) << "Unique" << std::setw(12) << "Redundancy" << "\n";
     for (const auto& [field, type] : all_fields_and_types_) {
-        size_t total = getTotalCount(field, type);
-        size_t unique = getUniqueValueCount(field, type);
+        size_t total = getTotalCount(FieldKey{field, type});
+        size_t unique = getUniqueValueCount(FieldKey{field, type});
         double redundancy = unique ? (double)total / unique : 0;
         std::string type_str;
         switch (type) {
@@ -186,6 +181,28 @@ bool FieldDictionaryManager::isTimestampValue(const std::string& value) const {
 
 bool FieldDictionaryManager::isLogTemplate(const std::string& value) const {
     return SimpleTypeDetector::isLogTemplate(value);
+}
+
+std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey& key, uint32_t code) const {
+    switch (key.type) {
+        case FieldType::String:
+        case FieldType::Null:
+        case FieldType::Int:
+        case FieldType::Double:
+        case FieldType::Bool:
+            return variable_dict_.getFieldValueByCode(key, code);
+        case FieldType::Timestamp: {
+            EncodedTimestamp encoded{code, 0};
+            std::string val = timestamp_dict_.decode(key, encoded);
+            return val.empty() ? std::nullopt : std::optional<Value>(val);
+        }
+        case FieldType::LogType: {
+            std::string val = logtype_dict_.getLogTypeById(code);
+            return val.empty() ? std::nullopt : std::optional<Value>(val);
+        }
+        default:
+            return std::nullopt;
+    }
 }
 
 } // namespace json2 

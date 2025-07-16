@@ -1,32 +1,30 @@
 #include "../include/logtype_dictionary.h"
+#include "variable_dictionary.h"
+#include <variant>
 #include <regex>
-#include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
+#include <iostream> // Added for debug output
 
 namespace json2 {
 
 uint32_t LogTypeDictionary::addLogType(const std::string& log_template) {
     auto it = template_to_id_.find(log_template);
     if (it != template_to_id_.end()) {
-        template_count_[log_template]++;
+        // std::cout << "[DEBUG][LogTypeDictionary::addLogType] already exists: id=" << it->second << ", template='" << log_template << "'" << std::endl;
         return it->second;
     }
-    uint32_t id = next_id_++;
+    uint32_t id = static_cast<uint32_t>(id_to_template_.size() + 1);
     template_to_id_[log_template] = id;
-    if (id_to_template_.size() <= id) {
-        id_to_template_.resize(id + 1);
-    }
-    id_to_template_[id] = log_template;
-    template_count_[log_template] = 1;
+    id_to_template_.push_back(log_template);
+    // std::cout << "[DEBUG][LogTypeDictionary::addLogType] new: id=" << id << ", template='" << log_template << "'" << std::endl;
     return id;
 }
 
 std::string LogTypeDictionary::getLogTypeById(uint32_t id) const {
-    if (id < id_to_template_.size()) {
-        return id_to_template_[id];
-    }
-    return "";
+    // std::cout << "[DEBUG][LogTypeDictionary::getLogTypeById] template_id=" << id << std::endl;
+    if (id == 0 || id > id_to_template_.size()) return "";
+    return id_to_template_[id - 1];
 }
 
 size_t LogTypeDictionary::getLogTypeCount(const std::string& log_template) const {
@@ -72,6 +70,31 @@ std::string LogTypeDictionary::decodeVariable(uint32_t code) const {
     return "";
 }
 
+
+
+EncodedLog LogTypeDictionary::encodeLog(const FieldKey& key, const std::string& log_template, const std::vector<std::string>& variables) {
+    // 目前FieldKey未参与分发，保留接口兼容性
+    return encodeLog(log_template, variables);
+}
+
+std::pair<std::string, std::vector<std::string>> LogTypeDictionary::decodeLog(const FieldKey& key, const EncodedLog& encoded) const {
+    return decodeLog(encoded);
+}
+
+std::string LogTypeDictionary::decodeLogToString(const FieldKey& key, const EncodedLog& encoded) const {
+    // std::cout << "[DEBUG] decodeLogToString: template_id=" << encoded.template_id << std::endl;
+    auto [tmpl, vars] = decodeLog(encoded);
+    // std::cout << "[DEBUG] decodeLogToString: tmpl=" << tmpl << std::endl;
+    std::string result = tmpl;
+    size_t var_idx = 0;
+    size_t pos = 0;
+    while ((pos = result.find("*", pos)) != std::string::npos && var_idx < vars.size()) {
+        result.replace(pos, 1, vars[var_idx++]);
+        pos += vars[var_idx-1].size();
+    }
+    // std::cout << "[DEBUG][LogTypeDictionary::decodeLogToString] result=" << result << std::endl;
+    return result;
+}
 
 
 EncodedLog LogTypeDictionary::encodeLog(const std::string& log_template, const std::vector<std::string>& variables) {
@@ -128,6 +151,15 @@ std::string LogTypeDictionary::decodeLogToString(const EncodedLog& encoded) cons
         pos += vars[var_idx-1].size();
     }
     return result;
+}
+
+uint32_t LogTypeDictionary::getOrAddFieldValue(const FieldKey& key, const Value& value) {
+    // 只支持 string 类型
+    if (!std::holds_alternative<std::string>(value)) {
+        throw std::invalid_argument("LogTypeDictionary only supports string values");
+    }
+    const std::string& str = std::get<std::string>(value);
+    return addLogType(str);
 }
 
 } // namespace json2

@@ -1,8 +1,11 @@
 #include "../include/timestamp_dictionary.h"
+#include "../include/variable_dictionary.h"
 #include <regex>
 #include <ctime>
 #include <sstream>
 #include <iomanip>
+#include <variant>
+#include <iostream> // Added for [DEBUG] output
 
 namespace json2 {
 
@@ -49,50 +52,58 @@ static std::pair<std::string, int64_t> parseTimestamp(const std::string& value) 
     return {"", -1};
 }
 
-std::pair<uint32_t, int64_t> TimestampDictionary::addTimestamp(const std::string& field, const std::string& value) {
+std::pair<uint32_t, int64_t> TimestampDictionary::addTimestamp(const FieldKey& key, const std::string& value) {
+    return addTimestamp(key.name, value);
+}
+
+EncodedTimestamp TimestampDictionary::encode(const FieldKey& key, const std::string& value) {
+    // 实际编码逻辑
     auto [fmt, epoch] = parseTimestamp(value);
     if (fmt.empty() || epoch < 0) {
-        // 解析失败，全部归为格式0，值-1
+        // 解析失败，返回无效编码
         return {0, -1};
     }
-    // 分配格式ID
     uint32_t pattern_id;
     auto it = pattern_to_id_.find(fmt);
     if (it == pattern_to_id_.end()) {
         pattern_id = next_pattern_id_++;
         pattern_to_id_[fmt] = pattern_id;
-        id_to_pattern_.resize(pattern_id + 1);
-        id_to_pattern_[pattern_id] = fmt;
+        id_to_pattern_.push_back(fmt);
     } else {
         pattern_id = it->second;
     }
-    // 更新范围
-    auto& range = field_ranges_[field];
+    // 更新字段时间范围
+    auto& range = field_ranges_[key.name];
     if (epoch < range.min) range.min = epoch;
     if (epoch > range.max) range.max = epoch;
-    
-    // 填充反查映射，确保解码功能正常工作
+    // 存储反查映射
     encoded_to_value_[pattern_id][epoch] = value;
-    
     return {pattern_id, epoch};
 }
 
-EncodedTimestamp TimestampDictionary::encode(const std::string& field, const std::string& value) {
-    auto [pattern_id, epoch] = addTimestamp(field, value);
-    if (pattern_id != 0 && epoch != -1) {
-        encoded_to_value_[pattern_id][epoch] = value;
-    }
-    return {pattern_id, epoch};
-}
-
-std::string TimestampDictionary::decode(const EncodedTimestamp& encoded) const {
-    auto it1 = encoded_to_value_.find(encoded.pattern_id);
-    if (it1 != encoded_to_value_.end()) {
-        auto it2 = it1->second.find(encoded.epoch);
-        if (it2 != it1->second.end()) {
-            return it2->second;
+std::string TimestampDictionary::decode(const FieldKey& key, const EncodedTimestamp& encoded) const {
+    // std::cout << "[DEBUG][TimestampDictionary::decode] field=" << key.name << ", pattern_id=" << encoded.pattern_id << ", epoch=" << encoded.epoch << std::endl;
+    // 实际解码逻辑
+    if (encoded.pattern_id > 0 && encoded.pattern_id <= id_to_pattern_.size()) {
+        // 反查原始字符串
+        auto it_epoch = encoded_to_value_.find(encoded.pattern_id);
+        if (it_epoch != encoded_to_value_.end()) {
+            auto it_val = it_epoch->second.find(encoded.epoch);
+            if (it_val != it_epoch->second.end()) {
+                // std::cout << "[DEBUG][TimestampDictionary::decode] found value: " << it_val->second << std::endl;
+                return it_val->second;
+            }
         }
+        // std::cout << "[DEBUG][TimestampDictionary::decode] not found, pattern_id or epoch missing" << std::endl;
+        // 若找不到原始字符串，可选：格式化epoch为字符串
+        // std::time_t t = encoded.epoch;
+        // std::tm* tm_ptr = std::gmtime(&t);
+        // char buf[64];
+        // if (tm_ptr && std::strftime(buf, sizeof(buf), id_to_pattern_[encoded.pattern_id-1].c_str(), tm_ptr)) {
+        //     return std::string(buf);
+        // }
     }
+    // std::cout << "[DEBUG][TimestampDictionary::decode] invalid pattern_id, return empty string" << std::endl;
     return "";
 }
 
@@ -101,13 +112,19 @@ std::string TimestampDictionary::getPatternById(uint32_t id) const {
     return "";
 }
 
-std::pair<int64_t, int64_t> TimestampDictionary::getRange(const std::string& field) const {
-    auto it = field_ranges_.find(field);
-    if (it == field_ranges_.end()) return {0, 0};
-    return {it->second.min, it->second.max};
+std::pair<int64_t, int64_t> TimestampDictionary::getRange(const FieldKey& key) const {
+    return getRange(key.name);
 }
 
-
+uint32_t TimestampDictionary::getOrAddFieldValue(const FieldKey& key, const Value& value) {
+    // 只支持 string 类型
+    if (!std::holds_alternative<std::string>(value)) {
+        throw std::invalid_argument("TimestampDictionary only supports string values");
+    }
+    const std::string& str = std::get<std::string>(value);
+    auto encoded = encode(key, str);
+    return encoded.pattern_id; // 这里只返回 pattern_id 作为编码，实际可扩展
+}
 
 void TimestampDictionary::clear() {
     pattern_to_id_.clear();

@@ -129,30 +129,6 @@ json2/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/build
 .PHONY : json2/fast
 
-src/compress.o: src/compress.cpp.o
-.PHONY : src/compress.o
-
-# target to build an object file
-src/compress.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress.cpp.o
-.PHONY : src/compress.cpp.o
-
-src/compress.i: src/compress.cpp.i
-.PHONY : src/compress.i
-
-# target to preprocess a source file
-src/compress.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress.cpp.i
-.PHONY : src/compress.cpp.i
-
-src/compress.s: src/compress.cpp.s
-.PHONY : src/compress.s
-
-# target to generate assembly for a file
-src/compress.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress.cpp.s
-.PHONY : src/compress.cpp.s
-
 src/field_dictionary_manager.o: src/field_dictionary_manager.cpp.o
 .PHONY : src/field_dictionary_manager.o
 
@@ -201,29 +177,29 @@ src/logtype_dictionary.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/logtype_dictionary.cpp.s
 .PHONY : src/logtype_dictionary.cpp.s
 
-src/main_compress.o: src/main_compress.cpp.o
-.PHONY : src/main_compress.o
+src/main_trie.o: src/main_trie.cpp.o
+.PHONY : src/main_trie.o
 
 # target to build an object file
-src/main_compress.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/main_compress.cpp.o
-.PHONY : src/main_compress.cpp.o
+src/main_trie.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/main_trie.cpp.o
+.PHONY : src/main_trie.cpp.o
 
-src/main_compress.i: src/main_compress.cpp.i
-.PHONY : src/main_compress.i
+src/main_trie.i: src/main_trie.cpp.i
+.PHONY : src/main_trie.i
 
 # target to preprocess a source file
-src/main_compress.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/main_compress.cpp.i
-.PHONY : src/main_compress.cpp.i
+src/main_trie.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/main_trie.cpp.i
+.PHONY : src/main_trie.cpp.i
 
-src/main_compress.s: src/main_compress.cpp.s
-.PHONY : src/main_compress.s
+src/main_trie.s: src/main_trie.cpp.s
+.PHONY : src/main_trie.s
 
 # target to generate assembly for a file
-src/main_compress.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/main_compress.cpp.s
-.PHONY : src/main_compress.cpp.s
+src/main_trie.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/main_trie.cpp.s
+.PHONY : src/main_trie.cpp.s
 
 src/parser.o: src/parser.cpp.o
 .PHONY : src/parser.o
@@ -378,18 +354,15 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... json2"
-	@echo "... src/compress.o"
-	@echo "... src/compress.i"
-	@echo "... src/compress.s"
 	@echo "... src/field_dictionary_manager.o"
 	@echo "... src/field_dictionary_manager.i"
 	@echo "... src/field_dictionary_manager.s"
 	@echo "... src/logtype_dictionary.o"
 	@echo "... src/logtype_dictionary.i"
 	@echo "... src/logtype_dictionary.s"
-	@echo "... src/main_compress.o"
-	@echo "... src/main_compress.i"
-	@echo "... src/main_compress.s"
+	@echo "... src/main_trie.o"
+	@echo "... src/main_trie.i"
+	@echo "... src/main_trie.s"
 	@echo "... src/parser.o"
 	@echo "... src/parser.i"
 	@echo "... src/parser.s"

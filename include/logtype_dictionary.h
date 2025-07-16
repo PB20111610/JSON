@@ -5,13 +5,18 @@
 #include <vector>
 #include <ostream>
 #include <iostream>
-#include <cstdint>
+#include "field_key.h"
+#include "variable_dictionary.h"
+#include <variant>
 
 namespace json2 {
 
 struct EncodedLog {
     uint32_t template_id;
     std::vector<uint32_t> var_codes;
+    bool operator==(const EncodedLog& other) const {
+        return template_id == other.template_id && var_codes == other.var_codes;
+    }
 };
 
 class LogTypeDictionary {
@@ -30,10 +35,19 @@ public:
     std::string decodeVariable(uint32_t code) const;
 
     // 日志整体编码/解码
+    EncodedLog encodeLog(const FieldKey& key, const std::string& log_template, const std::vector<std::string>& variables);
     EncodedLog encodeLog(const std::string& log_template, const std::vector<std::string>& variables);
+    std::pair<std::string, std::vector<std::string>> decodeLog(const FieldKey& key, const EncodedLog& encoded) const;
     std::pair<std::string, std::vector<std::string>> decodeLog(const EncodedLog& encoded) const;
     // 自动解码为原始日志字符串
+    std::string decodeLogToString(const FieldKey& key, const EncodedLog& encoded) const;
     std::string decodeLogToString(const EncodedLog& encoded) const;
+
+    // 兼容 Trie 类型分发接口
+    uint32_t getOrAddFieldValue(const FieldKey& key, const Value& value);
+
+    // 公开：提取模板和变量
+    std::pair<std::string, std::vector<std::string>> extractTemplateAndVars(const std::string& raw_log) const;
 
 private:
     std::unordered_map<std::string, uint32_t> template_to_id_;
@@ -48,8 +62,6 @@ private:
 
     // 自动模板化和变量提取编码
     EncodedLog encodeLog(const std::string& raw_log);
-    // 辅助函数，提取模板和变量
-    std::pair<std::string, std::vector<std::string>> extractTemplateAndVars(const std::string& raw_log) const;
 };
 
 } // namespace json2

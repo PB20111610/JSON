@@ -7,6 +7,8 @@
 #include "timestamp_dictionary.h"
 #include "trie.h"
 #include "field_dictionary_manager.h"
+#include <iostream> // Added for debugging output
+#include <set> // Added for std::set
 
 namespace json2 {
 
@@ -66,76 +68,41 @@ std::string reconstructJsonFromTrie(const Trie& trie, const FieldDictionaryManag
     using nlohmann::json;
     std::vector<json> records;
     const auto& ordered_fields = trie.getOrderedFields();
-    const auto& all_fields_and_types = manager.getAllFieldsAndTypes();
+    size_t field_count = ordered_fields.size();
     
-    // 构建字段类型映射
-    std::unordered_map<std::string, FieldType> field_types;
-    for (const auto& [field, type] : all_fields_and_types) {
-        field_types[field] = type;
-    }
-    
-    std::function<void(const TrieNode*, std::vector<std::pair<std::string, std::string>>, size_t)> traverse =
-        [&](const TrieNode* node, std::vector<std::pair<std::string, std::string>> currentRecord, size_t depth) {
+    // 递归遍历Trie，按顺序重建每条记录
+    std::function<void(const TrieNode*, std::vector<std::pair<FieldKey, std::string>>&, size_t)> traverse;
+    traverse = [&](const TrieNode* node, std::vector<std::pair<FieldKey, std::string>>& currentRecord, size_t depth) {
         if (!node) return;
-        if (depth > 0 && !node->isPlaceholder()) {
-            std::string fieldName = ordered_fields[depth - 1];
-            const NodeValue& node_value = node->getValue();
-            
-            // 获取字段类型
-            FieldType fieldType = FieldType::String; // 默认类型
-            auto type_it = field_types.find(fieldName);
-            if (type_it != field_types.end()) {
-                fieldType = type_it->second;
-            }
-            
-            // 根据NodeValue的类型和字段类型来决定如何重建值
-            std::string value;
-            if (std::holds_alternative<uint32_t>(node_value)) {
-                // 这是字典编码值，需要解码
-                uint32_t code = std::get<uint32_t>(node_value);
-                
-                // 使用确切的字段类型进行解码
-                const Dictionary& dict = manager.variableDict();
-                auto opt_value = dict.getFieldValueByCode(fieldName, fieldType, code);
-                if (opt_value) {
-                    if (std::holds_alternative<std::string>(*opt_value)) {
-                        value = std::get<std::string>(*opt_value);
-                    } else if (std::holds_alternative<std::nullptr_t>(*opt_value)) {
-                        value = "null";
-                    } else {
-                        // 其他类型转换为字符串
-                        value = "UNKNOWN_TYPE";
-                    }
-                } else {
-                    // 解码失败
-                    value = "DECODE_ERROR_" + std::to_string(code);
-                }
-                
-            } else if (std::holds_alternative<int64_t>(node_value)) {
-                // 直接返回整数值（不需要解码）
-                value = std::to_string(std::get<int64_t>(node_value));
-            } else if (std::holds_alternative<double>(node_value)) {
-                // 直接返回浮点值（不需要解码）
-                value = std::to_string(std::get<double>(node_value));
-            } else if (std::holds_alternative<bool>(node_value)) {
-                // 直接返回布尔值（不需要解码）
-                value = std::get<bool>(node_value) ? "true" : "false";
-            }
-            
-            currentRecord.push_back({fieldName, value});
+        const auto& path = node->getPath();
+        for (size_t i = 0; i < path.size(); ++i) {
+            if (depth + i >= field_count) break;
+            const auto& key = ordered_fields[depth + i];
+            const auto& node_value = path[i];
+            // 跳过 nullptr
+            if (std::holds_alternative<std::nullptr_t>(node_value)) continue;
+            std::string value = trie.reconstructFieldValue(key, node_value, manager);
+            currentRecord.emplace_back(key, value);
         }
         if (node->getChildren().empty() && !currentRecord.empty()) {
+            // 构建json对象，只包含实际存在的字段
             json j;
-            for (const auto& [k, v] : currentRecord) {
-                set_nested(j, k, parseValue(v));
+            std::set<std::string> output_names;
+            for (const auto& [key, val] : currentRecord) {
+                // 只输出第一个有值的同名字段（类型敏感）
+                if (output_names.count(key.name)) continue;
+                set_nested(j, key.name, parseValue(val));
+                output_names.insert(key.name);
             }
             records.push_back(j);
         }
-        for (const auto& [val, child] : node->getChildren()) {
-            traverse(child.get(), currentRecord, depth + 1);
+        for (const auto& child : node->getChildren()) {
+            std::vector<std::pair<FieldKey, std::string>> nextRecord = currentRecord;
+            traverse(child.get(), nextRecord, depth + path.size());
         }
     };
-    traverse(trie.getRoot(), {}, 0);
+    std::vector<std::pair<FieldKey, std::string>> record;
+    traverse(trie.getRoot(), record, 0);
     std::stringstream ss;
     for (size_t i = 0; i < records.size(); ++i) {
         if (i > 0) ss << "\n";

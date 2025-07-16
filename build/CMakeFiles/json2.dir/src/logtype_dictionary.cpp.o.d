@@ -164,12 +164,16 @@ CMakeFiles/json2.dir/src/logtype_dictionary.cpp.o: \
  /usr/include/c++/13/bits/basic_ios.tcc \
  /usr/include/c++/13/bits/ostream.tcc /usr/include/c++/13/iostream \
  /usr/include/c++/13/istream /usr/include/c++/13/bits/istream.tcc \
+ /workspaces/JSON/src/../include/field_key.h \
+ /workspaces/JSON/src/../include/variable_dictionary.h \
+ /usr/include/c++/13/variant /usr/include/c++/13/bits/parse_numbers.h \
  /usr/include/c++/13/cstdint \
  /usr/lib/gcc/x86_64-linux-gnu/13/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
  /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
- /usr/include/c++/13/regex /usr/include/c++/13/bitset \
- /usr/include/c++/13/locale \
+ /usr/include/c++/13/optional \
+ /workspaces/JSON/include/variable_dictionary.h /usr/include/c++/13/regex \
+ /usr/include/c++/13/bitset /usr/include/c++/13/locale \
  /usr/include/c++/13/bits/locale_facets_nonio.h /usr/include/c++/13/ctime \
  /usr/include/x86_64-linux-gnu/c++/13/bits/time_members.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/messages_members.h \

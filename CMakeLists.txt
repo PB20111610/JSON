@@ -14,7 +14,7 @@ add_definitions(-DUSE_ZSTD)
 
 # Add our executable and the library sources
 add_executable(json2
-    src/main_trie.cpp
+    src/main_compress.cpp
     src/parser.cpp
     src/variable_dictionary.cpp
     src/timestamp_dictionary.cpp
@@ -22,6 +22,7 @@ add_executable(json2
     src/field_dictionary_manager.cpp 
     src/trie.cpp
     src/reconstruct.cpp
+    src/compress.cpp
     vendor/simdjson/simdjson.cpp
 )
 

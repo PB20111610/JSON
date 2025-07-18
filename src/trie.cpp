@@ -17,6 +17,8 @@ const std::vector<NodeValue>& TrieNode::getPath() const {
     return path_;
 }
 
+std::vector<NodeValue>& TrieNode::getPath() { return path_; }
+
 bool TrieNode::isPlaceholder() const {
     return is_placeholder_;
 }
@@ -25,11 +27,14 @@ void TrieNode::setPlaceholder(bool is_placeholder) {
     is_placeholder_ = is_placeholder;
 }
 
-const std::vector<std::unique_ptr<TrieNode>>& TrieNode::getChildren() const {
-    return children_;
+void TrieNode::setPath(const std::vector<NodeValue>& path) {
+    path_ = path;
 }
 
-std::vector<std::unique_ptr<TrieNode>>& TrieNode::getChildren() {
+std::unordered_map<NodeValue, std::unique_ptr<TrieNode>, NodeValueHash>& TrieNode::getChildren() {
+    return children_;
+}
+const std::unordered_map<NodeValue, std::unique_ptr<TrieNode>, NodeValueHash>& TrieNode::getChildren() const {
     return children_;
 }
 
@@ -99,8 +104,7 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
             NodeValue node_value = createNodeValue(key, value, manager);
             values.push_back(node_value);
         } catch (const simdjson::simdjson_error& e) {
-            // 字段不存在时，插入nullptr占位
-            NodeValue node_value = createNodeValue(key, nullptr, manager);
+            NodeValue node_value = NodeValue(nullptr);
             values.push_back(node_value);
         }
     }
@@ -108,51 +112,60 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
     TrieNode* cur = root_.get();
     for (size_t i = 0; i < values.size(); ++i) {
         NodeValue& v = values[i];
-        bool found = false;
-        for (auto& child : cur->getChildren()) {
-            if (child->getPath().size() == 1 && child->getPath()[0] == v) {
-                cur = child.get();
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
+        auto& children = cur->getChildren();
+        auto it = children.find(v);
+        if (it != children.end()) {
+            cur = it->second.get();
+        } else {
             auto new_node = std::make_unique<TrieNode>(std::vector<NodeValue>{v}, false);
             TrieNode* new_ptr = new_node.get();
-            cur->getChildren().push_back(std::move(new_node));
+            children[v] = std::move(new_node);
             cur = new_ptr;
         }
     }
     cur->setPlaceholder(true);
 }
 
-// 批量路径压缩递归实现
+// 修正后的批量路径压缩递归实现（合并path和children）
 static void compressTrieNode(TrieNode* node) {
-    while (node->getChildren().size() == 1) { // 允许占位节点也参与压缩
-        TrieNode* child = node->getChildren()[0].get();
-        // 合并child的path到node
-        auto& node_path = const_cast<std::vector<NodeValue>&>(node->getPath());
-        node_path.insert(node_path.end(), child->getPath().begin(), child->getPath().end());
-        // 继承child的children和占位
-        node->getChildren() = std::move(const_cast<std::vector<std::unique_ptr<TrieNode>>&>(child->getChildren()));
-        node->setPlaceholder(child->isPlaceholder());
-        // child节点析构
-    }
+    // 先递归压缩所有子节点
     for (auto& child : node->getChildren()) {
-        compressTrieNode(child.get());
+        compressTrieNode(child.second.get());
+    }
+    // 合并单分支路径
+    while (node->getChildren().size() == 1) {
+        auto it = node->getChildren().begin();
+        std::unique_ptr<TrieNode> only_child = std::move(it->second);
+        node->getChildren().clear();
+
+        // 合并 path
+        auto& node_path = node->getPath();
+        const auto& child_path = only_child->getPath();
+        node_path.insert(node_path.end(), child_path.begin(), child_path.end());
+
+        // 合并 children
+        auto& child_children = only_child->getChildren();
+        for (auto& kv : child_children) {
+            node->getChildren()[kv.first] = std::move(kv.second);
+        }
+
+        // 合并 placeholder
+        node->setPlaceholder(only_child->isPlaceholder());
+        // only_child 自动析构
     }
 }
 
 void Trie::compressPaths() {
     for (auto& child : root_->getChildren()) {
-        compressTrieNode(child.get());
+        compressTrieNode(child.second.get());
     }
 }
 
 // Trie序列化/反序列化
 void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const {
-    // 写入path长度
     uint32_t path_len = static_cast<uint32_t>(node->getPath().size());
+    // std::cerr << "[SER] path_len=" << path_len << ", data_pos=" << data.size() << ", child_count=" << node->getChildren().size() << std::endl;
+    // 写入path长度
     data.insert(data.end(), reinterpret_cast<uint8_t*>(&path_len), reinterpret_cast<uint8_t*>(&path_len) + sizeof(path_len));
     // 写入path内容
     for (size_t idx = 0; idx < node->getPath().size(); ++idx) {
@@ -164,6 +177,7 @@ void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const
         else if (std::holds_alternative<bool>(val)) type_byte = 3;
         else if (std::holds_alternative<EncodedTimestamp>(val)) type_byte = 4;
         else if (std::holds_alternative<EncodedLog>(val)) type_byte = 5;
+        else if (std::holds_alternative<std::nullptr_t>(val)) type_byte = 6;
         data.push_back(type_byte);
         switch (type_byte) {
             case 0: {
@@ -202,6 +216,9 @@ void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const
                 }
                 break;
             }
+            case 6: // std::nullptr_t
+                // 空值不写内容
+                break;
         }
     }
     // 写入占位标志
@@ -211,7 +228,7 @@ void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const
     data.insert(data.end(), reinterpret_cast<uint8_t*>(&child_count), reinterpret_cast<uint8_t*>(&child_count) + sizeof(child_count));
     // 递归序列化子节点
     for (const auto& child : node->getChildren()) {
-        serializeNode(child.get(), data);
+        serializeNode(child.second.get(), data);
     }
 }
 
@@ -221,10 +238,12 @@ std::vector<uint8_t> Trie::serialize() const {
     return data;
 }
 
-TrieNode* Trie::deserializeNode(const std::vector<uint8_t>& data, size_t& pos) {
+// 新增is_root参数，根节点允许path.size()==0，非根节点要求path.size()==1
+TrieNode* Trie::deserializeNode(const std::vector<uint8_t>& data, size_t& pos, bool is_root) {
     if (pos + sizeof(uint32_t) > data.size()) return nullptr;
     uint32_t path_len;
     std::memcpy(&path_len, &data[pos], sizeof(path_len));
+    // std::cerr << "[DESER] path_len=" << path_len << ", pos=" << pos << std::endl;
     pos += sizeof(path_len);
     std::vector<NodeValue> path;
     for (uint32_t i = 0; i < path_len; ++i) {
@@ -282,27 +301,40 @@ TrieNode* Trie::deserializeNode(const std::vector<uint8_t>& data, size_t& pos) {
                 path.emplace_back(EncodedLog{template_id, var_codes});
                 break;
             }
+            case 6: // std::nullptr_t
+                path.emplace_back(std::nullptr_t{});
+                break;
             default:
                 return nullptr;
         }
     }
-    if (pos >= data.size()) return nullptr;
+    // 不再断言，允许 path.size() > 1（压缩trie兼容）
     bool is_placeholder = (data[pos++] == 1);
     auto node = std::make_unique<TrieNode>(path, is_placeholder);
     if (pos + sizeof(uint32_t) > data.size()) return nullptr;
     uint32_t child_count;
     std::memcpy(&child_count, &data[pos], sizeof(child_count));
+    // std::cerr << "[DESER] child_count=" << child_count << ", pos=" << pos << std::endl;
     pos += sizeof(child_count);
     for (uint32_t i = 0; i < child_count; ++i) {
-        TrieNode* child = deserializeNode(data, pos);
-        if (child) node->getChildren().emplace_back(child);
+        TrieNode* child = deserializeNode(data, pos, false);
+        if (child) {
+            auto key = child->getPath()[0];
+            auto& children = node->getChildren();
+            if (children.count(key)) {
+                throw std::runtime_error("Duplicate child key in TrieNode deserialization!");
+            }
+            children[key] = std::unique_ptr<TrieNode>(child);
+        }
     }
     return node.release();
 }
 
 void Trie::deserialize(const std::vector<uint8_t>& data) {
     size_t pos = 0;
-    root_.reset(deserializeNode(data, pos));
+    root_.reset(deserializeNode(data, pos, true)); // 根节点允许path.size()==0
+    // 反序列化后自动展开路径，恢复为标准trie
+    expandPaths();
 }
 
 const std::vector<FieldKey>& Trie::getOrderedFields() const {
@@ -315,9 +347,9 @@ void Trie::setOrderedFields(const std::vector<FieldKey>& fields) {
 
 void Trie::copyChildren(const TrieNode* src, TrieNode* dest) {
     for (const auto& child : src->getChildren()) {
-        auto new_child = std::make_unique<TrieNode>(child->getPath(), child->isPlaceholder());
-        copyChildren(child.get(), new_child.get());
-        dest->getChildren().push_back(std::move(new_child));
+        auto new_child = std::make_unique<TrieNode>(child.second->getPath(), child.second->isPlaceholder());
+        copyChildren(child.second.get(), new_child.get());
+        dest->getChildren()[child.second->getPath()[0]] = std::move(new_child);
     }
 }
 
@@ -466,6 +498,31 @@ std::string Trie::reconstructFieldValue(const FieldKey& key, const NodeValue& no
                 return "";
         default:
             return "";
+    }
+}
+
+void expandTrieNode(TrieNode* node) {
+    // 先拆分 path
+    while (node->getPath().size() > 1) {
+        std::vector<NodeValue> path = node->getPath();
+        NodeValue first = path[0];
+        std::vector<NodeValue> rest(path.begin() + 1, path.end());
+        auto new_child = std::make_unique<TrieNode>(rest, node->isPlaceholder());
+        new_child->getChildren() = std::move(node->getChildren());
+        node->getChildren().clear();
+        node->getChildren()[first] = std::move(new_child);
+        node->setPlaceholder(false);
+        node->setPath({first});
+    }
+    // 再递归展开所有子节点
+    for (auto& child : node->getChildren()) {
+        expandTrieNode(child.second.get());
+    }
+}
+
+void Trie::expandPaths() {
+    for (auto& child : root_->getChildren()) {
+        expandTrieNode(child.second.get());
     }
 }
 

@@ -26,7 +26,7 @@ struct ValueEqual {
 
 // -------------- 底层类型分发实现 --------------
 uint32_t Dictionary::addFieldValue(const FieldKey& key, FieldType type, const std::string& value) {
-    auto& dict = field_dicts[key].variable_dict;
+    auto& dict = global_variable_dict; // 全局字符串字典
     auto it = dict.value_to_code.find(value);
     if (it != dict.value_to_code.end()) {
         return it->second;
@@ -86,7 +86,7 @@ uint32_t Dictionary::addFieldValue(const FieldKey& key, FieldType type, bool val
 }
 
 uint32_t Dictionary::addFieldValue(const FieldKey& key, FieldType type, std::nullptr_t) {
-    auto& dict = field_dicts[key].variable_dict;
+    auto& dict = global_variable_dict; // 全局字符串字典
     std::string null_str = "<null>";
     auto it = dict.value_to_code.find(null_str);
     if (it != dict.value_to_code.end()) {
@@ -105,9 +105,9 @@ uint32_t Dictionary::addFieldValue(const FieldKey& key, FieldType type, std::nul
 uint32_t Dictionary::getFieldValueCode(const FieldKey& key, const Value& value) const {
     switch (key.type) {
         case FieldType::String:
-            return field_dicts.at(key).variable_dict.value_to_code.at(std::get<std::string>(value));
+            return global_variable_dict.value_to_code.at(std::get<std::string>(value));
         case FieldType::Null:
-            return field_dicts.at(key).variable_dict.value_to_code.at("<null>");
+            return global_variable_dict.value_to_code.at("<null>");
         case FieldType::Int:
             return field_dicts.at(key).integer_dict.value_to_code.at(std::get<int64_t>(value));
         case FieldType::Double:
@@ -123,7 +123,7 @@ std::optional<Value> Dictionary::getFieldValueByCode(const FieldKey& key, uint32
     switch (key.type) {
         case FieldType::String:
         case FieldType::Null: {
-            const auto& dict = field_dicts.at(key).variable_dict;
+            const auto& dict = global_variable_dict;
             if (code == 0 || code > dict.code_to_value.size()) return std::nullopt;
             return dict.code_to_value[code - 1];
         }
@@ -169,10 +169,32 @@ uint32_t Dictionary::getOrAddFieldValue(const FieldKey& key, const Value& value)
 
 void Dictionary::clear() {
     field_dicts.clear();
+    global_variable_dict = VariableDict(); // 清空全局字符串字典
 }
 
 size_t Dictionary::getFieldValueCount(const FieldKey& key) const {
-    return getFieldValueCount(key.name, key.type);
+    switch (key.type) {
+        case FieldType::String:
+        case FieldType::Null:
+            return global_variable_dict.code_to_value.size();
+        case FieldType::Int: {
+            auto it = field_dicts.find(key);
+            if (it == field_dicts.end()) return 0;
+            return it->second.integer_dict.code_to_value.size();
+        }
+        case FieldType::Double: {
+            auto it = field_dicts.find(key);
+            if (it == field_dicts.end()) return 0;
+            return it->second.float_dict.code_to_value.size();
+        }
+        case FieldType::Bool: {
+            auto it = field_dicts.find(key);
+            if (it == field_dicts.end()) return 0;
+            return it->second.boolean_dict.code_to_value.size();
+        }
+        default:
+            return 0;
+    }
 }
 
 void Dictionary::loadFromCodeToValue(const std::vector<FieldKey>& ordered_fields, const std::unordered_map<FieldKey, std::vector<std::string>>& field_code_to_value) {
@@ -180,11 +202,43 @@ void Dictionary::loadFromCodeToValue(const std::vector<FieldKey>& ordered_fields
     for (const auto& key : ordered_fields) {
         auto it = field_code_to_value.find(key);
         if (it != field_code_to_value.end()) {
-            auto& dict = field_dicts[key];
-            dict.variable_dict.code_to_value = it->second;
-            dict.variable_dict.next_code = static_cast<uint32_t>(it->second.size() + 1);
-            for (size_t i = 0; i < it->second.size(); ++i) {
-                dict.variable_dict.value_to_code[it->second[i]] = static_cast<uint32_t>(i + 1);
+            if (key.type == FieldType::String || key.type == FieldType::Null) {
+                // 合并所有字段的字符串到全局字典
+                for (const auto& val : it->second) {
+                    addFieldValue(key, key.type, val);
+                }
+            } else if (key.type == FieldType::Int) {
+                auto& dict = field_dicts[key].integer_dict;
+                dict.code_to_value.clear();
+                dict.code_to_value.reserve(it->second.size());
+                for (const auto& s : it->second) {
+                    dict.code_to_value.push_back(std::stoll(s));
+                }
+                dict.next_code = static_cast<uint32_t>(it->second.size() + 1);
+                for (size_t i = 0; i < it->second.size(); ++i) {
+                    dict.value_to_code[std::stoll(it->second[i])] = static_cast<uint32_t>(i + 1);
+                }
+            } else if (key.type == FieldType::Double) {
+                auto& dict = field_dicts[key].float_dict;
+                dict.code_to_value.clear();
+                dict.code_to_value.reserve(it->second.size());
+                for (const auto& s : it->second) {
+                    dict.code_to_value.push_back(std::stod(s));
+                }
+                dict.next_code = static_cast<uint32_t>(it->second.size() + 1);
+                for (size_t i = 0; i < it->second.size(); ++i) {
+                    dict.value_to_code[std::stod(it->second[i])] = static_cast<uint32_t>(i + 1);
+                }
+            } else if (key.type == FieldType::Bool) {
+                auto& dict = field_dicts[key].boolean_dict;
+                dict.code_to_value.clear();
+                dict.next_code = 1;
+                for (size_t i = 0; i < it->second.size(); ++i) {
+                    bool b = (it->second[i] == "true" || it->second[i] == "1");
+                    dict.value_to_code[b] = static_cast<uint32_t>(i + 1);
+                    dict.code_to_value.push_back(b);
+                    dict.next_code++;
+                }
             }
         }
     }

@@ -40,15 +40,15 @@ public:
     void clear();
     // 获取某类型字段值数量
     size_t getFieldValueCount(const FieldKey& key) const;
-    size_t getFieldValueCount(const std::string& field, FieldType type) const { return getFieldValueCount(FieldKey{field, static_cast<FieldType>(type)}); }
 
 private:
-    // 各类型分离的字典
+    // 全局字符串字典（合并所有字段的字符串编码）
     struct VariableDict {
         std::unordered_map<std::string, uint32_t> value_to_code;
         std::vector<std::string> code_to_value;
         uint32_t next_code = 1;
     };
+    VariableDict global_variable_dict; // 新增：全局字符串字典
     struct IntegerDict {
         std::unordered_map<int64_t, uint32_t> value_to_code;
         std::vector<int64_t> code_to_value;
@@ -65,12 +65,11 @@ private:
         uint32_t next_code = 1;
     };
     struct FieldDicts {
-        VariableDict variable_dict;
         IntegerDict integer_dict;
         FloatDict float_dict;
         BooleanDict boolean_dict;
     };
-    std::unordered_map<FieldKey, FieldDicts> field_dicts;
+    std::unordered_map<FieldKey, FieldDicts> field_dicts; // 只用于非字符串类型
 };
 
 } // namespace json2

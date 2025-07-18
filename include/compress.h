@@ -47,8 +47,7 @@ private:
     static std::vector<uint8_t> serializeMetadata(const Trie& trie, const FieldDictionaryManager& manager);
     
     // 反序列化元数据
-    static std::pair<std::vector<std::string>, std::unordered_map<std::string, FieldType>> 
-    deserializeMetadata(const std::vector<uint8_t>& data);
+    static std::vector<FieldKey> deserializeMetadata(const std::vector<uint8_t>& data);
     
     // 使用Zstandard压缩数据
     static std::vector<uint8_t> compressWithZstd(const std::vector<uint8_t>& data);

@@ -5,62 +5,115 @@
 #include <sstream>
 #include <iomanip>
 #include <variant>
-#include <iostream> // Added for [DEBUG] output
+#include <iostream>
+#include <map>
 
 namespace json2 {
 
-// 支持的时间戳格式（可扩展）
-static const std::vector<std::pair<std::string, std::string>> kPatterns = {
-    // 格式字符串, strptime格式
-    {R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+)", "%Y-%m-%d %H:%M:%S"},  // 2023-03-27 00:26:35.719 EDT
-    {R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \w+)", "%Y-%m-%d %H:%M:%S"},        // 2023-03-27 00:26:35 EDT
-    {R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", "%Y-%m-%d %H:%M:%S"},            // 2023-03-27 00:26:35
-    {R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)", "%Y-%m-%dT%H:%M:%SZ"},           // 2023-03-27T00:26:35Z
-    {R"(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})", "%Y/%m/%d %H:%M:%S"},            // 2023/03/27 00:26:35
+// 支持的时间戳格式（pattern, regex, 是否有毫秒, 是否有Z时区, 是否有三字母时区）
+struct PatternInfo {
+    std::string regex_str;
+    std::string fmt;
+    bool has_millis;
+    bool has_z;
+    bool has_tz;
+};
+
+static const std::vector<PatternInfo> kPatterns = {
+    // 2024-03-20 10:30:45.123 EDT
+    {R"((\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.(\d{3}) (\w+))", "%Y-%m-%d %H:%M:%S.%f %Z", true, false, true},
+    // 2024-03-20 10:30:45 EDT
+    {R"((\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w+))", "%Y-%m-%d %H:%M:%S %Z", false, false, true},
+    // 2024-03-20 10:30:45.123
+    {R"((\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.(\d{3}))", "%Y-%m-%d %H:%M:%S.%f", true, false, false},
+    // 2024-03-20 10:30:45
+    {R"((\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}))", "%Y-%m-%d %H:%M:%S", false, false, false},
+    // 2024-03-20T10:30:45.123Z
+    {R"((\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.(\d{3})Z)", "%Y-%m-%dT%H:%M:%S.%fZ", true, true, false},
+    // 2024-03-20T10:30:45Z
+    {R"((\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z)", "%Y-%m-%dT%H:%M:%SZ", false, true, false},
+    // 2024/03/20 10:30:45
+    {R"((\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}))", "%Y/%m/%d %H:%M:%S", false, false, false},
     // 可扩展更多
 };
 
-// 尝试匹配并解析时间戳字符串，返回(格式字符串, epoch秒)
-static std::pair<std::string, int64_t> parseTimestamp(const std::string& value) {
-    for (const auto& [regex_str, fmt] : kPatterns) {
-        if (std::regex_match(value, std::regex(regex_str))) {
+// 解析时间戳字符串，返回(pattern, epoch毫秒, tz字符串)
+static std::tuple<std::string, int64_t, std::string> parseTimestamp(const std::string& value) {
+    for (const auto& pat : kPatterns) {
+        std::smatch match;
+        if (std::regex_match(value, match, std::regex(pat.regex_str))) {
             std::tm tm = {};
-            std::string time_part = value;
-            
-            // 如果包含毫秒和时区，提取基本时间部分
-            if (value.find('.') != std::string::npos) {
-                // 包含毫秒，提取到秒的部分
-                size_t dot_pos = value.find('.');
-                time_part = value.substr(0, dot_pos);
-            } else if (value.find(' ') != std::string::npos && value.find(' ') < value.length() - 4) {
-                // 可能包含时区，提取到秒的部分
-                size_t last_space = value.rfind(' ');
-                if (last_space > 15) { // 确保有足够的时间部分
-                    time_part = value.substr(0, last_space);
-                }
+            int millis = 0;
+            std::string time_part = match[1];
+            std::string tz_str;
+            if (pat.has_millis) {
+                millis = std::stoi(match[2]);
             }
-            
+            if (pat.has_tz) {
+                tz_str = match[pat.has_millis ? 3 : 2];
+            } else if (pat.has_z) {
+                tz_str = "Z";
+                }
+            // 解析时间
             std::istringstream ss(time_part);
+            std::string fmt = pat.fmt;
+            // 去掉.%f和%Z/Z，strptime/strftime不支持
+            size_t pos;
+            if ((pos = fmt.find(".%f")) != std::string::npos) fmt.erase(pos, 3);
+            if ((pos = fmt.find(" %Z")) != std::string::npos) fmt.erase(pos, 4);
+            if ((pos = fmt.find("%Z")) != std::string::npos) fmt.erase(pos, 2);
+            if ((pos = fmt.find("Z")) != std::string::npos) fmt.erase(pos, 1);
             ss >> std::get_time(&tm, fmt.c_str());
-            if (!ss.fail()) {
-                time_t epoch = timegm(&tm); // 使用UTC
-                return {fmt, static_cast<int64_t>(epoch)};
+            if (ss.fail()) continue;
+            time_t epoch = timegm(&tm); // UTC
+            int64_t epoch_ms = static_cast<int64_t>(epoch) * 1000 + millis;
+            return {pat.fmt, epoch_ms, tz_str};
             }
         }
-    }
-    // 解析失败，返回空格式和-1
-    return {"", -1};
+    return {"", -1, ""};
 }
+
+// 反向格式化
+static std::string formatTimestamp(const std::string& pattern, int64_t epoch_ms, const std::string& tz_str) {
+    time_t epoch = epoch_ms / 1000;
+    int millis = epoch_ms % 1000;
+    std::tm* tm_ptr = gmtime(&epoch);
+    char buf[64];
+    std::string fmt = pattern;
+    // 去掉.%f和%Z/Z，strftime不支持
+    size_t pos;
+    if ((pos = fmt.find(".%f")) != std::string::npos) fmt.erase(pos, 3);
+    if ((pos = fmt.find(" %Z")) != std::string::npos) fmt.erase(pos, 4);
+    if ((pos = fmt.find("%Z")) != std::string::npos) fmt.erase(pos, 2);
+    if ((pos = fmt.find("Z")) != std::string::npos) fmt.erase(pos, 1);
+    strftime(buf, sizeof(buf), fmt.c_str(), tm_ptr);
+    std::string result(buf);
+    // 补毫秒
+    if (pattern.find(".%f") != std::string::npos) {
+        char msbuf[8];
+        snprintf(msbuf, sizeof(msbuf), ".%03d", millis);
+        result += msbuf;
+    }
+    // 补空格和时区
+    if (pattern.find("%Z") != std::string::npos) {
+        result += " ";
+        result += tz_str;
+    } else if (pattern.find("Z") != std::string::npos) {
+        result += "Z";
+    }
+    return result;
+}
+
+// 存储 pattern_id+epoch -> tz 字符串
+static std::map<std::pair<uint32_t, int64_t>, std::string> pattern_epoch_to_tz;
 
 std::pair<uint32_t, int64_t> TimestampDictionary::addTimestamp(const FieldKey& key, const std::string& value) {
     return addTimestamp(key.name, value);
 }
 
 EncodedTimestamp TimestampDictionary::encode(const FieldKey& key, const std::string& value) {
-    // 实际编码逻辑
-    auto [fmt, epoch] = parseTimestamp(value);
+    auto [fmt, epoch, tz] = parseTimestamp(value);
     if (fmt.empty() || epoch < 0) {
-        // 解析失败，返回无效编码
         return {0, -1};
     }
     uint32_t pattern_id;
@@ -76,39 +129,28 @@ EncodedTimestamp TimestampDictionary::encode(const FieldKey& key, const std::str
     auto& range = field_ranges_[key.name];
     if (epoch < range.min) range.min = epoch;
     if (epoch > range.max) range.max = epoch;
-    // 存储反查映射
-    encoded_to_value_[pattern_id][epoch] = value;
+    // 存储 pattern_id+epoch -> tz
+    if (!tz.empty()) {
+        pattern_epoch_to_tz[{pattern_id, epoch}] = tz;
+    }
     return {pattern_id, epoch};
 }
 
 std::string TimestampDictionary::decode(const FieldKey& key, const EncodedTimestamp& encoded) const {
-    // std::cout << "[DEBUG][TimestampDictionary::decode] field=" << key.name << ", pattern_id=" << encoded.pattern_id << ", epoch=" << encoded.epoch << std::endl;
-    // 实际解码逻辑
     if (encoded.pattern_id > 0 && encoded.pattern_id <= id_to_pattern_.size()) {
-        // 反查原始字符串
-        auto it_epoch = encoded_to_value_.find(encoded.pattern_id);
-        if (it_epoch != encoded_to_value_.end()) {
-            auto it_val = it_epoch->second.find(encoded.epoch);
-            if (it_val != it_epoch->second.end()) {
-                // std::cout << "[DEBUG][TimestampDictionary::decode] found value: " << it_val->second << std::endl;
-                return it_val->second;
-            }
+        const std::string& pattern = id_to_pattern_[encoded.pattern_id - 1];
+        std::string tz;
+        auto it = pattern_epoch_to_tz.find({encoded.pattern_id, encoded.epoch});
+        if (it != pattern_epoch_to_tz.end()) {
+            tz = it->second;
         }
-        // std::cout << "[DEBUG][TimestampDictionary::decode] not found, pattern_id or epoch missing" << std::endl;
-        // 若找不到原始字符串，可选：格式化epoch为字符串
-        // std::time_t t = encoded.epoch;
-        // std::tm* tm_ptr = std::gmtime(&t);
-        // char buf[64];
-        // if (tm_ptr && std::strftime(buf, sizeof(buf), id_to_pattern_[encoded.pattern_id-1].c_str(), tm_ptr)) {
-        //     return std::string(buf);
-        // }
+        return formatTimestamp(pattern, encoded.epoch, tz);
     }
-    // std::cout << "[DEBUG][TimestampDictionary::decode] invalid pattern_id, return empty string" << std::endl;
     return "";
 }
 
 std::string TimestampDictionary::getPatternById(uint32_t id) const {
-    if (id < id_to_pattern_.size()) return id_to_pattern_[id];
+    if (id > 0 && id <= id_to_pattern_.size()) return id_to_pattern_[id - 1];
     return "";
 }
 
@@ -117,13 +159,12 @@ std::pair<int64_t, int64_t> TimestampDictionary::getRange(const FieldKey& key) c
 }
 
 uint32_t TimestampDictionary::getOrAddFieldValue(const FieldKey& key, const Value& value) {
-    // 只支持 string 类型
     if (!std::holds_alternative<std::string>(value)) {
         throw std::invalid_argument("TimestampDictionary only supports string values");
     }
     const std::string& str = std::get<std::string>(value);
     auto encoded = encode(key, str);
-    return encoded.pattern_id; // 这里只返回 pattern_id 作为编码，实际可扩展
+    return encoded.pattern_id;
 }
 
 void TimestampDictionary::clear() {
@@ -131,7 +172,13 @@ void TimestampDictionary::clear() {
     id_to_pattern_.clear();
     next_pattern_id_ = 1;
     field_ranges_.clear();
-    encoded_to_value_.clear();
+    pattern_epoch_to_tz.clear();
+}
+
+void TimestampDictionary::registerPattern(const std::string& pattern) {
+    if (pattern_to_id_.count(pattern)) return;
+    pattern_to_id_[pattern] = next_pattern_id_++;
+    id_to_pattern_.push_back(pattern);
 }
 
 } // namespace json2 

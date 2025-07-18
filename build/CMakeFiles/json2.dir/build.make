@@ -69,19 +69,19 @@ include CMakeFiles/json2.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/json2.dir/flags.make
 
-CMakeFiles/json2.dir/src/main_trie.cpp.o: CMakeFiles/json2.dir/flags.make
-CMakeFiles/json2.dir/src/main_trie.cpp.o: /workspaces/JSON/src/main_trie.cpp
-CMakeFiles/json2.dir/src/main_trie.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/json2.dir/src/main_trie.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/src/main_trie.cpp.o -MF CMakeFiles/json2.dir/src/main_trie.cpp.o.d -o CMakeFiles/json2.dir/src/main_trie.cpp.o -c /workspaces/JSON/src/main_trie.cpp
+CMakeFiles/json2.dir/src/main_compress.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/src/main_compress.cpp.o: /workspaces/JSON/src/main_compress.cpp
+CMakeFiles/json2.dir/src/main_compress.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/json2.dir/src/main_compress.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/src/main_compress.cpp.o -MF CMakeFiles/json2.dir/src/main_compress.cpp.o.d -o CMakeFiles/json2.dir/src/main_compress.cpp.o -c /workspaces/JSON/src/main_compress.cpp
 
-CMakeFiles/json2.dir/src/main_trie.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/src/main_trie.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/src/main_trie.cpp > CMakeFiles/json2.dir/src/main_trie.cpp.i
+CMakeFiles/json2.dir/src/main_compress.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/src/main_compress.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/src/main_compress.cpp > CMakeFiles/json2.dir/src/main_compress.cpp.i
 
-CMakeFiles/json2.dir/src/main_trie.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/src/main_trie.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/src/main_trie.cpp -o CMakeFiles/json2.dir/src/main_trie.cpp.s
+CMakeFiles/json2.dir/src/main_compress.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/src/main_compress.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/src/main_compress.cpp -o CMakeFiles/json2.dir/src/main_compress.cpp.s
 
 CMakeFiles/json2.dir/src/parser.cpp.o: CMakeFiles/json2.dir/flags.make
 CMakeFiles/json2.dir/src/parser.cpp.o: /workspaces/JSON/src/parser.cpp
@@ -181,10 +181,24 @@ CMakeFiles/json2.dir/src/reconstruct.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/src/reconstruct.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/src/reconstruct.cpp -o CMakeFiles/json2.dir/src/reconstruct.cpp.s
 
+CMakeFiles/json2.dir/src/compress.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/src/compress.cpp.o: /workspaces/JSON/src/compress.cpp
+CMakeFiles/json2.dir/src/compress.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/json2.dir/src/compress.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/src/compress.cpp.o -MF CMakeFiles/json2.dir/src/compress.cpp.o.d -o CMakeFiles/json2.dir/src/compress.cpp.o -c /workspaces/JSON/src/compress.cpp
+
+CMakeFiles/json2.dir/src/compress.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/src/compress.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/src/compress.cpp > CMakeFiles/json2.dir/src/compress.cpp.i
+
+CMakeFiles/json2.dir/src/compress.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/src/compress.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/src/compress.cpp -o CMakeFiles/json2.dir/src/compress.cpp.s
+
 CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: CMakeFiles/json2.dir/flags.make
 CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: /workspaces/JSON/vendor/simdjson/simdjson.cpp
 CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o -MF CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o.d -o CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o -c /workspaces/JSON/vendor/simdjson/simdjson.cpp
 
 CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.i: cmake_force
@@ -197,7 +211,7 @@ CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.s: cmake_force
 
 # Object files for target json2
 json2_OBJECTS = \
-"CMakeFiles/json2.dir/src/main_trie.cpp.o" \
+"CMakeFiles/json2.dir/src/main_compress.cpp.o" \
 "CMakeFiles/json2.dir/src/parser.cpp.o" \
 "CMakeFiles/json2.dir/src/variable_dictionary.cpp.o" \
 "CMakeFiles/json2.dir/src/timestamp_dictionary.cpp.o" \
@@ -205,12 +219,13 @@ json2_OBJECTS = \
 "CMakeFiles/json2.dir/src/field_dictionary_manager.cpp.o" \
 "CMakeFiles/json2.dir/src/trie.cpp.o" \
 "CMakeFiles/json2.dir/src/reconstruct.cpp.o" \
+"CMakeFiles/json2.dir/src/compress.cpp.o" \
 "CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o"
 
 # External object files for target json2
 json2_EXTERNAL_OBJECTS =
 
-json2: CMakeFiles/json2.dir/src/main_trie.cpp.o
+json2: CMakeFiles/json2.dir/src/main_compress.cpp.o
 json2: CMakeFiles/json2.dir/src/parser.cpp.o
 json2: CMakeFiles/json2.dir/src/variable_dictionary.cpp.o
 json2: CMakeFiles/json2.dir/src/timestamp_dictionary.cpp.o
@@ -218,10 +233,11 @@ json2: CMakeFiles/json2.dir/src/logtype_dictionary.cpp.o
 json2: CMakeFiles/json2.dir/src/field_dictionary_manager.cpp.o
 json2: CMakeFiles/json2.dir/src/trie.cpp.o
 json2: CMakeFiles/json2.dir/src/reconstruct.cpp.o
+json2: CMakeFiles/json2.dir/src/compress.cpp.o
 json2: CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o
 json2: CMakeFiles/json2.dir/build.make
 json2: CMakeFiles/json2.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Linking CXX executable json2"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Linking CXX executable json2"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/json2.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

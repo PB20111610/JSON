@@ -96,9 +96,9 @@ std::string reconstructJsonFromTrie(const Trie& trie, const FieldDictionaryManag
             }
             records.push_back(j);
         }
-        for (const auto& child : node->getChildren()) {
+        for (const auto& child_pair : node->getChildren()) {
             std::vector<std::pair<FieldKey, std::string>> nextRecord = currentRecord;
-            traverse(child.get(), nextRecord, depth + path.size());
+            traverse(child_pair.second.get(), nextRecord, depth + path.size());
         }
     };
     std::vector<std::pair<FieldKey, std::string>> record;

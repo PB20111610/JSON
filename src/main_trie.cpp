@@ -1,5 +1,6 @@
 #include "../include/parser.h"
 #include "../include/field_dictionary_manager.h"
+// #include "../include/trie_type_aware.h"
 #include "../include/reconstruct.h"
 #include "../include/trie.h" // Added for Trie
 #include <iostream>
@@ -118,7 +119,7 @@ void printTrieNode(const TrieNode* node, int depth, const std::vector<FieldKey>&
     }
     std::cout << "\n";
     for (const auto& child : node->getChildren()) {
-        printTrieNode(child.get(), depth + node->getPath().size(), fields, manager);
+        printTrieNode(child.second.get(), depth + node->getPath().size(), fields, manager);
     }
 }
 
@@ -189,35 +190,50 @@ int main() {
             return 0;
         }
 
+        // 打印Trie树结构（压缩前）
+        std::cout << "\n=== Trie Tree Structure (Before Compression) ===\n";
+        printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
+
         // 插入后批量路径压缩
         trie->compressPaths();
 
+        // 打印Trie树结构（压缩后）
+        std::cout << "\n=== Trie Tree Structure (After Compression) ===\n";
+        printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
+
+        // 展开Trie树，保证重建时字段不缺失
+        trie->expandPaths();
+
+        // 打印Trie树结构（展开后）
+        std::cout << "\n=== Trie Tree Structure (After Expand) ===\n";
+        printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
+        
         // === 调试：打印LogTypeDictionary内容 ===
-        // const auto& log_dict = manager.logtypeDict();
-        // std::cout << "\n=== LogTypeDictionary Templates ===\n";
-        // for (uint32_t i = 1; i <= log_dict.getLogTypeCount(); ++i) {
-        //     std::cout << "Template " << i << ": " << log_dict.getLogTypeById(i) << std::endl;
-        // }
-        // // 打印变量字典
-        // std::cout << "\n=== LogTypeDictionary Variables ===\n";
-        // for (uint32_t i = 1; i < 1000; ++i) { // 假定变量数不会超过1000
-        //     std::string var = log_dict.decodeVariable(i);
-        //     if (!var.empty()) {
-        //         std::cout << "VarCode " << i << ": " << var << std::endl;
-        //     }
-        // }
+        const auto& log_dict = manager.logtypeDict();
+        std::cout << "\n=== LogTypeDictionary Templates ===\n";
+        for (uint32_t i = 1; i <= log_dict.getLogTypeCount(); ++i) {
+            std::cout << "Template " << i << ": " << log_dict.getLogTypeById(i) << std::endl;
+        }
+        // 打印变量字典
+        std::cout << "\n=== LogTypeDictionary Variables ===\n";
+        for (uint32_t i = 1; i < 1000; ++i) { // 假定变量数不会超过1000
+            std::string var = log_dict.decodeVariable(i);
+            if (!var.empty()) {
+                std::cout << "VarCode " << i << ": " << var << std::endl;
+            }
+        }
 
         // === 调试：打印TimestampDictionary内容 ===
-        // const auto& ts_dict = manager.timestampDict();
-        // std::cout << "\n=== TimestampDictionary Patterns ===\n";
-        // // 没有getPatternCount成员，改为遍历pattern id直到getPatternById返回空
-        // for (uint32_t i = 0; ; ++i) {
-        //     std::string pattern = ts_dict.getPatternById(i);
-        //     if (pattern.empty()) break;
-        //     std::cout << "Pattern " << (i+1) << ": " << pattern << std::endl;
-        // }
-        // // 打印pattern_id/epoch到原始字符串的映射
-        // std::cout << "\n=== TimestampDictionary Encoded Values ===\n";
+        const auto& ts_dict = manager.timestampDict();
+        std::cout << "\n=== TimestampDictionary Patterns ===\n";
+        // 修正：pattern_id 从 1 开始
+        for (uint32_t i = 1; ; ++i) {
+            std::string pattern = ts_dict.getPatternById(i);
+            if (pattern.empty()) break;
+            std::cout << "Pattern " << i << ": " << pattern << std::endl;
+        }
+        // 打印pattern_id/epoch到原始字符串的映射
+        std::cout << "\n=== TimestampDictionary Encoded Values ===\n";
         // 这里假定你有接口遍历encoded_to_value_，如无可补充
 
         // Verification and reconstruction steps remain the same

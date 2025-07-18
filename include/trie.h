@@ -20,8 +20,30 @@ namespace dom {
 
 namespace json2 {
 
-// 节点值类型：可以是编码值或原始值
+// 节点值类型：可以是编码值或原始值，std::nullptr_t用于空字段占位
 using NodeValue = std::variant<uint32_t, int64_t, double, bool, std::nullptr_t, EncodedTimestamp, EncodedLog>;
+
+// NodeValue哈希函数
+struct NodeValueHash {
+    std::size_t operator()(const NodeValue& v) const {
+        return std::visit([](auto&& arg) -> std::size_t {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, uint32_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, double> || std::is_same_v<T, bool>) {
+                return std::hash<T>{}(arg);
+            } else if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return 0;
+            } else if constexpr (std::is_same_v<T, EncodedTimestamp>) {
+                return std::hash<uint32_t>{}(arg.pattern_id) ^ std::hash<int64_t>{}(arg.epoch);
+            } else if constexpr (std::is_same_v<T, EncodedLog>) {
+                std::size_t h = std::hash<uint32_t>{}(arg.template_id);
+                for (auto code : arg.var_codes) h ^= std::hash<uint32_t>{}(code) + 0x9e3779b9 + (h << 6) + (h >> 2);
+                return h;
+            } else {
+                return 0;
+            }
+        }, v);
+    }
+};
 
 // 路径压缩Trie树节点
 class TrieNode {
@@ -31,18 +53,21 @@ public:
 
     // 获取路径片段
     const std::vector<NodeValue>& getPath() const;
+    std::vector<NodeValue>& getPath(); // 新增：非 const 版本
 
     // 是否为占位节点
     bool isPlaceholder() const;
     void setPlaceholder(bool is_placeholder);
 
     // 获取所有子节点
-    const std::vector<std::unique_ptr<TrieNode>>& getChildren() const;
-    std::vector<std::unique_ptr<TrieNode>>& getChildren();
+    std::unordered_map<NodeValue, std::unique_ptr<TrieNode>, NodeValueHash>& getChildren();
+    const std::unordered_map<NodeValue, std::unique_ptr<TrieNode>, NodeValueHash>& getChildren() const;
+
+    void setPath(const std::vector<NodeValue>& path);
 
 private:
     std::vector<NodeValue> path_;  // 路径片段（可为多个NodeValue，表示合并的多层）
-    std::vector<std::unique_ptr<TrieNode>> children_;  // 子节点
+    std::unordered_map<NodeValue, std::unique_ptr<TrieNode>, NodeValueHash> children_;  // 子节点
     bool is_placeholder_;  // 占位标志位
 };
 
@@ -79,6 +104,9 @@ public:
     // 批量路径压缩接口
     void compressPaths();
 
+    // 解压路径压缩的Trie
+    void expandPaths();
+
 private:
     std::unique_ptr<TrieNode> root_;  // 根节点
     std::vector<FieldKey> ordered_fields_;  // 字段名+类型
@@ -87,7 +115,7 @@ private:
     void serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const;
     
     // 递归反序列化节点
-    TrieNode* deserializeNode(const std::vector<uint8_t>& data, size_t& pos);
+    TrieNode* deserializeNode(const std::vector<uint8_t>& data, size_t& pos, bool is_root);
     
     // 递归复制子节点
     void copyChildren(const TrieNode* src, TrieNode* dest);

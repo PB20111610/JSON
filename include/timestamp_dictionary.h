@@ -39,6 +39,7 @@ public:
     void clear();
     // 兼容 Trie 类型分发接口
     uint32_t getOrAddFieldValue(const FieldKey& key, const Value& value);
+    void registerPattern(const std::string& pattern);
 
 private:
     // 格式字符串到ID
@@ -48,8 +49,6 @@ private:
     // 每个字段的时间范围
     struct Range { int64_t min = std::numeric_limits<int64_t>::max(); int64_t max = std::numeric_limits<int64_t>::min(); };
     std::unordered_map<std::string, Range> field_ranges_;
-    // 反查用：pattern_id+epoch -> 原始字符串
-    std::unordered_map<uint32_t, std::unordered_map<int64_t, std::string>> encoded_to_value_;
 };
 
 } // namespace json2 

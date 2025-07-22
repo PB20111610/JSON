@@ -114,27 +114,34 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
         NodeValue& v = values[i];
         auto& children = cur->getChildren();
         auto it = children.find(v);
+        bool is_placeholder = std::holds_alternative<std::nullptr_t>(v);
         if (it != children.end()) {
             cur = it->second.get();
+            // 如果本次插入遇到缺失字段，且节点原本不是占位，则补上
+            if (is_placeholder && !cur->isPlaceholder()) {
+                cur->setPlaceholder(true);
+            }
         } else {
-            auto new_node = std::make_unique<TrieNode>(std::vector<NodeValue>{v}, false);
+            auto new_node = std::make_unique<TrieNode>(std::vector<NodeValue>{v}, is_placeholder);
             TrieNode* new_ptr = new_node.get();
             children[v] = std::move(new_node);
             cur = new_ptr;
         }
     }
-    cur->setPlaceholder(true);
 }
 
 // 修正后的批量路径压缩递归实现（合并path和children）
 static void compressTrieNode(TrieNode* node) {
-    // 先递归压缩所有子节点
     for (auto& child : node->getChildren()) {
         compressTrieNode(child.second.get());
     }
-    // 合并单分支路径
+    // 只在链式结构上合并：当前节点有且仅有一个子节点，且子节点也只有0或1个子节点
     while (node->getChildren().size() == 1) {
         auto it = node->getChildren().begin();
+        TrieNode* only_child_ptr = it->second.get();
+        // 如果子节点有多个分支，停止合并
+        if (only_child_ptr->getChildren().size() > 1) break;
+
         std::unique_ptr<TrieNode> only_child = std::move(it->second);
         node->getChildren().clear();
 
@@ -148,10 +155,7 @@ static void compressTrieNode(TrieNode* node) {
         for (auto& kv : child_children) {
             node->getChildren()[kv.first] = std::move(kv.second);
         }
-
-        // 合并 placeholder
         node->setPlaceholder(only_child->isPlaceholder());
-        // only_child 自动析构
     }
 }
 
@@ -355,43 +359,37 @@ void Trie::copyChildren(const TrieNode* src, TrieNode* dest) {
 
 // 类型对齐辅助（融合trie_type_aware的类型感知）
 static Value alignValueType(const FieldKey& key, const Value& value) {
-    try {
-        switch (key.type) {
-            case FieldType::Double:
-                if (std::holds_alternative<double>(value)) return value;
-                if (std::holds_alternative<int64_t>(value)) return static_cast<double>(std::get<int64_t>(value));
-                if (std::holds_alternative<bool>(value)) return static_cast<double>(std::get<bool>(value) ? 1.0 : 0.0);
-                if (std::holds_alternative<std::string>(value)) return std::stod(std::get<std::string>(value));
-                break;
-            case FieldType::Int:
-                if (std::holds_alternative<int64_t>(value)) return value;
-                if (std::holds_alternative<double>(value)) return static_cast<int64_t>(std::get<double>(value));
-                if (std::holds_alternative<bool>(value)) return static_cast<int64_t>(std::get<bool>(value) ? 1 : 0);
-                if (std::holds_alternative<std::string>(value)) return static_cast<int64_t>(std::stoll(std::get<std::string>(value)));
-                break;
-            case FieldType::Bool:
-                if (std::holds_alternative<bool>(value)) return value;
-                if (std::holds_alternative<int64_t>(value)) return static_cast<bool>(std::get<int64_t>(value) != 0);
-                if (std::holds_alternative<double>(value)) return static_cast<bool>(std::get<double>(value) != 0.0);
-                if (std::holds_alternative<std::string>(value)) {
-                    const auto& s = std::get<std::string>(value);
-                    return static_cast<bool>(s == "true" || s == "1");
-                }
-                break;
-            case FieldType::String:
-            case FieldType::Null:
-            case FieldType::Timestamp:
-            case FieldType::LogType:
-                if (std::holds_alternative<std::string>(value)) return value;
-                if (std::holds_alternative<int64_t>(value)) return std::to_string(std::get<int64_t>(value));
-                if (std::holds_alternative<double>(value)) return std::to_string(std::get<double>(value));
-                if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? "true" : "false";
-                break;
-            default:
-                break;
-        }
-    } catch (...) {}
-    return Value(nullptr);
+    switch (key.type) {
+        case FieldType::Double:
+            if (std::holds_alternative<double>(value)) return value;
+            if (std::holds_alternative<int64_t>(value)) return static_cast<double>(std::get<int64_t>(value));
+            if (std::holds_alternative<bool>(value)) return static_cast<double>(std::get<bool>(value) ? 1.0 : 0.0);
+            return Value(nullptr);
+        case FieldType::Int:
+            if (std::holds_alternative<int64_t>(value)) return value;
+            if (std::holds_alternative<double>(value)) return static_cast<int64_t>(std::get<double>(value));
+            if (std::holds_alternative<bool>(value)) return static_cast<int64_t>(std::get<bool>(value) ? 1 : 0);
+            return Value(nullptr);
+        case FieldType::Bool:
+            if (std::holds_alternative<bool>(value)) return value;
+            if (std::holds_alternative<int64_t>(value)) return static_cast<bool>(std::get<int64_t>(value) != 0);
+            if (std::holds_alternative<double>(value)) return static_cast<bool>(std::get<double>(value) != 0.0);
+            return Value(nullptr);
+        case FieldType::String:
+            if (std::holds_alternative<std::string>(value)) return value;
+            return Value(nullptr);
+        case FieldType::Null:
+        case FieldType::Timestamp:
+        case FieldType::LogType:
+            // 保持原有逻辑
+            if (std::holds_alternative<std::string>(value)) return value;
+            if (std::holds_alternative<int64_t>(value)) return std::to_string(std::get<int64_t>(value));
+            if (std::holds_alternative<double>(value)) return std::to_string(std::get<double>(value));
+            if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? "true" : "false";
+            return Value(nullptr);
+        default:
+            return Value(nullptr);
+    }
 }
 
 // NodeValue创建（融合trie_type_aware的类型安全编码）

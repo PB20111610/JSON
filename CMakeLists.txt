@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(json2 CXX)
+include_directories(/usr/include)
+link_directories(/usr/lib)
 
 # 设置C++标准
 set(CMAKE_CXX_STANDARD 17)
@@ -14,15 +16,20 @@ add_definitions(-DUSE_ZSTD)
 
 # Add our executable and the library sources
 add_executable(json2
-    src/main_compress.cpp
+    # test/main_compress.cpp
+    # test/main_trie.cpp
+    test/test_louds_trie.cpp
     src/parser.cpp
     src/variable_dictionary.cpp
     src/timestamp_dictionary.cpp
     src/logtype_dictionary.cpp
     src/field_dictionary_manager.cpp 
     src/trie.cpp
+    src/louds.cpp
+    src/loudsTotrie.cpp
     src/reconstruct.cpp
-    src/compress.cpp
+    # src/compress.cpp
+    # src/chunked_compressor.cpp
     vendor/simdjson/simdjson.cpp
 )
 
@@ -30,6 +37,7 @@ add_executable(json2
 target_link_libraries(json2
     PRIVATE
         ${ZSTD_LIBRARIES}
+        sdsl
 )
 target_include_directories(json2 PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
 

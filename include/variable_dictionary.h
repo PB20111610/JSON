@@ -41,6 +41,9 @@ public:
     // 获取某类型字段值数量
     size_t getFieldValueCount(const FieldKey& key) const;
 
+    // 获取全局字符串字典的所有字符串值（用于序列化）
+    std::vector<std::string> getAllStringValues() const;
+
 private:
     // 全局字符串字典（合并所有字段的字符串编码）
     struct VariableDict {

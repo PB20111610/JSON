@@ -19,7 +19,15 @@ struct EncodedTimestamp {
     bool operator==(const EncodedTimestamp& other) const {
         return pattern_id == other.pattern_id && epoch == other.epoch;
     }
+    bool operator!=(const EncodedTimestamp& other) const {
+        return !(*this == other);
+    }
 };
+
+// 添加operator<<定义
+inline std::ostream& operator<<(std::ostream& os, const EncodedTimestamp& ts) {
+    return os << "Timestamp{pattern=" << ts.pattern_id << ",epoch=" << ts.epoch << "}";
+}
 
 class TimestampDictionary {
 public:

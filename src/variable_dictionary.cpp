@@ -198,12 +198,12 @@ size_t Dictionary::getFieldValueCount(const FieldKey& key) const {
 }
 
 void Dictionary::loadFromCodeToValue(const std::vector<FieldKey>& ordered_fields, const std::unordered_map<FieldKey, std::vector<std::string>>& field_code_to_value) {
-    // 兼容旧实现，按字段名+类型分发
+    // 兼容旧实现，但String类型统一使用全局字典
     for (const auto& key : ordered_fields) {
         auto it = field_code_to_value.find(key);
         if (it != field_code_to_value.end()) {
             if (key.type == FieldType::String || key.type == FieldType::Null) {
-                // 合并所有字段的字符串到全局字典
+                // 合并所有字段的字符串到全局字典（不再按FieldKey分类）
                 for (const auto& val : it->second) {
                     addFieldValue(key, key.type, val);
                 }
@@ -242,6 +242,10 @@ void Dictionary::loadFromCodeToValue(const std::vector<FieldKey>& ordered_fields
             }
         }
     }
+}
+
+std::vector<std::string> Dictionary::getAllStringValues() const {
+    return global_variable_dict.code_to_value;
 }
 
 } // namespace json2

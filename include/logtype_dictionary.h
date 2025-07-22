@@ -17,7 +17,20 @@ struct EncodedLog {
     bool operator==(const EncodedLog& other) const {
         return template_id == other.template_id && var_codes == other.var_codes;
     }
+    bool operator!=(const EncodedLog& other) const {
+        return !(*this == other);
+    }
 };
+
+// 添加operator<<定义
+inline std::ostream& operator<<(std::ostream& os, const EncodedLog& log) {
+    os << "Log{template=" << log.template_id << ",vars=[";
+    for (size_t i = 0; i < log.var_codes.size(); ++i) {
+        if (i > 0) os << ",";
+        os << log.var_codes[i];
+    }
+    return os << "]}";
+}
 
 class LogTypeDictionary {
 public:

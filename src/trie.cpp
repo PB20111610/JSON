@@ -73,6 +73,92 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
     simdjson::dom::element record;
     auto error = parser.parse(record_string).get(record);
     if (error) return;
+
+    // 1. 动态扩展ordered_fields_，支持新字段
+    if (record.type() == simdjson::dom::element_type::OBJECT) {
+        auto obj = record.get_object();
+        for (auto field : obj) {
+            const std::string& field_name = std::string(field.key);
+            // 检查是否已存在
+            bool found = false;
+            for (const auto& fk : ordered_fields_) {
+                if (fk.name == field_name) { found = true; break; }
+            }
+            if (!found) {
+                // 推断类型（支持Timestamp/LogType）
+                FieldType type;
+                std::string value_str;
+                if (field.value.type() == simdjson::dom::element_type::STRING) {
+                    auto str_res = field.value.get_string();
+                    if (!str_res.error()) value_str = std::string(str_res.value());
+                    else value_str = "";
+                    if (manager.isTimestampField(field_name) && manager.isTimestampValue(value_str)) {
+                        type = FieldType::Timestamp;
+                    } else if (manager.isLogTemplate(value_str)) {
+                        type = FieldType::LogType;
+                    } else {
+                        type = FieldType::String;
+                    }
+                } else {
+                    switch (field.value.type()) {
+                        case simdjson::dom::element_type::INT64:
+                            type = FieldType::Int; break;
+                        case simdjson::dom::element_type::DOUBLE:
+                            type = FieldType::Double; break;
+                        case simdjson::dom::element_type::BOOL:
+                            type = FieldType::Bool; break;
+                        case simdjson::dom::element_type::NULL_VALUE:
+                            type = FieldType::Null; break;
+                        default:
+                            type = FieldType::String; break;
+                    }
+                }
+                FieldKey new_fk{field_name, type};
+                ordered_fields_.push_back(new_fk);
+                // 同步更新FieldDictionaryManager，插入一个空值或当前值
+                switch (type) {
+                    case FieldType::String: {
+                        auto str_res = field.value.get_string();
+                        if (!str_res.error()) manager.addFieldValue(new_fk, type, std::string(str_res.value()));
+                        else manager.addFieldValue(new_fk, type, "");
+                        break;
+                    }
+                    case FieldType::Int: {
+                        auto int_res = field.value.get_int64();
+                        if (!int_res.error()) manager.addFieldValue(new_fk, type, int_res.value());
+                        else manager.addFieldValue(new_fk, type, int64_t(0));
+                        break;
+                    }
+                    case FieldType::Double: {
+                        auto dbl_res = field.value.get_double();
+                        if (!dbl_res.error()) manager.addFieldValue(new_fk, type, dbl_res.value());
+                        else manager.addFieldValue(new_fk, type, 0.0);
+                        break;
+                    }
+                    case FieldType::Bool: {
+                        auto bool_res = field.value.get_bool();
+                        if (!bool_res.error()) manager.addFieldValue(new_fk, type, bool_res.value());
+                        else manager.addFieldValue(new_fk, type, false);
+                        break;
+                    }
+                    case FieldType::Null:
+                        manager.addFieldValue(new_fk, type, nullptr);
+                        break;
+                    case FieldType::Timestamp:
+                    case FieldType::LogType: {
+                        auto str_res = field.value.get_string();
+                        if (!str_res.error()) manager.addFieldValue(new_fk, type, std::string(str_res.value()));
+                        else manager.addFieldValue(new_fk, type, "");
+                        break;
+                    }
+                    default:
+                        manager.addFieldValue(new_fk, type, "");
+                        break;
+                }
+            }
+        }
+    }
+
     std::vector<NodeValue> values;
     for (const auto& key : ordered_fields_) {
         try {
@@ -359,36 +445,36 @@ void Trie::copyChildren(const TrieNode* src, TrieNode* dest) {
 
 // 类型对齐辅助（融合trie_type_aware的类型感知）
 static Value alignValueType(const FieldKey& key, const Value& value) {
-    switch (key.type) {
-        case FieldType::Double:
-            if (std::holds_alternative<double>(value)) return value;
-            if (std::holds_alternative<int64_t>(value)) return static_cast<double>(std::get<int64_t>(value));
-            if (std::holds_alternative<bool>(value)) return static_cast<double>(std::get<bool>(value) ? 1.0 : 0.0);
+        switch (key.type) {
+            case FieldType::Double:
+                if (std::holds_alternative<double>(value)) return value;
+                if (std::holds_alternative<int64_t>(value)) return static_cast<double>(std::get<int64_t>(value));
+                if (std::holds_alternative<bool>(value)) return static_cast<double>(std::get<bool>(value) ? 1.0 : 0.0);
             return Value(nullptr);
-        case FieldType::Int:
-            if (std::holds_alternative<int64_t>(value)) return value;
-            if (std::holds_alternative<double>(value)) return static_cast<int64_t>(std::get<double>(value));
-            if (std::holds_alternative<bool>(value)) return static_cast<int64_t>(std::get<bool>(value) ? 1 : 0);
+            case FieldType::Int:
+                if (std::holds_alternative<int64_t>(value)) return value;
+                if (std::holds_alternative<double>(value)) return static_cast<int64_t>(std::get<double>(value));
+                if (std::holds_alternative<bool>(value)) return static_cast<int64_t>(std::get<bool>(value) ? 1 : 0);
             return Value(nullptr);
-        case FieldType::Bool:
-            if (std::holds_alternative<bool>(value)) return value;
-            if (std::holds_alternative<int64_t>(value)) return static_cast<bool>(std::get<int64_t>(value) != 0);
-            if (std::holds_alternative<double>(value)) return static_cast<bool>(std::get<double>(value) != 0.0);
+            case FieldType::Bool:
+                if (std::holds_alternative<bool>(value)) return value;
+                if (std::holds_alternative<int64_t>(value)) return static_cast<bool>(std::get<int64_t>(value) != 0);
+                if (std::holds_alternative<double>(value)) return static_cast<bool>(std::get<double>(value) != 0.0);
             return Value(nullptr);
-        case FieldType::String:
+            case FieldType::String:
             if (std::holds_alternative<std::string>(value)) return value;
             return Value(nullptr);
-        case FieldType::Null:
-        case FieldType::Timestamp:
-        case FieldType::LogType:
+            case FieldType::Null:
+            case FieldType::Timestamp:
+            case FieldType::LogType:
             // 保持原有逻辑
-            if (std::holds_alternative<std::string>(value)) return value;
-            if (std::holds_alternative<int64_t>(value)) return std::to_string(std::get<int64_t>(value));
-            if (std::holds_alternative<double>(value)) return std::to_string(std::get<double>(value));
-            if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? "true" : "false";
+                if (std::holds_alternative<std::string>(value)) return value;
+                if (std::holds_alternative<int64_t>(value)) return std::to_string(std::get<int64_t>(value));
+                if (std::holds_alternative<double>(value)) return std::to_string(std::get<double>(value));
+                if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? "true" : "false";
             return Value(nullptr);
-        default:
-            return Value(nullptr);
+            default:
+    return Value(nullptr);
     }
 }
 

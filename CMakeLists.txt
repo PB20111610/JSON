@@ -16,9 +16,10 @@ add_definitions(-DUSE_ZSTD)
 
 # Add our executable and the library sources
 add_executable(json2
+    test/test_chunked_compressor.cpp
     # test/main_compress.cpp
     # test/main_trie.cpp
-    test/test_louds_trie.cpp
+    # test/test_louds_trie.cpp
     src/parser.cpp
     src/variable_dictionary.cpp
     src/timestamp_dictionary.cpp
@@ -28,8 +29,8 @@ add_executable(json2
     src/louds.cpp
     src/loudsTotrie.cpp
     src/reconstruct.cpp
-    # src/compress.cpp
-    # src/chunked_compressor.cpp
+    src/compress.cpp
+    src/chunked_compressor.cpp
     vendor/simdjson/simdjson.cpp
 )
 

@@ -11,34 +11,24 @@ namespace json2 {
 
 // === LayeredNodeStorage 实现 ===
 
-void LayeredNodeStorage::addLayer(const FieldKey& field_key, size_t start_offset) {
-    LayerInfo layer;
-    layer.field_key = field_key;
-    layer.start_offset = start_offset;
-    layer.node_count = 0;
-    layers_.push_back(layer);
+void LayeredNodeStorage::addLayer(const FieldKey& /*field_key*/, size_t /*start_offset*/) {
+    layers_.emplace_back();
 }
 
 void LayeredNodeStorage::addNodeValue(const NodeValue& value, size_t layer_idx) {
     if (layers_.empty() || layer_idx >= layers_.size()) return;
-    layers_[layer_idx].values.push_back(value);
-    layers_[layer_idx].node_count++;
+    layers_[layer_idx].push_back(value);
 }
 
 const NodeValue& LayeredNodeStorage::getNodeValue(size_t layer_idx, size_t node_idx) const {
     assert(layer_idx < layers_.size());
-    assert(node_idx < layers_[layer_idx].values.size());
-    return layers_[layer_idx].values[node_idx];
+    assert(node_idx < layers_[layer_idx].size());
+    return layers_[layer_idx][node_idx];
 }
 
-const LayeredNodeStorage::LayerInfo& LayeredNodeStorage::getLayerInfo(size_t layer_idx) const {
+const std::vector<NodeValue>& LayeredNodeStorage::getLayer(size_t layer_idx) const {
     assert(layer_idx < layers_.size());
     return layers_[layer_idx];
-}
-
-void LayeredNodeStorage::setLayerStartOffset(size_t layer_idx, size_t start_offset) {
-    assert(layer_idx < layers_.size());
-    layers_[layer_idx].start_offset = start_offset;
 }
 
 const NodeValue& LayeredNodeStorage::getBFSNodeValue(size_t bfs_idx) const {
@@ -47,50 +37,32 @@ const NodeValue& LayeredNodeStorage::getBFSNodeValue(size_t bfs_idx) const {
 }
 
 std::pair<size_t, size_t> LayeredNodeStorage::bfsToLayerIndex(size_t bfs_idx) const {
-    // 根据BFS遍历顺序，先遍历完一层再遍历下一层
     size_t current_idx = 0;
     size_t layer_idx = 0;
     size_t node_idx = 0;
-    
-    // 遍历每一层
     for (size_t i = 0; i < layers_.size(); ++i) {
         const auto& layer = layers_[i];
-        // 如果bfs_idx在当前层的范围内
-        if (bfs_idx >= current_idx && bfs_idx < current_idx + layer.node_count) {
+        if (bfs_idx >= current_idx && bfs_idx < current_idx + layer.size()) {
             layer_idx = i;
             node_idx = bfs_idx - current_idx;
             break;
         }
-        current_idx += layer.node_count;
+        current_idx += layer.size();
     }
-    
-    // 确保不越界
     if (layer_idx >= layers_.size()) {
         layer_idx = layers_.size() - 1;
-        node_idx = layers_[layer_idx].values.size() - 1;
+        node_idx = layers_[layer_idx].size() - 1;
     }
-    
     return {layer_idx, node_idx};
 }
 
 void LayeredNodeStorage::serialize(std::ostream& out) const {
     size_t layer_count = layers_.size();
     out.write(reinterpret_cast<const char*>(&layer_count), sizeof(layer_count));
-    
     for (const auto& layer : layers_) {
-        // 序列化FieldKey
-        size_t name_len = layer.field_key.name.length();
-        out.write(reinterpret_cast<const char*>(&name_len), sizeof(name_len));
-        out.write(layer.field_key.name.c_str(), name_len);
-        int type_int = static_cast<int>(layer.field_key.type);
-        out.write(reinterpret_cast<const char*>(&type_int), sizeof(type_int));
-        
-        // 序列化层信息
-        out.write(reinterpret_cast<const char*>(&layer.node_count), sizeof(layer.node_count));
-        out.write(reinterpret_cast<const char*>(&layer.start_offset), sizeof(layer.start_offset));
-        
-        // 序列化节点值
-        for (const auto& val : layer.values) {
+        size_t node_count = layer.size();
+        out.write(reinterpret_cast<const char*>(&node_count), sizeof(node_count));
+        for (const auto& val : layer) {
             uint8_t type_byte = 0;
             if (std::holds_alternative<uint32_t>(val)) type_byte = 0;
             else if (std::holds_alternative<int64_t>(val)) type_byte = 1;
@@ -99,47 +71,15 @@ void LayeredNodeStorage::serialize(std::ostream& out) const {
             else if (std::holds_alternative<std::nullptr_t>(val)) type_byte = 4;
             else if (std::holds_alternative<EncodedTimestamp>(val)) type_byte = 5;
             else if (std::holds_alternative<EncodedLog>(val)) type_byte = 6;
-            
             out.write(reinterpret_cast<const char*>(&type_byte), 1);
-            
             switch (type_byte) {
-                case 0: {
-                    uint32_t v = std::get<uint32_t>(val);
-                    out.write(reinterpret_cast<const char*>(&v), sizeof(v));
-                    break;
-                }
-                case 1: {
-                    int64_t v = std::get<int64_t>(val);
-                    out.write(reinterpret_cast<const char*>(&v), sizeof(v));
-                    break;
-                }
-                case 2: {
-                    double v = std::get<double>(val);
-                    out.write(reinterpret_cast<const char*>(&v), sizeof(v));
-                    break;
-                }
-                case 3: {
-                    bool v = std::get<bool>(val);
-                    out.write(reinterpret_cast<const char*>(&v), sizeof(v));
-                    break;
-                }
+                case 0: { uint32_t v = std::get<uint32_t>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
+                case 1: { int64_t v = std::get<int64_t>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
+                case 2: { double v = std::get<double>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
+                case 3: { bool v = std::get<bool>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
                 case 4: break; // nullptr
-                case 5: {
-                    const auto& ts = std::get<EncodedTimestamp>(val);
-                    out.write(reinterpret_cast<const char*>(&ts.pattern_id), sizeof(ts.pattern_id));
-                    out.write(reinterpret_cast<const char*>(&ts.epoch), sizeof(ts.epoch));
-                    break;
-                }
-                case 6: {
-                    const auto& log = std::get<EncodedLog>(val);
-                    out.write(reinterpret_cast<const char*>(&log.template_id), sizeof(log.template_id));
-                    uint32_t n = static_cast<uint32_t>(log.var_codes.size());
-                    out.write(reinterpret_cast<const char*>(&n), sizeof(n));
-                    for (uint32_t code : log.var_codes) {
-                        out.write(reinterpret_cast<const char*>(&code), sizeof(code));
-                    }
-                    break;
-                }
+                case 5: { const auto& ts = std::get<EncodedTimestamp>(val); out.write(reinterpret_cast<const char*>(&ts.pattern_id), sizeof(ts.pattern_id)); out.write(reinterpret_cast<const char*>(&ts.epoch), sizeof(ts.epoch)); break; }
+                case 6: { const auto& log = std::get<EncodedLog>(val); out.write(reinterpret_cast<const char*>(&log.template_id), sizeof(log.template_id)); uint32_t n = static_cast<uint32_t>(log.var_codes.size()); out.write(reinterpret_cast<const char*>(&n), sizeof(n)); for (uint32_t code : log.var_codes) { out.write(reinterpret_cast<const char*>(&code), sizeof(code)); } break; }
             }
         }
     }
@@ -149,84 +89,72 @@ void LayeredNodeStorage::deserialize(std::istream& in) {
     layers_.clear();
     size_t layer_count;
     in.read(reinterpret_cast<char*>(&layer_count), sizeof(layer_count));
-    
     for (size_t i = 0; i < layer_count; ++i) {
-        LayerInfo layer;
-        
-        // 反序列化FieldKey
-        size_t name_len;
-        in.read(reinterpret_cast<char*>(&name_len), sizeof(name_len));
-        layer.field_key.name.resize(name_len);
-        in.read(&layer.field_key.name[0], name_len);
-        int type_int;
-        in.read(reinterpret_cast<char*>(&type_int), sizeof(type_int));
-        layer.field_key.type = static_cast<FieldType>(type_int);
-        
-        // 反序列化层信息
-        in.read(reinterpret_cast<char*>(&layer.node_count), sizeof(layer.node_count));
-        in.read(reinterpret_cast<char*>(&layer.start_offset), sizeof(layer.start_offset));
-        
-        // 反序列化节点值
-        for (size_t j = 0; j < layer.node_count; ++j) {
+        std::vector<NodeValue> layer;
+        size_t node_count;
+        in.read(reinterpret_cast<char*>(&node_count), sizeof(node_count));
+        for (size_t j = 0; j < node_count; ++j) {
             uint8_t type_byte;
             in.read(reinterpret_cast<char*>(&type_byte), 1);
-            
             switch (type_byte) {
-                case 0: {
-                    uint32_t v;
-                    in.read(reinterpret_cast<char*>(&v), sizeof(v));
-                    layer.values.emplace_back(v);
-                    break;
-                }
-                case 1: {
-                    int64_t v;
-                    in.read(reinterpret_cast<char*>(&v), sizeof(v));
-                    layer.values.emplace_back(v);
-                    break;
-                }
-                case 2: {
-                    double v;
-                    in.read(reinterpret_cast<char*>(&v), sizeof(v));
-                    layer.values.emplace_back(v);
-                    break;
-                }
-                case 3: {
-                    bool v;
-                    in.read(reinterpret_cast<char*>(&v), sizeof(v));
-                    layer.values.emplace_back(v);
-                    break;
-                }
-                case 4: {
-                    layer.values.emplace_back(std::nullptr_t{});
-                    break;
-                }
-                case 5: {
-                    uint32_t pattern_id;
-                    int64_t epoch;
-                    in.read(reinterpret_cast<char*>(&pattern_id), sizeof(pattern_id));
-                    in.read(reinterpret_cast<char*>(&epoch), sizeof(epoch));
-                    layer.values.emplace_back(EncodedTimestamp{pattern_id, epoch});
-                    break;
-                }
-                case 6: {
-                    uint32_t template_id;
-                    in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id));
-                    uint32_t n;
-                    in.read(reinterpret_cast<char*>(&n), sizeof(n));
-                    std::vector<uint32_t> var_codes(n);
-                    for (uint32_t& code : var_codes) {
-                        in.read(reinterpret_cast<char*>(&code), sizeof(code));
-                    }
-                    layer.values.emplace_back(EncodedLog{template_id, var_codes});
-                    break;
-                }
-                default:
-                    layer.values.emplace_back(std::nullptr_t{});
-                    break;
-            }
+                case 0: { uint32_t v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
+                case 1: { int64_t v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
+                case 2: { double v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
+                case 3: { bool v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
+                case 4: { layer.emplace_back(std::nullptr_t{}); break; }
+                case 5: { uint32_t pattern_id; int64_t epoch; in.read(reinterpret_cast<char*>(&pattern_id), sizeof(pattern_id)); in.read(reinterpret_cast<char*>(&epoch), sizeof(epoch)); layer.emplace_back(EncodedTimestamp{pattern_id, epoch}); break; }
+                case 6: { uint32_t template_id; in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id)); uint32_t n; in.read(reinterpret_cast<char*>(&n), sizeof(n)); std::vector<uint32_t> var_codes(n); for (uint32_t& code : var_codes) { in.read(reinterpret_cast<char*>(&code), sizeof(code)); } layer.emplace_back(EncodedLog{template_id, var_codes}); break; }
+                default: layer.emplace_back(std::nullptr_t{}); break; }
         }
-        
-        layers_.push_back(layer);
+        layers_.push_back(std::move(layer));
+    }
+}
+
+void LayeredNodeStorage::serializeLayer(size_t layer_idx, std::ostream& out) const {
+    if (layer_idx >= layers_.size()) return;
+    const auto& layer = layers_[layer_idx];
+    size_t node_count = layer.size();
+    out.write(reinterpret_cast<const char*>(&node_count), sizeof(node_count));
+    for (const auto& val : layer) {
+        uint8_t type_byte = 0;
+        if (std::holds_alternative<uint32_t>(val)) type_byte = 0;
+        else if (std::holds_alternative<int64_t>(val)) type_byte = 1;
+        else if (std::holds_alternative<double>(val)) type_byte = 2;
+        else if (std::holds_alternative<bool>(val)) type_byte = 3;
+        else if (std::holds_alternative<std::nullptr_t>(val)) type_byte = 4;
+        else if (std::holds_alternative<EncodedTimestamp>(val)) type_byte = 5;
+        else if (std::holds_alternative<EncodedLog>(val)) type_byte = 6;
+        out.write(reinterpret_cast<const char*>(&type_byte), 1);
+        switch (type_byte) {
+            case 0: { uint32_t v = std::get<uint32_t>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
+            case 1: { int64_t v = std::get<int64_t>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
+            case 2: { double v = std::get<double>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
+            case 3: { bool v = std::get<bool>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
+            case 4: break; // nullptr
+            case 5: { const auto& ts = std::get<EncodedTimestamp>(val); out.write(reinterpret_cast<const char*>(&ts.pattern_id), sizeof(ts.pattern_id)); out.write(reinterpret_cast<const char*>(&ts.epoch), sizeof(ts.epoch)); break; }
+            case 6: { const auto& log = std::get<EncodedLog>(val); out.write(reinterpret_cast<const char*>(&log.template_id), sizeof(log.template_id)); uint32_t n = static_cast<uint32_t>(log.var_codes.size()); out.write(reinterpret_cast<const char*>(&n), sizeof(n)); for (uint32_t code : log.var_codes) { out.write(reinterpret_cast<const char*>(&code), sizeof(code)); } break; }
+        }
+    }
+}
+
+void LayeredNodeStorage::deserializeLayer(size_t layer_idx, std::istream& in) {
+    if (layer_idx >= layers_.size()) return;
+    std::vector<NodeValue>& layer = layers_[layer_idx];
+    layer.clear();
+    size_t node_count;
+    in.read(reinterpret_cast<char*>(&node_count), sizeof(node_count));
+    for (size_t j = 0; j < node_count; ++j) {
+        uint8_t type_byte;
+        in.read(reinterpret_cast<char*>(&type_byte), 1);
+        switch (type_byte) {
+            case 0: { uint32_t v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
+            case 1: { int64_t v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
+            case 2: { double v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
+            case 3: { bool v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
+            case 4: { layer.emplace_back(std::nullptr_t{}); break; }
+            case 5: { uint32_t pattern_id; int64_t epoch; in.read(reinterpret_cast<char*>(&pattern_id), sizeof(pattern_id)); in.read(reinterpret_cast<char*>(&epoch), sizeof(epoch)); layer.emplace_back(EncodedTimestamp{pattern_id, epoch}); break; }
+            case 6: { uint32_t template_id; in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id)); uint32_t n; in.read(reinterpret_cast<char*>(&n), sizeof(n)); std::vector<uint32_t> var_codes(n); for (uint32_t& code : var_codes) { in.read(reinterpret_cast<char*>(&code), sizeof(code)); } layer.emplace_back(EncodedLog{template_id, var_codes}); break; }
+            default: layer.emplace_back(std::nullptr_t{}); break; }
     }
 }
 
@@ -246,7 +174,7 @@ size_t LOUDSTrie::buildFromTrie(const Trie& trie) {
     // 统计总节点数
     total_nodes_ = 0;
     for (size_t i = 0; i < layered_storage_.getLayerCount(); ++i) {
-        total_nodes_ += layered_storage_.getLayerInfo(i).node_count;
+        total_nodes_ += layered_storage_.getLayer(i).size();
     }
     
     return root->getChildren().size();
@@ -265,104 +193,33 @@ void LOUDSTrie::buildLoudsStructure(const Trie& trie) {
 
     // 初始化分层存储（不再有ROOT层）
     layered_storage_ = LayeredNodeStorage();
-    std::vector<size_t> layer_node_counts(field_order_.size(), 0);
-
-    // 先计算每层的节点数（从根的所有子节点开始）
-    {
-        std::queue<std::pair<const TrieNode*, size_t>> q;
-        for (const auto& child : root->getChildren()) {
-            q.push({child.second.get(), 0});
-        }
-        while (!q.empty()) {
-            auto [node, depth] = q.front(); q.pop();
-            if (depth < field_order_.size()) {
-                layer_node_counts[depth]++;
-                for (const auto& child : node->getChildren()) {
-                    q.push({child.second.get(), depth + 1});
-                }
-            }
-        }
-    }
-
-    // 初始化所有层（不含ROOT）
-    size_t cumulative_offset = 0;
     for (size_t i = 0; i < field_order_.size(); ++i) {
-        layered_storage_.addLayer(field_order_[i], cumulative_offset);
-        cumulative_offset += layer_node_counts[i];
+        layered_storage_.addLayer(field_order_[i], 0);
     }
 
     // BFS遍历：构建LOUDS位图，同时填充分层内容
-    std::cout << "\n=== 分层内容构建调试信息 ===\n";
-    std::queue<std::pair<const TrieNode*, size_t>> q;
-    std::vector<const TrieNode*> bfs_nodes; // 记录BFS顺序的节点指针
-    std::vector<size_t> node_depths; // 记录每个节点的深度
-    // 从根的所有子节点开始
+    std::queue<std::pair<const TrieNode*, size_t>> q; // node, depth
     for (const auto& child : root->getChildren()) {
         q.push({child.second.get(), 0});
-        bfs_nodes.push_back(child.second.get());
-        node_depths.push_back(0);
     }
     while (!q.empty()) {
         auto [node, depth] = q.front(); q.pop();
         const auto& children = node->getChildren();
         size_t child_count = children.size();
-        // 调试输出
-        std::cout << " 节点编号: " << (bfs_nodes.size() - q.size() - 1);
-        std::cout << ", 路径: ";
-        for (const auto& v : node->getPath()) {
-            std::visit([](auto&& arg){
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, uint32_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, double> || std::is_same_v<T, bool>) {
-                    std::cout << arg << " ";
-                } else if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                    std::cout << "null ";
-                } else if constexpr (std::is_same_v<T, json2::EncodedTimestamp>) {
-                    std::cout << "EncodedTimestamp{pattern_id=" << arg.pattern_id << ", epoch=" << arg.epoch << "} ";
-                } else if constexpr (std::is_same_v<T, json2::EncodedLog>) {
-                    std::cout << "EncodedLog{template_id=" << arg.template_id << ", var_codes=[";
-                    for (size_t i = 0; i < arg.var_codes.size(); ++i) {
-                        std::cout << arg.var_codes[i];
-                        if (i + 1 < arg.var_codes.size()) std::cout << ",";
-                    }
-                    std::cout << "]} ";
-                } else {
-                    std::cout << "[UnknownType] ";
-                }
-            }, v);
-        }
-        std::cout << ", 孩子数: " << child_count;
-        std::cout << ", LOUDS位图下标: " << louds_bits.size() << std::endl;
         // 构建LOUDS位图
         for (size_t i = 0; i < child_count; ++i) louds_bits.push_back(1);
         louds_bits.push_back(0);
-        // 入队所有子节点，并分配BFS编号和深度
+        // 分层内容：只写当前层的NodeValue
+        if (depth < field_order_.size()) {
+            if (!node->getPath().empty()) {
+                layered_storage_.addNodeValue(node->getPath()[0], depth);
+            } else {
+                layered_storage_.addNodeValue(std::nullptr_t{}, depth);
+            }
+        }
+        // 入队所有子节点
         for (const auto& child : children) {
             q.push({child.second.get(), depth + 1});
-            bfs_nodes.push_back(child.second.get());
-            node_depths.push_back(depth + 1);
-        }
-    }
-
-    // 分层内容填充：对所有BFS节点填充（不含ROOT）
-    for (size_t bfs_idx = 0; bfs_idx < bfs_nodes.size(); ++bfs_idx) {
-        const TrieNode* node = bfs_nodes[bfs_idx];
-        size_t depth = node_depths[bfs_idx];
-        const auto& path = node->getPath();
-        // path 可能跨多层
-        for (size_t i = 0; i < path.size(); ++i) {
-            size_t layer = depth - path.size() + 1 + i;
-            if (layer < field_order_.size()) {
-                std::cout << "添加节点到层 " << layer << " [" << field_order_[layer].name << "], 值=";
-                std::visit([](const auto& v) {
-                    if constexpr (!std::is_same_v<std::decay_t<decltype(v)>, std::nullptr_t>) {
-                        std::cout << v;
-                    } else {
-                        std::cout << "null";
-                    }
-                }, path[i]);
-                std::cout << std::endl;
-                layered_storage_.addNodeValue(path[i], layer);
-            }
         }
     }
 
@@ -376,6 +233,12 @@ void LOUDSTrie::buildLoudsStructure(const Trie& trie) {
     louds_select_ = sdsl::select_support_mcl<>(&louds_bv_);
     louds_select0_ = sdsl::select_support_mcl<0>(&louds_bv_);
     louds_rank0_ = sdsl::rank_support_v<0>(&louds_bv_);
+
+    // 统计总节点数
+    total_nodes_ = 0;
+    for (size_t i = 0; i < layered_storage_.getLayerCount(); ++i) {
+        total_nodes_ += layered_storage_.getLayer(i).size();
+    }
 }
 
 // 新增：递归构建LOUDS位图的辅助方法
@@ -428,7 +291,7 @@ void LOUDSTrie::buildLayeredContent(const Trie& trie) {
     // 计算总节点数：所有层的节点数之和
     total_nodes_ = 0;
     for (size_t i = 0; i < layered_storage_.getLayerCount(); ++i) {
-        total_nodes_ += layered_storage_.getLayerInfo(i).node_count;
+        total_nodes_ += layered_storage_.getLayer(i).size();
     }
 }
 
@@ -509,7 +372,7 @@ void LOUDSTrie::buildLayeredContentByField_BFS(const Trie& trie) {
     // 统计总节点数
     total_nodes_ = 0;
     for (size_t i = 0; i < layered_storage_.getLayerCount(); ++i) {
-        total_nodes_ += layered_storage_.getLayerInfo(i).node_count;
+        total_nodes_ += layered_storage_.getLayer(i).size();
     }
 }
 
@@ -531,7 +394,7 @@ void LOUDSTrie::buildLayeredContentByField(const Trie& trie) {
     // 计算总节点数：所有层的节点数之和
     total_nodes_ = 0;
     for (size_t i = 0; i < layered_storage_.getLayerCount(); ++i) {
-        total_nodes_ += layered_storage_.getLayerInfo(i).node_count;
+        total_nodes_ += layered_storage_.getLayer(i).size();
     }
 }
 
@@ -565,6 +428,10 @@ size_t LOUDSTrie::nodeCount() const {
 
 const NodeValue& LOUDSTrie::getNodeValue(size_t bfs_idx) const {
     return layered_storage_.getBFSNodeValue(bfs_idx);
+}
+
+LayeredNodeStorage& LOUDSTrie::getLayeredStorage() {
+    return layered_storage_;
 }
 
 // 标准LOUDS树导航实现
@@ -609,45 +476,74 @@ size_t LOUDSTrie::parent(size_t node_idx) const {
     return parent_idx;
 }
 
-const LayeredNodeStorage::LayerInfo& LOUDSTrie::getLayerInfo(size_t layer_idx) const {
-    return layered_storage_.getLayerInfo(layer_idx);
+const std::vector<NodeValue>& LOUDSTrie::getLayer(size_t layer_idx) const {
+    return layered_storage_.getLayer(layer_idx);
 }
 
 const NodeValue& LOUDSTrie::getLayerNodeValue(size_t layer_idx, size_t node_idx) const {
     return layered_storage_.getNodeValue(layer_idx, node_idx);
 }
 
-// 序列化/反序列化
-void LOUDSTrie::serialize(std::ostream& out) const {
-    // 序列化LOUDS结构
-    sdsl::serialize(louds_bv_, out);
-    
-    // 序列化元数据
-    out.write(reinterpret_cast<const char*>(&total_nodes_), sizeof(total_nodes_));
-    
-    // 序列化字段顺序
-    field_utils::serializeFieldList(field_order_, out);
-    
-    // 序列化分层存储
-    layered_storage_.serialize(out);
-}
-
-void LOUDSTrie::deserialize(std::istream& in) {
-    // 反序列化LOUDS结构
-    sdsl::load(louds_bv_, in);
+void LOUDSTrie::loadFromSerialized(const std::vector<bool>& bv, const std::vector<std::vector<NodeValue>>& all_layers, const std::vector<FieldKey>& field_order) {
+    // 1. 设置 field_order_
+    field_order_ = field_order;
+    // 2. 设置 LOUDS 位图
+    louds_bv_ = sdsl::bit_vector(bv.size());
+    for (size_t i = 0; i < bv.size(); ++i) {
+        louds_bv_[i] = bv[i];
+    }
+    // 3. 构建 Rank/Select 支持
     louds_rank_ = sdsl::rank_support_v<>(&louds_bv_);
     louds_select_ = sdsl::select_support_mcl<>(&louds_bv_);
     louds_select0_ = sdsl::select_support_mcl<0>(&louds_bv_);
-    louds_rank0_ = sdsl::rank_support_v<0>(&louds_bv_); // 新增
-    
-    // 反序列化元数据
-    in.read(reinterpret_cast<char*>(&total_nodes_), sizeof(total_nodes_));
-    
-    // 反序列化字段顺序
-    field_utils::deserializeFieldList(field_order_, in);
-    
-    // 反序列化分层存储
-    layered_storage_.deserialize(in);
+    louds_rank0_ = sdsl::rank_support_v<0>(&louds_bv_);
+    // 4. 重建分层内容
+    layered_storage_ = LayeredNodeStorage();
+    for (size_t l = 0; l < all_layers.size(); ++l) {
+        FieldKey fk = (l < field_order.size()) ? field_order[l] : FieldKey{"unknown", FieldType::String};
+        layered_storage_.addLayer(fk, 0);
+        for (const auto& val : all_layers[l]) {
+            layered_storage_.addNodeValue(val, l);
+        }
+    }
+    // 5. 统计总节点数
+    total_nodes_ = 0;
+    for (size_t i = 0; i < layered_storage_.getLayerCount(); ++i) {
+        total_nodes_ += layered_storage_.getLayer(i).size();
+    }
 }
+
+void LOUDSTrie::serializeBitmap(std::ostream& out) const {
+    size_t bv_size = louds_bv_.size();
+    out.write(reinterpret_cast<const char*>(&bv_size), sizeof(bv_size));
+    for (size_t i = 0; i < bv_size; ++i) {
+        bool bit = louds_bv_[i];
+        out.write(reinterpret_cast<const char*>(&bit), sizeof(bit));
+    }
+}
+
+void LOUDSTrie::deserializeBitmap(std::istream& in) {
+    size_t bv_size;
+    in.read(reinterpret_cast<char*>(&bv_size), sizeof(bv_size));
+    louds_bv_ = sdsl::bit_vector(bv_size);
+    for (size_t i = 0; i < bv_size; ++i) {
+        bool bit;
+        in.read(reinterpret_cast<char*>(&bit), sizeof(bit));
+        louds_bv_[i] = bit;
+    }
+    louds_rank_ = sdsl::rank_support_v<>(&louds_bv_);
+    louds_select_ = sdsl::select_support_mcl<>(&louds_bv_);
+    louds_select0_ = sdsl::select_support_mcl<0>(&louds_bv_);
+    louds_rank0_ = sdsl::rank_support_v<0>(&louds_bv_);
+}
+
+// 新增：手动设置field_order_
+void LOUDSTrie::setFieldOrder(const std::vector<FieldKey>& field_order) {
+    field_order_ = field_order;
+}
+
+LOUDSTrie::LOUDSTrie() = default;
+LOUDSTrie::LOUDSTrie(const std::vector<FieldKey>& field_order)
+    : field_order_(field_order) {}
 
 } // namespace json2

@@ -11,14 +11,6 @@ namespace json2 {
 // 分层节点数据存储 - 每层存储同类型数据
 class LayeredNodeStorage {
 public:
-    // 层信息
-    struct LayerInfo {
-        FieldKey field_key;           // 字段键（类型+名称）
-        size_t node_count;            // 该层节点数量
-        size_t start_offset;          // 在BFS序列中的起始位置
-        std::vector<NodeValue> values; // 该层所有节点的值（BFS顺序）
-    };
-
     // 添加新层
     void addLayer(const FieldKey& field_key, size_t start_offset);
     
@@ -28,11 +20,8 @@ public:
     // 获取指定层的节点值
     const NodeValue& getNodeValue(size_t layer_idx, size_t node_idx) const;
     
-    // 获取层信息
-    const LayerInfo& getLayerInfo(size_t layer_idx) const;
-    
-    // 设置层的start_offset
-    void setLayerStartOffset(size_t layer_idx, size_t start_offset);
+    // 获取层内容
+    const std::vector<NodeValue>& getLayer(size_t layer_idx) const;
     
     // 获取层数
     size_t getLayerCount() const { return layers_.size(); }
@@ -47,18 +36,20 @@ public:
     // 根据BFS索引找到对应的层和层内索引
     std::pair<size_t, size_t> bfsToLayerIndex(size_t bfs_idx) const;
 
+    // 新增：单层序列化/反序列化
+    void serializeLayer(size_t layer_idx, std::ostream& out) const;
+    void deserializeLayer(size_t layer_idx, std::istream& in);
+
 private:
-    std::vector<LayerInfo> layers_;
+    std::vector<std::vector<NodeValue>> layers_;
 };
 
 class LOUDSTrie {
 public:
+    LOUDSTrie();
+    explicit LOUDSTrie(const std::vector<FieldKey>& field_order);
     // 构建 LOUDS Trie - 返回根节点子节点数量
     size_t buildFromTrie(const Trie& trie);
-
-    // 序列化/反序列化
-    void serialize(std::ostream& out) const;
-    void deserialize(std::istream& in);
 
     // 查询/遍历接口
     size_t nodeCount() const;
@@ -74,21 +65,28 @@ public:
     size_t parent(size_t node_idx) const;
     
     // 层访问接口
-    const LayeredNodeStorage::LayerInfo& getLayerInfo(size_t layer_idx) const;
+    const std::vector<NodeValue>& getLayer(size_t layer_idx) const;
     const NodeValue& getLayerNodeValue(size_t layer_idx, size_t node_idx) const;
     
     // 调试接口
     const sdsl::bit_vector& getLoudsBv() const { return louds_bv_; }
     const LayeredNodeStorage& getLayeredStorage() const { return layered_storage_; }
+    LayeredNodeStorage& getLayeredStorage();
     const sdsl::select_support_mcl<0>& getLoudsSelect0() const { return louds_select0_; }
     const sdsl::rank_support_v<>& getLoudsRank() const { return louds_rank_; }
     const sdsl::select_support_mcl<>& getLoudsSelect() const { return louds_select_; }
     
-    // 构造函数
-    LOUDSTrie() = default;
-    
     // 获取字段顺序（用于重建）
     const std::vector<FieldKey>& getFieldOrder() const { return field_order_; }
+
+    void loadFromSerialized(const std::vector<bool>& bv, const std::vector<std::vector<NodeValue>>& all_layers, const std::vector<FieldKey>& field_order);
+
+    // LOUDS位图序列化/反序列化
+    void serializeBitmap(std::ostream& out) const;
+    void deserializeBitmap(std::istream& in);
+
+    // 新增：手动设置field_order_
+    void setFieldOrder(const std::vector<FieldKey>& field_order);
 
 private:
     // LOUDS结构部分

@@ -1,6 +1,8 @@
 #include "../include/parser.h"
 #include "../include/field_dictionary_manager.h"
 #include "../include/trie.h"
+#include "../include/louds.h"
+#include "../include/loudsTotrie.h"
 #include "../include/reconstruct.h"
 #include "../include/compress.h"
 #include <iostream>
@@ -82,7 +84,7 @@ void printTrieNode(const TrieNode* node, int depth, const std::vector<FieldKey>&
 
 int main() {
     const size_t CHUNK_SIZE = 1000; // Process 1000 records for field order analysis
-    const char* DATA_PATH =   "test_data.json"; //"../data/postgresql.log";  //
+    const char* DATA_PATH = "test_data.json"; //"../data/postgresql.log"; //
 
     try {
         FieldDictionaryManager manager;
@@ -148,7 +150,7 @@ int main() {
         in.close();
 
         // 插入后批量路径压缩
-        trie->compressPaths();
+        // trie->compressPaths();
         
         // 插入所有数据后，打印Trie结构
         // std::cout << "[DEBUG] 压缩前 Trie 结构：" << std::endl;
@@ -216,13 +218,13 @@ int main() {
             std::cout << "✅ Decompression successful!\n";
                        
             // 展开路径压缩
-            decompressed_trie->expandPaths();
+            // decompressed_trie->expandPaths();
             // std::cout << "[DEBUG] expandPaths()后 Trie 结构：" << std::endl;
             // printTrieNode(decompressed_trie->getRoot(), 0, decompressed_trie->getOrderedFields(), *decompressed_manager);
 
             // 只重建并保存解压缩后的JSON
             std::string decompressed_json = reconstructJsonFromTrie(*decompressed_trie, *decompressed_manager);
-            const std::string reconstructed_filename = "reconstructed_from_compressed.json";
+            const std::string reconstructed_filename = "compressed.json";
             std::ofstream out_file_compressed(reconstructed_filename);
             if (!out_file_compressed.is_open()) {
                 throw std::runtime_error("Cannot open " + reconstructed_filename + " for writing");

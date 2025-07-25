@@ -129,6 +129,54 @@ json2/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/build
 .PHONY : json2/fast
 
+src/chunked_compressor.o: src/chunked_compressor.cpp.o
+.PHONY : src/chunked_compressor.o
+
+# target to build an object file
+src/chunked_compressor.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/chunked_compressor.cpp.o
+.PHONY : src/chunked_compressor.cpp.o
+
+src/chunked_compressor.i: src/chunked_compressor.cpp.i
+.PHONY : src/chunked_compressor.i
+
+# target to preprocess a source file
+src/chunked_compressor.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/chunked_compressor.cpp.i
+.PHONY : src/chunked_compressor.cpp.i
+
+src/chunked_compressor.s: src/chunked_compressor.cpp.s
+.PHONY : src/chunked_compressor.s
+
+# target to generate assembly for a file
+src/chunked_compressor.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/chunked_compressor.cpp.s
+.PHONY : src/chunked_compressor.cpp.s
+
+src/compress.o: src/compress.cpp.o
+.PHONY : src/compress.o
+
+# target to build an object file
+src/compress.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress.cpp.o
+.PHONY : src/compress.cpp.o
+
+src/compress.i: src/compress.cpp.i
+.PHONY : src/compress.i
+
+# target to preprocess a source file
+src/compress.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress.cpp.i
+.PHONY : src/compress.cpp.i
+
+src/compress.s: src/compress.cpp.s
+.PHONY : src/compress.s
+
+# target to generate assembly for a file
+src/compress.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress.cpp.s
+.PHONY : src/compress.cpp.s
+
 src/field_dictionary_manager.o: src/field_dictionary_manager.cpp.o
 .PHONY : src/field_dictionary_manager.o
 
@@ -345,29 +393,29 @@ src/variable_dictionary.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/variable_dictionary.cpp.s
 .PHONY : src/variable_dictionary.cpp.s
 
-test/test_louds_trie.o: test/test_louds_trie.cpp.o
-.PHONY : test/test_louds_trie.o
+test/test_chunked_compressor.o: test/test_chunked_compressor.cpp.o
+.PHONY : test/test_chunked_compressor.o
 
 # target to build an object file
-test/test_louds_trie.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_louds_trie.cpp.o
-.PHONY : test/test_louds_trie.cpp.o
+test/test_chunked_compressor.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o
+.PHONY : test/test_chunked_compressor.cpp.o
 
-test/test_louds_trie.i: test/test_louds_trie.cpp.i
-.PHONY : test/test_louds_trie.i
+test/test_chunked_compressor.i: test/test_chunked_compressor.cpp.i
+.PHONY : test/test_chunked_compressor.i
 
 # target to preprocess a source file
-test/test_louds_trie.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_louds_trie.cpp.i
-.PHONY : test/test_louds_trie.cpp.i
+test/test_chunked_compressor.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.i
+.PHONY : test/test_chunked_compressor.cpp.i
 
-test/test_louds_trie.s: test/test_louds_trie.cpp.s
-.PHONY : test/test_louds_trie.s
+test/test_chunked_compressor.s: test/test_chunked_compressor.cpp.s
+.PHONY : test/test_chunked_compressor.s
 
 # target to generate assembly for a file
-test/test_louds_trie.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_louds_trie.cpp.s
-.PHONY : test/test_louds_trie.cpp.s
+test/test_chunked_compressor.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.s
+.PHONY : test/test_chunked_compressor.cpp.s
 
 vendor/simdjson/simdjson.o: vendor/simdjson/simdjson.cpp.o
 .PHONY : vendor/simdjson/simdjson.o
@@ -402,6 +450,12 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... json2"
+	@echo "... src/chunked_compressor.o"
+	@echo "... src/chunked_compressor.i"
+	@echo "... src/chunked_compressor.s"
+	@echo "... src/compress.o"
+	@echo "... src/compress.i"
+	@echo "... src/compress.s"
 	@echo "... src/field_dictionary_manager.o"
 	@echo "... src/field_dictionary_manager.i"
 	@echo "... src/field_dictionary_manager.s"
@@ -429,9 +483,9 @@ help:
 	@echo "... src/variable_dictionary.o"
 	@echo "... src/variable_dictionary.i"
 	@echo "... src/variable_dictionary.s"
-	@echo "... test/test_louds_trie.o"
-	@echo "... test/test_louds_trie.i"
-	@echo "... test/test_louds_trie.s"
+	@echo "... test/test_chunked_compressor.o"
+	@echo "... test/test_chunked_compressor.i"
+	@echo "... test/test_chunked_compressor.s"
 	@echo "... vendor/simdjson/simdjson.o"
 	@echo "... vendor/simdjson/simdjson.i"
 	@echo "... vendor/simdjson/simdjson.s"

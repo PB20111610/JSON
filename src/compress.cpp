@@ -112,16 +112,26 @@ std::vector<uint8_t> Compressor::serializeDictionary(const FieldDictionaryManage
         writeValue(data, static_cast<uint32_t>(fk.type));
         writeVector(data, values);
     }
-    // 2. Timestamp pattern列表
+    // 2. Timestamp模板和变量列表
     const auto& ts_dict = manager.timestampDict();
-    // pattern_id从1开始，直到getPatternById返回空
-    std::vector<std::string> patterns;
-    for (uint32_t i = 1;; ++i) {
-        std::string pattern = ts_dict.getPatternById(i);
-        if (pattern.empty()) break;
-        patterns.push_back(pattern);
+    // 序列化模板
+    std::vector<std::string> templates;
+    for (uint32_t i = 1; i <= ts_dict.getTemplateCount(); ++i) {
+        std::string template_str = ts_dict.getTemplateById(i);
+        if (!template_str.empty()) {
+            templates.push_back(template_str);
+        }
     }
-    writeVector(data, patterns);
+    writeVector(data, templates);
+    // 序列化变量
+    std::vector<std::string> variables;
+    for (uint32_t i = 1; i <= ts_dict.getVariableCount(); ++i) {
+        std::string variable = ts_dict.getVariableByCode(i);
+        if (!variable.empty()) {
+            variables.push_back(variable);
+        }
+    }
+    writeVector(data, variables);
     // 3. LogType模板和变量字典
     const auto& log_dict = manager.logtypeDict();
     // 模板
@@ -156,12 +166,20 @@ std::unique_ptr<FieldDictionaryManager> Compressor::deserializeDictionary(const 
             manager->variableDict().addFieldValue(fk, type, v);
         }
     }
-    // 2. Timestamp pattern列表
-    std::vector<std::string> patterns = readVector(data, pos);
+    // 2. Timestamp模板和变量列表
+    std::vector<std::string> templates = readVector(data, pos);
+    std::vector<std::string> variables = readVector(data, pos);
     auto& ts_dict = manager->timestampDict();
-    for (const auto& pattern : patterns) {
-        if (!pattern.empty()) {
-            ts_dict.registerPattern(pattern);
+    // 预注册模板
+    for (const auto& template_str : templates) {
+        if (!template_str.empty()) {
+            ts_dict.registerTemplate(template_str);
+        }
+    }
+    // 预注册变量
+    for (const auto& variable : variables) {
+        if (!variable.empty()) {
+            ts_dict.registerVariable(variable);
         }
     }
     // 3. LogType模板
@@ -457,17 +475,28 @@ CompressedData Compressor::compressLouds(const LOUDSTrie& louds, const FieldDict
     }
     auto compressed_string_dict = compressWithZstd(string_dict_raw);
 
-    // 3.2 Timestamp pattern
+    // 3.2 Timestamp模板和变量
     std::vector<uint8_t> ts_dict_raw;
     {
         const auto& ts_dict = manager.timestampDict();
-        std::vector<std::string> patterns;
-        for (uint32_t i = 1;; ++i) {
-            std::string pattern = ts_dict.getPatternById(i);
-            if (pattern.empty()) break;
-            patterns.push_back(pattern);
+        // 序列化模板
+        std::vector<std::string> templates;
+        for (uint32_t i = 1; i <= ts_dict.getTemplateCount(); ++i) {
+            std::string template_str = ts_dict.getTemplateById(i);
+            if (!template_str.empty()) {
+                templates.push_back(template_str);
+            }
         }
-        writeVector(ts_dict_raw, patterns);
+        writeVector(ts_dict_raw, templates);
+        // 序列化变量
+        std::vector<std::string> variables;
+        for (uint32_t i = 1; i <= ts_dict.getVariableCount(); ++i) {
+            std::string variable = ts_dict.getVariableByCode(i);
+            if (!variable.empty()) {
+                variables.push_back(variable);
+            }
+        }
+        writeVector(ts_dict_raw, variables);
     }
     auto compressed_ts_dict = compressWithZstd(ts_dict_raw);
 
@@ -600,13 +629,21 @@ std::pair<std::unique_ptr<LOUDSTrie>, std::unique_ptr<FieldDictionaryManager>> C
             manager->variableDict().addFieldValue(fk, type, v);
         }
     }
-    // 2. Timestamp pattern列表
+    // 2. Timestamp模板和变量列表
     pos = 0;
-    std::vector<std::string> patterns = readVector(ts_dict_raw, pos);
+    std::vector<std::string> templates = readVector(ts_dict_raw, pos);
+    std::vector<std::string> variables = readVector(ts_dict_raw, pos);
     auto& ts_dict = manager->timestampDict();
-    for (const auto& pattern : patterns) {
-        if (!pattern.empty()) {
-            ts_dict.registerPattern(pattern);
+    // 预注册模板
+    for (const auto& template_str : templates) {
+        if (!template_str.empty()) {
+            ts_dict.registerTemplate(template_str);
+        }
+    }
+    // 预注册变量
+    for (const auto& variable : variables) {
+        if (!variable.empty()) {
+            ts_dict.registerVariable(variable);
         }
     }
     // 3. LogType模板

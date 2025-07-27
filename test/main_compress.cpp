@@ -66,8 +66,14 @@ void printTrieNode(const TrieNode* node, int depth, const std::vector<FieldKey>&
                 std::cout << "Double: " << std::get<double>(value);
             } else if (std::holds_alternative<bool>(value)) {
                 std::cout << "Bool: " << (std::get<bool>(value) ? "true" : "false");
-            } else if (std::holds_alternative<EncodedTimestamp>(value)) {
-                std::cout << "Timestamp: [pattern_id=" << std::get<EncodedTimestamp>(value).pattern_id << ", epoch=" << std::get<EncodedTimestamp>(value).epoch << "]";
+            } else if (std::holds_alternative<TemplateEncodedTimestamp>(value)) {
+                std::cout << "TemplateEncodedTimestamp: [template_id=" << std::get<TemplateEncodedTimestamp>(value).template_id << ", var_codes=[";
+                const auto& var_codes = std::get<TemplateEncodedTimestamp>(value).var_codes;
+                for (size_t i = 0; i < var_codes.size(); ++i) {
+                    if (i > 0) std::cout << ", ";
+                    std::cout << var_codes[i];
+                }
+                std::cout << "]]";
             } else if (std::holds_alternative<EncodedLog>(value)) {
                 std::cout << "LogType: [template_id=" << std::get<EncodedLog>(value).template_id << ", var_codes=";
                 for (auto v : std::get<EncodedLog>(value).var_codes) std::cout << v << ",";
@@ -89,7 +95,7 @@ int main() {
     try {
         FieldDictionaryManager manager;
         // 配置时间戳字段
-        std::vector<std::string> timestamp_fields = {"timestamp", "session_start"};
+        std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start"};
         manager.setTimestampFields(timestamp_fields);
         std::vector<FieldKey> fieldOrder;
         std::unique_ptr<Trie> trie = nullptr;

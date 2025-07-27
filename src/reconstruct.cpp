@@ -46,16 +46,7 @@ static nlohmann::json parseValue(const std::string& s) {
     if (isDouble(s)) return std::stod(s);
     return s;
 }
-static void set_nested(nlohmann::json& j, const std::string& flat_key, const nlohmann::json& value) {
-    size_t pos = 0, next;
-    nlohmann::json* curr = &j;
-    while ((next = flat_key.find('.', pos)) != std::string::npos) {
-        std::string key = flat_key.substr(pos, next - pos);
-        curr = &(*curr)[key];
-        pos = next + 1;
-    }
-    (*curr)[flat_key.substr(pos)] = value;
-}
+
 
 static std::string epochToString(int64_t epoch, const std::string& fmt) {
     struct tm tm = *gmtime(&epoch);
@@ -89,10 +80,27 @@ std::string reconstructJsonFromTrie(const Trie& trie, const FieldDictionaryManag
             json j;
             std::set<std::string> output_names;
             for (const auto& [key, val] : currentRecord) {
-                // 只输出第一个有值的同名字段（类型敏感）
-                if (output_names.count(key.name)) continue;
-                set_nested(j, key.name, parseValue(val));
-                output_names.insert(key.name);
+                // 跳过空值
+                if (val.empty()) continue;
+                
+                // 检查是否为嵌套字段（以 ~ 开头）
+                if (manager.isNestedField(key.name)) {
+                    // 嵌套字段：去掉 ~ 前缀后按点号分割并创建嵌套结构
+                    std::string key_without_prefix = key.name.substr(1); // 去掉 ~ 前缀
+                    size_t pos = 0, next;
+                    nlohmann::json* curr = &j;
+                    while ((next = key_without_prefix.find('.', pos)) != std::string::npos) {
+                        std::string field_key = key_without_prefix.substr(pos, next - pos);
+                        curr = &(*curr)[field_key];
+                        pos = next + 1;
+                    }
+                    (*curr)[key_without_prefix.substr(pos)] = parseValue(val);
+                } else {
+                    // 扁平字段：只输出第一个有值的同名字段（类型敏感）
+                    if (output_names.count(key.name)) continue;
+                    j[key.name] = parseValue(val);
+                    output_names.insert(key.name);
+                }
             }
             records.push_back(j);
         }
@@ -106,7 +114,7 @@ std::string reconstructJsonFromTrie(const Trie& trie, const FieldDictionaryManag
     std::stringstream ss;
     for (size_t i = 0; i < records.size(); ++i) {
         if (i > 0) ss << "\n";
-        ss << records[i].dump();
+        ss << records[i].dump(-1);
     }
     return ss.str();
 }

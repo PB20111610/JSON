@@ -44,28 +44,94 @@ Trie::Trie(const std::vector<FieldKey>& fields)
 
 // 辅助：simdjson按路径取字段
 static simdjson::dom::element getJsonFieldSimd(simdjson::dom::element node, const std::string& field) {
-    simdjson::dom::element current = node;
-    size_t start = 0;
-    size_t end = field.find('.');
-    while (start < field.length()) {
-        std::string part = field.substr(start, end - start);
-        size_t bracket_pos = part.find('[');
-        if (bracket_pos != std::string::npos) {
-            std::string key = part.substr(0, bracket_pos);
-            if (!key.empty()) {
-                current = current[key];
+    // 首先检查是否是真正的嵌套字段（包含数组索引）
+    if (field.find('[') != std::string::npos) {
+        // 这是真正的嵌套字段，使用原来的逻辑
+        simdjson::dom::element current = node;
+        size_t start = 0;
+        size_t end = field.find('.');
+        
+        while (start < field.length()) {
+            std::string part;
+            if (end == std::string::npos) {
+                part = field.substr(start);
+            } else {
+                part = field.substr(start, end - start);
             }
-            size_t end_bracket_pos = part.find(']', bracket_pos);
-            int index = std::stoi(part.substr(bracket_pos + 1, end_bracket_pos - bracket_pos - 1));
-            current = current.at(index);
-        } else {
-            current = current[part.c_str()];
+            
+            size_t bracket_pos = part.find('[');
+            if (bracket_pos != std::string::npos) {
+                std::string key = part.substr(0, bracket_pos);
+                if (!key.empty()) {
+                    auto result = current[key];
+                    if (result.error()) {
+                        throw simdjson::simdjson_error(result.error());
+                    }
+                    current = result.value();
+                }
+                size_t end_bracket_pos = part.find(']', bracket_pos);
+                int index = std::stoi(part.substr(bracket_pos + 1, end_bracket_pos - bracket_pos - 1));
+                auto result = current.at(index);
+                if (result.error()) {
+                    throw simdjson::simdjson_error(result.error());
+                }
+                current = result.value();
+            } else {
+                auto result = current[part.c_str()];
+                if (result.error()) {
+                    throw simdjson::simdjson_error(result.error());
+                }
+                current = result.value();
+            }
+            
+            if (end == std::string::npos) break;
+            start = end + 1;
+            end = field.find('.', start);
         }
-        if (end == std::string::npos) break;
-        start = end + 1;
-        end = field.find('.', start);
+        return current;
+    } else {
+        // 检查是否为嵌套字段（包含点号但不包含数组索引）
+        if (field.find('.') != std::string::npos) {
+            // 尝试直接访问，如果失败则按嵌套字段处理
+            auto result = node[field.c_str()];
+            if (!result.error()) {
+                // 直接访问成功，说明这是扁平字段名
+                return result.value();
+            } else {
+                // 直接访问失败，按嵌套字段处理
+                simdjson::dom::element current = node;
+                size_t start = 0;
+                size_t end = field.find('.');
+                
+                while (start < field.length()) {
+                    std::string part;
+                    if (end == std::string::npos) {
+                        part = field.substr(start);
+                    } else {
+                        part = field.substr(start, end - start);
+                    }
+                    
+                    auto result = current[part.c_str()];
+                    if (result.error()) {
+                        throw simdjson::simdjson_error(result.error());
+                    }
+                    current = result.value();
+                    
+                    if (end == std::string::npos) break;
+                    start = end + 1;
+                    end = field.find('.', start);
+                }
+                return current;
+            }
+        } else {
+            // 这是真正的扁平字段，直接访问
+            auto result = node[field.c_str()];
+            if (result.error()) {
+                throw simdjson::simdjson_error(result.error());
+            }
+            return result.value();
+        }
     }
-    return current;
 }
 
 // 标准Trie插入（每层一个字段）
@@ -162,7 +228,27 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
     std::vector<NodeValue> values;
     for (const auto& key : ordered_fields_) {
         try {
-            simdjson::dom::element value_node = getJsonFieldSimd(record, key.name);
+            // 尝试直接访问字段
+            simdjson::dom::element value_node;
+            
+            // 对于嵌套字段（以 ~ 开头），在查找时去掉 ~ 前缀
+            std::string lookup_name = key.name;
+            if (!key.name.empty() && key.name[0] == '~') {
+                lookup_name = key.name.substr(1);
+            }
+            
+            if (lookup_name.find('.') != std::string::npos) {
+                // 嵌套字段，使用 getJsonFieldSimd
+                value_node = getJsonFieldSimd(record, lookup_name);
+            } else {
+                // 简单字段，直接访问
+                auto result = record[lookup_name];
+                if (result.error()) {
+                    throw simdjson::simdjson_error(result.error());
+                }
+                value_node = result.value();
+            }
+            
             Value value;
             switch(value_node.type()) {
                 case simdjson::dom::element_type::STRING:
@@ -190,6 +276,7 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
             NodeValue node_value = createNodeValue(key, value, manager);
             values.push_back(node_value);
         } catch (const simdjson::simdjson_error& e) {
+            // std::cerr << "[DEBUG] Field '" << key.name << "' failed to get value: " << e.what() << std::endl;
             NodeValue node_value = NodeValue(nullptr);
             values.push_back(node_value);
         }
@@ -265,7 +352,7 @@ void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const
         else if (std::holds_alternative<int64_t>(val)) type_byte = 1;
         else if (std::holds_alternative<double>(val)) type_byte = 2;
         else if (std::holds_alternative<bool>(val)) type_byte = 3;
-        else if (std::holds_alternative<EncodedTimestamp>(val)) type_byte = 4;
+        else if (std::holds_alternative<TemplateEncodedTimestamp>(val)) type_byte = 4;
         else if (std::holds_alternative<EncodedLog>(val)) type_byte = 5;
         else if (std::holds_alternative<std::nullptr_t>(val)) type_byte = 6;
         data.push_back(type_byte);
@@ -290,10 +377,14 @@ void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const
                 data.push_back(v ? 1 : 0);
                 break;
             }
-            case 4: { // EncodedTimestamp
-                const auto& ts = std::get<EncodedTimestamp>(val);
-                data.insert(data.end(), reinterpret_cast<const uint8_t*>(&ts.pattern_id), reinterpret_cast<const uint8_t*>(&ts.pattern_id) + sizeof(ts.pattern_id));
-                data.insert(data.end(), reinterpret_cast<const uint8_t*>(&ts.epoch), reinterpret_cast<const uint8_t*>(&ts.epoch) + sizeof(ts.epoch));
+            case 4: { // TemplateEncodedTimestamp
+                const auto& ts = std::get<TemplateEncodedTimestamp>(val);
+                data.insert(data.end(), reinterpret_cast<const uint8_t*>(&ts.template_id), reinterpret_cast<const uint8_t*>(&ts.template_id) + sizeof(ts.template_id));
+                uint32_t var_count = static_cast<uint32_t>(ts.var_codes.size());
+                data.insert(data.end(), reinterpret_cast<const uint8_t*>(&var_count), reinterpret_cast<const uint8_t*>(&var_count) + sizeof(var_count));
+                for (uint32_t var_code : ts.var_codes) {
+                    data.insert(data.end(), reinterpret_cast<const uint8_t*>(&var_code), reinterpret_cast<const uint8_t*>(&var_code) + sizeof(var_code));
+                }
                 break;
             }
             case 5: { // EncodedLog
@@ -366,14 +457,19 @@ TrieNode* Trie::deserializeNode(const std::vector<uint8_t>& data, size_t& pos, b
                 path.emplace_back(v);
                 break;
             }
-            case 4: { // EncodedTimestamp
-                uint32_t pattern_id;
-                int64_t epoch;
-                std::memcpy(&pattern_id, &data[pos], sizeof(pattern_id));
-                pos += sizeof(pattern_id);
-                std::memcpy(&epoch, &data[pos], sizeof(epoch));
-                pos += sizeof(epoch);
-                path.emplace_back(EncodedTimestamp{pattern_id, epoch});
+            case 4: { // TemplateEncodedTimestamp
+                uint32_t template_id;
+                std::memcpy(&template_id, &data[pos], sizeof(template_id));
+                pos += sizeof(template_id);
+                uint32_t var_count;
+                std::memcpy(&var_count, &data[pos], sizeof(var_count));
+                pos += sizeof(var_count);
+                std::vector<uint32_t> var_codes(var_count);
+                for (uint32_t j = 0; j < var_count; ++j) {
+                    std::memcpy(&var_codes[j], &data[pos], sizeof(uint32_t));
+                    pos += sizeof(uint32_t);
+                }
+                path.emplace_back(TemplateEncodedTimestamp{template_id, var_codes});
                 break;
             }
             case 5: { // EncodedLog
@@ -499,7 +595,7 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
             } else {
                 return NodeValue(nullptr);
             }
-            auto encoded = manager.timestampDict().encode(key, str_val);
+            auto encoded = manager.timestampDict().encodeTemplate(key, str_val);
             return NodeValue(encoded);
         }
         case FieldType::LogType: {
@@ -542,21 +638,33 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
 // 字段值重建（融合trie_type_aware的类型安全解码）
 std::string Trie::reconstructFieldValue(const FieldKey& key, const NodeValue& node_value, const FieldDictionaryManager& manager) const {
     if (std::holds_alternative<std::nullptr_t>(node_value)) return "";
+    
+    // 对于嵌套字段（以 ~ 开头），在查找值时去掉 ~ 前缀
+    std::string lookup_name = key.name;
+    if (!key.name.empty() && key.name[0] == '~') {
+        lookup_name = key.name.substr(1);
+    }
+    
+    // 创建用于查找的 FieldKey（去掉 ~ 前缀）
+    FieldKey lookup_key{lookup_name, key.type};
+    
     switch (key.type) {
         case FieldType::Timestamp:
-            if (std::holds_alternative<EncodedTimestamp>(node_value))
-                return manager.timestampDict().decode(key, std::get<EncodedTimestamp>(node_value));
+        if (std::holds_alternative<TemplateEncodedTimestamp>(node_value)) {
+            const auto& ts = std::get<TemplateEncodedTimestamp>(node_value);
+            return manager.timestampDict().decodeTemplate(lookup_key, ts);
+        }
             else
                 return "";
         case FieldType::LogType:
             if (std::holds_alternative<EncodedLog>(node_value))
-                return manager.logtypeDict().decodeLogToString(key, std::get<EncodedLog>(node_value));
+                return manager.logtypeDict().decodeLogToString(lookup_key, std::get<EncodedLog>(node_value));
             else
                 return "";
         case FieldType::String:
         case FieldType::Null:
             if (std::holds_alternative<uint32_t>(node_value)) {
-                auto opt_value = manager.getFieldValueByCode(key, std::get<uint32_t>(node_value));
+                auto opt_value = manager.getFieldValueByCode(lookup_key, std::get<uint32_t>(node_value));
                 if (opt_value) {
                     if (std::holds_alternative<std::string>(*opt_value))
                         return std::get<std::string>(*opt_value);

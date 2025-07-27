@@ -14,8 +14,23 @@ namespace json2 {
 class SimpleTypeDetector {
 private:
     std::vector<std::string> timestamp_fields_;
+    std::vector<std::regex> timestamp_patterns_; // 预编译的正则表达式
     
 public:
+    SimpleTypeDetector() {
+        // 预编译时间戳正则表达式
+        std::vector<std::string> patterns = {
+            R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+)",  // 2023-03-27 00:26:35.719 EDT
+            R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \w+)",        // 2023-03-27 00:26:35 EDT
+            R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})",            // 2023-03-27 00:26:35
+            R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)",           // 2023-03-27T00:26:35Z
+            R"(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})",            // 2023/03/27 00:26:35
+        };
+        for (const auto& pattern : patterns) {
+            timestamp_patterns_.emplace_back(pattern);
+        }
+    }
+    
     void setTimestampFields(const std::vector<std::string>& fields) {
         timestamp_fields_ = fields;
     }
@@ -25,21 +40,12 @@ public:
         return std::find(timestamp_fields_.begin(), timestamp_fields_.end(), field) != timestamp_fields_.end();
     }
     
-    // 检查字符串是否为时间戳格式
-    static bool isTimestampValue(const std::string& value) {
+    // 检查字符串是否为时间戳格式（使用预编译的正则表达式）
+    bool isTimestampValue(const std::string& value) const {
         if (value.empty()) return false;
         
-        // 扩展的时间戳格式检测，包含毫秒和时区
-        std::vector<std::string> patterns = {
-            R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+)",  // 2023-03-27 00:26:35.719 EDT
-            R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \w+)",        // 2023-03-27 00:26:35 EDT
-            R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})",            // 2023-03-27 00:26:35
-            R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)",           // 2023-03-27T00:26:35Z
-            R"(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})",            // 2023/03/27 00:26:35
-        };
-        
-        for (const auto& pattern : patterns) {
-            if (std::regex_match(value, std::regex(pattern))) {
+        for (const auto& pattern : timestamp_patterns_) {
+            if (std::regex_match(value, pattern)) {
                 return true;
             }
         }
@@ -47,7 +53,7 @@ public:
     }
     
     // 检查字符串是否为日志模板（包含空格，但不是时间戳）
-    static bool isLogTemplate(const std::string& value) {
+    bool isLogTemplate(const std::string& value) const {
         // 如果包含空格但不是时间戳，则认为是日志模板
         return value.find(' ') != std::string::npos && !isTimestampValue(value);
     }
@@ -58,25 +64,26 @@ static SimpleTypeDetector type_detector;
 uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::string& value) {
     FieldType actual_type = key.type;
     if (key.type == FieldType::String) {
-        if (type_detector.isTimestampField(key.name) && type_detector.isTimestampValue(value)) {
+        // 优先使用字段名检测（更快）
+        if (type_detector.isTimestampField(key.name)) {
             actual_type = FieldType::Timestamp;
-        } else if (type_detector.isLogTemplate(value)) {
+        } 
+        // 兜底方案：使用正则匹配检测时间戳格式
+        else if (type_detector.isTimestampValue(value)) {
+            actual_type = FieldType::Timestamp;
+        } 
+        // 最后检查是否为日志模板
+        else if (type_detector.isLogTemplate(value)) {
             actual_type = FieldType::LogType;
         }
     }
     FieldKey actual_key{key.name, static_cast<FieldType>(actual_type)};
-    // std::cout << "[DEBUG] field_type_total_count_++ 前, key=" << actual_key.name << ", type=" << static_cast<int>(actual_key.type) << std::endl;
     field_type_total_count_[actual_key]++;
-    // std::cout << "[DEBUG] field_type_total_count_++ 后" << std::endl;
     if (!field_type_seen_[actual_key]) {
-        // std::cout << "[DEBUG] all_fields_and_types_ push_back 前" << std::endl;
         all_fields_and_types_.push_back(actual_key);
         field_type_seen_[actual_key] = true;
-        // std::cout << "[DEBUG] all_fields_and_types_ push_back 后" << std::endl;
     }
-    // std::cout << "[DEBUG] field_type_unique_values_ insert 前" << std::endl;
     field_type_unique_values_[actual_key].insert(value);
-    // std::cout << "[DEBUG] field_type_unique_values_ insert 后" << std::endl;
     switch (actual_type) {
         case FieldType::Int: {
             int64_t v = std::stoll(value);
@@ -98,9 +105,11 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::s
             return ret;
         }
         case FieldType::Timestamp: {
-            // 直接调用timestamp_dict_
-            auto encoded = timestamp_dict_.encode(key.name, value);
-            return encoded.pattern_id;
+            // 使用新的模板化编码方式，提高压缩率
+            auto encoded = timestamp_dict_.encodeTemplate(key, value);
+            // 存储完整的编码信息用于解码
+            timestamp_encodings_[key][encoded.template_id] = encoded;
+            return encoded.template_id;
         }
         case FieldType::LogType: {
             // 直接调用logtype_dict_
@@ -165,6 +174,8 @@ void FieldDictionaryManager::clear() {
     all_fields_and_types_.clear();
     field_type_seen_.clear();
     field_type_unique_values_.clear();
+    timestamp_encodings_.clear();
+    // 注意：不再需要清理 nested_fields_，因为现在使用 ~ 前缀标识
 }
 
 void FieldDictionaryManager::setTimestampFields(const std::vector<std::string>& fields) {
@@ -176,11 +187,11 @@ bool FieldDictionaryManager::isTimestampField(const std::string& field) const {
 }
 
 bool FieldDictionaryManager::isTimestampValue(const std::string& value) const {
-    return SimpleTypeDetector::isTimestampValue(value);
+    return type_detector.isTimestampValue(value);
 }
 
 bool FieldDictionaryManager::isLogTemplate(const std::string& value) const {
-    return SimpleTypeDetector::isLogTemplate(value);
+    return type_detector.isLogTemplate(value);
 }
 
 std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey& key, uint32_t code) const {
@@ -192,9 +203,16 @@ std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey&
         case FieldType::Bool:
             return variable_dict_.getFieldValueByCode(key, code);
         case FieldType::Timestamp: {
-            EncodedTimestamp encoded{code, 0};
-            std::string val = timestamp_dict_.decode(key, encoded);
+            // 使用模板化解码
+            auto it = timestamp_encodings_.find(key);
+            if (it != timestamp_encodings_.end()) {
+                auto encoded_it = it->second.find(code);
+                if (encoded_it != it->second.end()) {
+                    std::string val = timestamp_dict_.decodeTemplate(key, encoded_it->second);
             return val.empty() ? std::nullopt : std::optional<Value>(val);
+                }
+            }
+            return std::nullopt;
         }
         case FieldType::LogType: {
             std::string val = logtype_dict_.getLogTypeById(code);
@@ -203,6 +221,10 @@ std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey&
         default:
             return std::nullopt;
     }
+}
+
+bool FieldDictionaryManager::isNestedField(const std::string& field_name) const {
+    return !field_name.empty() && field_name[0] == '~';
 }
 
 } // namespace json2 

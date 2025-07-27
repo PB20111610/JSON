@@ -1,4 +1,5 @@
 #include "../include/chunked_compressor.h"
+#include "../include/compress.h"
 #include "../include/reconstruct.h"
 #include <simdjson.h>
 #include <fstream>
@@ -10,7 +11,7 @@
 using namespace json2;
 
 int main() {
-    const std::string input_file = "test_data.json";
+    const std::string input_file = "test_data.json";//
     const size_t BLOCK_SIZE = 20000;
     std::ifstream fin(input_file);
     if (!fin.is_open()) {
@@ -29,6 +30,10 @@ int main() {
     CompressorConfig config;
     config.block_size = BLOCK_SIZE;
     ChunkedTrieCompressor compressor(config);
+
+    // 设置时间戳字段
+    // std::vector<std::string> timestamp_fields = { "timestamp", "session_start"};  //"@timestamp",
+    // compressor.setTimestampFields(timestamp_fields);
 
     // 设置原始文件大小
     struct stat st;

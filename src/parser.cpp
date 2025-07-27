@@ -34,7 +34,13 @@ void collectFieldsSimd(simdjson::dom::element node, const std::string& prefix, s
             break;
         default:
             // It's a scalar type
-            fields.insert(prefix);
+            // 检查是否为嵌套字段（通过递归访问产生的字段）
+            std::string field_name = prefix;
+            // 只有通过递归访问产生的字段才是嵌套字段，才添加 ~ 前缀
+            if (!prefix.empty()) {
+                field_name = "~" + prefix;  // 添加 ~ 前缀标识嵌套字段
+            }
+            fields.insert(field_name);
             // 类型敏感处理
             std::string value_str;
             FieldType type;
@@ -65,8 +71,8 @@ void collectFieldsSimd(simdjson::dom::element node, const std::string& prefix, s
                     type = FieldType::String;
                     break;
             }
-            manager.addFieldValue(FieldKey{prefix, type}, value_str);
-            value_counts[prefix]++;
+            manager.addFieldValue(FieldKey{field_name, type}, value_str);
+            value_counts[field_name]++;
             break;
     }
 }
@@ -134,28 +140,35 @@ void JsonParser::analyzeAndSortFields(const std::vector<std::string>& records, F
                                     break;
                             }
                         }
-                        FieldKey key{prefix, static_cast<FieldType>(type)};
+                        // 检查是否为嵌套字段（通过递归访问产生的字段）
+                        std::string field_name = prefix;
+                        // 只有通过递归访问产生的字段才是嵌套字段，才添加 ~ 前缀
+                        // 真正的嵌套字段应该是在对象内部通过递归访问产生的
+                        if (!prefix.empty() && depth > 1) {
+                            field_name = "~" + prefix;  // 添加 ~ 前缀标识嵌套字段
+                        }
+                        FieldKey key{field_name, static_cast<FieldType>(type)};
                         all_fields.insert(key);
                         value_counts[key]++;
                         // std::cout << "[DEBUG] addFieldValue 前, prefix='" << prefix << "', type=" << static_cast<int>(type) << ", depth=" << depth << std::endl;
                         switch (node.type()) {
                             case simdjson::dom::element_type::STRING:
-                                manager.addFieldValue(FieldKey{prefix, type}, type, std::string(node.get_string().value()));
+                                manager.addFieldValue(FieldKey{field_name, type}, type, std::string(node.get_string().value()));
                                 break;
                             case simdjson::dom::element_type::INT64:
-                                manager.addFieldValue(FieldKey{prefix, type}, type, node.get_int64().value());
+                                manager.addFieldValue(FieldKey{field_name, type}, type, node.get_int64().value());
                                 break;
                             case simdjson::dom::element_type::DOUBLE:
-                                manager.addFieldValue(FieldKey{prefix, type}, type, node.get_double().value());
+                                manager.addFieldValue(FieldKey{field_name, type}, type, node.get_double().value());
                                 break;
                             case simdjson::dom::element_type::BOOL:
-                                manager.addFieldValue(FieldKey{prefix, type}, type, node.get_bool().value());
+                                manager.addFieldValue(FieldKey{field_name, type}, type, node.get_bool().value());
                                 break;
                             case simdjson::dom::element_type::NULL_VALUE:
-                                manager.addFieldValue(FieldKey{prefix, type}, type, nullptr);
+                                manager.addFieldValue(FieldKey{field_name, type}, type, nullptr);
                                 break;
                             default:
-                                manager.addFieldValue(FieldKey{prefix, type}, type, "");
+                                manager.addFieldValue(FieldKey{field_name, type}, type, "");
                                 break;
                         }
                         // std::cout << "[DEBUG] addFieldValue 后, prefix='" << prefix << "', type=" << static_cast<int>(type) << ", depth=" << depth << std::endl;

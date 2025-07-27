@@ -11,6 +11,8 @@
 #include <variant>
 #include <nlohmann/json.hpp> // 只用于重建验证
 #include <simdjson.h>
+#include <queue>
+#include <type_traits>
 
 using namespace json2;
 using nlohmann::json;
@@ -123,14 +125,43 @@ void printTrieNode(const TrieNode* node, int depth, const std::vector<FieldKey>&
     }
 }
 
+// === printNodeValue 声明和实现 ===
+void printNodeValue(const NodeValue& v) {
+    std::visit([](auto&& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, uint32_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, double> || std::is_same_v<T, bool>) {
+            std::cout << val;
+        } else if constexpr (std::is_same_v<T, std::nullptr_t>) {
+            std::cout << "null";
+        } else if constexpr (std::is_same_v<T, TemplateEncodedTimestamp>) {
+            std::cout << "TemplateEncodedTimestamp{template_id=" << val.template_id << ", var_codes=[";
+            for (size_t i = 0; i < val.var_codes.size(); ++i) {
+                if (i > 0) std::cout << ", ";
+                std::cout << val.var_codes[i];
+            }
+            std::cout << "]}";
+        } else if constexpr (std::is_same_v<T, EncodedLog>) {
+            std::cout << "EncodedLog{template_id=" << val.template_id << ", var_codes=[";
+            for (size_t i = 0; i < val.var_codes.size(); ++i) {
+                std::cout << val.var_codes[i];
+                if (i + 1 < val.var_codes.size()) std::cout << ", ";
+            }
+            std::cout << "]}";
+        } else {
+            std::cout << "[UnknownType]";
+        }
+    }, v);
+}
+
 int main() {
     const size_t CHUNK_SIZE = 10000; // Process 10,000 records per chunk
 
     try {
         FieldDictionaryManager manager;
         // 配置时间戳字段
-        std::vector<std::string> timestamp_fields = {"timestamp", "session_start"};
-        manager.setTimestampFields(timestamp_fields);
+        // std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start"};
+        // manager.setTimestampFields(timestamp_fields);
+        
         std::vector<FieldKey> fieldOrder;
         std::unique_ptr<Trie> trie = nullptr;
 
@@ -190,24 +221,14 @@ int main() {
             return 0;
         }
 
-        // 打印Trie树结构（压缩前）
-        std::cout << "\n=== Trie Tree Structure (Before Compression) ===\n";
-        printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
-
         // 插入后批量路径压缩
         trie->compressPaths();
 
-        // 打印Trie树结构（压缩后）
-        std::cout << "\n=== Trie Tree Structure (After Compression) ===\n";
-        printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
-
         // 展开Trie树，保证重建时字段不缺失
         trie->expandPaths();
-
-        // 打印Trie树结构（展开后）
-        std::cout << "\n=== Trie Tree Structure (After Expand) ===\n";
+        std::cout << "\n=== Trie Tree Structure (Before Compression) ===\n";
         printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
-        
+
         // === 调试：打印LogTypeDictionary内容 ===
         const auto& log_dict = manager.logtypeDict();
         std::cout << "\n=== LogTypeDictionary Templates ===\n";
@@ -225,16 +246,24 @@ int main() {
 
         // === 调试：打印TimestampDictionary内容 ===
         const auto& ts_dict = manager.timestampDict();
-        std::cout << "\n=== TimestampDictionary Patterns ===\n";
-        // 修正：pattern_id 从 1 开始
-        for (uint32_t i = 1; ; ++i) {
-            std::string pattern = ts_dict.getPatternById(i);
-            if (pattern.empty()) break;
-            std::cout << "Pattern " << i << ": " << pattern << std::endl;
+        
+        // 打印模板化编码信息
+        std::cout << "\n=== TimestampDictionary Templates ===\n";
+        for (uint32_t i = 1; i <= ts_dict.getTemplateCount(); ++i) {
+            std::string template_str = ts_dict.getTemplateById(i);
+            if (!template_str.empty()) {
+                std::cout << "Template " << i << ": " << template_str << std::endl;
         }
-        // 打印pattern_id/epoch到原始字符串的映射
-        std::cout << "\n=== TimestampDictionary Encoded Values ===\n";
-        // 这里假定你有接口遍历encoded_to_value_，如无可补充
+        }
+        
+        // 打印变量信息
+        std::cout << "\n=== TimestampDictionary Variables ===\n";
+        for (uint32_t i = 1; i <= ts_dict.getVariableCount(); ++i) {
+            std::string var = ts_dict.getVariableByCode(i);
+            if (!var.empty()) {
+                std::cout << "VarCode " << i << ": " << var << std::endl;
+            }
+        }
 
         // Verification and reconstruction steps remain the same
         std::string reconstructed_json = reconstructJsonFromTrie(*trie, manager);

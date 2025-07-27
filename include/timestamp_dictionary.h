@@ -13,50 +13,67 @@
 
 namespace json2 {
 
-struct EncodedTimestamp {
-    uint32_t pattern_id;
-    int64_t epoch;
-    bool operator==(const EncodedTimestamp& other) const {
-        return pattern_id == other.pattern_id && epoch == other.epoch;
+// 模板化时间戳编码结构
+struct TemplateEncodedTimestamp {
+    uint32_t template_id;      // 时间戳模板ID
+    std::vector<uint32_t> var_codes;  // 变量编码（年、月、日、时、分、秒等）
+    
+    bool operator==(const TemplateEncodedTimestamp& other) const {
+        return template_id == other.template_id && var_codes == other.var_codes;
     }
-    bool operator!=(const EncodedTimestamp& other) const {
+    bool operator!=(const TemplateEncodedTimestamp& other) const {
         return !(*this == other);
     }
 };
 
 // 添加operator<<定义
-inline std::ostream& operator<<(std::ostream& os, const EncodedTimestamp& ts) {
-    return os << "Timestamp{pattern=" << ts.pattern_id << ",epoch=" << ts.epoch << "}";
+inline std::ostream& operator<<(std::ostream& os, const TemplateEncodedTimestamp& ts) {
+    os << "TemplateTimestamp{template=" << ts.template_id << ",vars=[";
+    for (size_t i = 0; i < ts.var_codes.size(); ++i) {
+        if (i > 0) os << ",";
+        os << ts.var_codes[i];
+    }
+    return os << "]}";
 }
 
 class TimestampDictionary {
 public:
-    // 添加时间戳，返回格式ID和纪元时间
-    std::pair<uint32_t, int64_t> addTimestamp(const FieldKey& key, const std::string& value);
-    std::pair<uint32_t, int64_t> addTimestamp(const std::string& field, const std::string& value) { return addTimestamp(FieldKey{field, FieldType::Timestamp}, value); }
-    // 获取格式ID对应的格式字符串
-    std::string getPatternById(uint32_t id) const;
-    // 获取字段的时间范围
-    std::pair<int64_t, int64_t> getRange(const FieldKey& key) const;
-    std::pair<int64_t, int64_t> getRange(const std::string& field) const { return getRange(FieldKey{field, FieldType::Timestamp}); }
     // 编码/解码接口
-    EncodedTimestamp encode(const FieldKey& key, const std::string& value);
-    EncodedTimestamp encode(const std::string& field, const std::string& value) { return encode(FieldKey{field, FieldType::Timestamp}, value); }
-    std::string decode(const FieldKey& key, const EncodedTimestamp& encoded) const;
-    std::string decode(const std::string& field, const EncodedTimestamp& encoded) const { return decode(FieldKey{field, FieldType::Timestamp}, encoded); }
+    TemplateEncodedTimestamp encodeTemplate(const FieldKey& key, const std::string& value);
+    std::string decodeTemplate(const FieldKey& key, const TemplateEncodedTimestamp& encoded) const;
+    
+    // 获取模板ID对应的模板字符串
+    std::string getTemplateById(uint32_t id) const;
+    // 获取变量编码对应的变量字符串
+    std::string getVariableByCode(uint32_t code) const;
+    // 获取模板数量
+    size_t getTemplateCount() const;
+    // 获取变量数量
+    size_t getVariableCount() const;
+    
+    // 预注册模板（用于反序列化）
+    void registerTemplate(const std::string& template_str);
+    // 预注册变量（用于反序列化）
+    void registerVariable(const std::string& variable);
+    
     void clear();
     // 兼容 Trie 类型分发接口
     uint32_t getOrAddFieldValue(const FieldKey& key, const Value& value);
-    void registerPattern(const std::string& pattern);
 
 private:
-    // 格式字符串到ID
-    std::unordered_map<std::string, uint32_t> pattern_to_id_;
-    std::vector<std::string> id_to_pattern_;
-    uint32_t next_pattern_id_ = 1;
-    // 每个字段的时间范围
-    struct Range { int64_t min = std::numeric_limits<int64_t>::max(); int64_t max = std::numeric_limits<int64_t>::min(); };
-    std::unordered_map<std::string, Range> field_ranges_;
+    // 模板化编码相关
+    std::unordered_map<std::string, uint32_t> template_to_id_;
+    std::vector<std::string> id_to_template_;
+    uint32_t next_template_id_ = 1;
+    std::unordered_map<std::string, uint32_t> variable_to_code_;
+    std::vector<std::string> code_to_variable_;
+    uint32_t next_var_code_ = 1;
+    
+    // 辅助方法
+    uint32_t addTemplate(const std::string& template_str);
+    uint32_t encodeVariable(const std::string& var);
+    std::string decodeVariable(uint32_t code) const;
+    std::pair<std::string, std::vector<std::string>> extractTemplateAndVars(const std::string& timestamp) const;
 };
 
 } // namespace json2 

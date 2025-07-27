@@ -60,6 +60,12 @@ public:
 
     std::optional<Value> getFieldValueByCode(const FieldKey& key, uint32_t code) const;
 
+    // 新增：获取时间戳的完整编码信息
+    std::optional<TemplateEncodedTimestamp> getTimestampEncoding(const FieldKey& key, uint32_t code) const;
+
+    // 检查是否为嵌套字段（通过 ~ 前缀标识）
+    bool isNestedField(const std::string& field_name) const;
+
 private:
     Dictionary variable_dict_;
     TimestampDictionary timestamp_dict_;
@@ -72,6 +78,9 @@ private:
     std::unordered_map<FieldKey, bool> field_type_seen_;
     // 统计每个字段每种类型的唯一值
     std::unordered_map<FieldKey, std::set<std::string>> field_type_unique_values_;
+    // 存储时间戳的完整编码信息
+    std::unordered_map<FieldKey, std::unordered_map<uint32_t, TemplateEncodedTimestamp>> timestamp_encodings_;
+    // 嵌套字段使用 ~ 前缀标识，无需额外的 set
 };
 
 } // namespace json2 

@@ -129,64 +129,6 @@ void printTrieNode(const TrieNode* node, int depth, const std::vector<FieldKey>&
     }
 }
 
-void printLoudsStructure(const LOUDSTrie& louds_trie) {
-    std::cout << "=== LOUDS Trie 结构信息 ===" << std::endl;
-    std::cout << "总节点数: " << louds_trie.nodeCount() << std::endl;
-    std::cout << "层数: " << louds_trie.layerCount() << std::endl;
-    
-    const auto& louds_bv = louds_trie.getLoudsBv();
-    std::cout << "LOUDS位图大小: " << louds_bv.size() << std::endl;
-    std::cout << "LOUDS位图: ";
-    for (size_t i = 0; i < std::min(louds_bv.size(), size_t(50)); ++i) {
-        std::cout << (louds_bv[i] ? "1" : "0");
-    }
-    if (louds_bv.size() > 50) std::cout << "...";
-    std::cout << std::endl;
-    
-    std::cout << "\n=== 分层信息 ===" << std::endl;
-    for (size_t i = 0; i < louds_trie.layerCount(); ++i) {
-        const auto& layer_info = louds_trie.getLayerInfo(i);
-        std::cout << "层 " << i << ": " << layer_info.field_key.name 
-                  << " (类型: " << fieldTypeToString(layer_info.field_key.type) << ")"
-                  << ", 节点数: " << layer_info.node_count
-                  << ", 起始偏移: " << layer_info.start_offset << std::endl;
-    }
-    
-    // 打印每层的详细内容
-    std::cout << "\n=== 分层内容详情 ===" << std::endl;
-    for (size_t i = 0; i < louds_trie.layerCount(); ++i) {
-        const auto& layer_info = louds_trie.getLayerInfo(i);
-        std::cout << "\n层 " << i << " (" << layer_info.field_key.name << "):" << std::endl;
-        
-        for (size_t j = 0; j < std::min(layer_info.node_count, size_t(10)); ++j) {
-            const auto& value = louds_trie.getLayerNodeValue(i, j);
-            std::cout << "  节点[" << j << "]: ";
-            std::visit([](auto&& arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, uint32_t>) {
-                    std::cout << "uint32(" << arg << ")";
-                } else if constexpr (std::is_same_v<T, int64_t>) {
-                    std::cout << "int64(" << arg << ")";
-                } else if constexpr (std::is_same_v<T, double>) {
-                    std::cout << "double(" << arg << ")";
-                } else if constexpr (std::is_same_v<T, bool>) {
-                    std::cout << "bool(" << (arg ? "true" : "false") << ")";
-                } else if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                    std::cout << "null";
-                } else if constexpr (std::is_same_v<T, EncodedTimestamp>) {
-                    std::cout << "timestamp(" << arg.pattern_id << "," << arg.epoch << ")";
-                } else if constexpr (std::is_same_v<T, EncodedLog>) {
-                    std::cout << "log(" << arg.template_id << ",[" << arg.var_codes.size() << "])";
-                }
-            }, value);
-            std::cout << std::endl;
-        }
-        if (layer_info.node_count > 10) {
-            std::cout << "  ... (还有 " << (layer_info.node_count - 10) << " 个节点)" << std::endl;
-        }
-    }
-}
-
 void debugLoudsConstructionRecursive(const TrieNode* node, std::vector<bool>& bits, 
                                    std::vector<std::string>& node_info, int depth);
 
@@ -211,8 +153,8 @@ void printNodeTraversal(const LOUDSTrie& louds_trie) {
                 std::cout << "bool(" << (arg ? "true" : "false") << ")";
             } else if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 std::cout << "null";
-            } else if constexpr (std::is_same_v<T, EncodedTimestamp>) {
-                std::cout << "timestamp(" << arg.pattern_id << "," << arg.epoch << ")";
+            } else if constexpr (std::is_same_v<T, TemplateEncodedTimestamp>) {
+                std::cout << "timestamp(" << arg.template_id << ",[" << arg.var_codes.size() << "])";
             } else if constexpr (std::is_same_v<T, EncodedLog>) {
                 std::cout << "log(" << arg.template_id << ",[" << arg.var_codes.size() << "])";
             }
@@ -236,37 +178,8 @@ void printNodeTraversal(const LOUDSTrie& louds_trie) {
     }
 }
 
-void testSerialization(const LOUDSTrie& louds_trie) {
-    std::cout << "\n=== 序列化测试 ===" << std::endl;
-    
-    // 序列化
-    std::stringstream ss;
-    louds_trie.serialize(ss);
-    
-    std::cout << "序列化大小: " << ss.str().size() << " 字节" << std::endl;
-    
-    // 反序列化
-    ss.seekg(0);
-    LOUDSTrie new_louds_trie;
-    new_louds_trie.deserialize(ss);
-    
-    std::cout << "反序列化后节点数: " << new_louds_trie.nodeCount() << std::endl;
-    std::cout << "反序列化后层数: " << new_louds_trie.layerCount() << std::endl;
-    
-    // 验证数据一致性
-    bool consistent = true;
-    for (size_t i = 0; i < std::min(louds_trie.nodeCount(), size_t(10)); ++i) {
-        if (louds_trie.getNodeValue(i) != new_louds_trie.getNodeValue(i)) {
-            consistent = false;
-            break;
-        }
-    }
-    
-    std::cout << "数据一致性: " << (consistent ? "通过" : "失败") << std::endl;
-}
-
 // 新增：专门的LOUDS结构测试
-void testLoudsStructure(const LOUDSTrie& louds_trie, const FieldDictionaryManager& manager) {
+void testLoudsStructure(const LOUDSTrie& louds_trie, const FieldDictionaryManager& manager, const std::vector<FieldKey>& fieldOrder) {
     std::cout << "\n=== LOUDS位图结构详细分析 ===" << std::endl;
     
     const auto& louds_bv = louds_trie.getLoudsBv();
@@ -374,12 +287,12 @@ void testLoudsStructure(const LOUDSTrie& louds_trie, const FieldDictionaryManage
     // 新增：打印每层的内容
     std::cout << "\n=== 分层内容详情 ===" << std::endl;
     for (size_t layer = 0; layer < louds_trie.layerCount(); ++layer) {
-        const auto& layer_info = louds_trie.getLayerInfo(layer);
-        std::cout << "第 " << layer << " 层 [" << layer_info.field_key.name << "]: ";
-        for (size_t i = 0; i < layer_info.node_count; ++i) {
+        const auto& l = louds_trie.getLayer(layer);
+        std::cout << "第 " << layer << " 层 [" << fieldOrder[layer].name << "]: ";
+        for (size_t i = 0; i < l.size(); ++i) {
             if (i > 0) std::cout << ", ";
             const auto& value = louds_trie.getLayerNodeValue(layer, i);
-            printDecodedNodeValue(value, layer_info.field_key, manager);
+            printDecodedNodeValue(value, fieldOrder[layer], manager);
         }
         std::cout << std::endl;
     }
@@ -390,8 +303,8 @@ void testLoudsStructure(const LOUDSTrie& louds_trie, const FieldDictionaryManage
     for (size_t i = 0; i < std::min(louds_trie.nodeCount(), size_t(30)); ++i) {
         std::cout << "节点 " << i << ": ";
         auto [layer_idx, node_idx] = louds_trie.getLayeredStorage().bfsToLayerIndex(i);
-        const auto& layer_info = louds_trie.getLayerInfo(layer_idx);
-        std::cout << "层 " << layer_idx << " [" << layer_info.field_key.name << "], 层内idx " << node_idx;
+        const auto& l = louds_trie.getLayer(layer_idx);
+        std::cout << "层 " << layer_idx << " [" << fieldOrder[layer_idx].name << "], 层内idx " << node_idx;
         const auto& value = louds_trie.getNodeValue(i);
         std::cout << ", 值=";
         printNodeValue(value);
@@ -457,134 +370,6 @@ void debugLoudsConstructionRecursive(const TrieNode* node, std::vector<bool>& bi
     }
 }
 
-// 新增：数据类型验证测试
-void testDataTypeValidation(const LOUDSTrie& louds_trie) {
-    std::cout << "\n=== 数据类型验证测试 ===" << std::endl;
-    
-    for (size_t i = 0; i < louds_trie.layerCount(); ++i) {
-        const auto& layer_info = louds_trie.getLayerInfo(i);
-        std::cout << "\n层 " << i << " (" << layer_info.field_key.name << "[" 
-                  << fieldTypeToString(layer_info.field_key.type) << "]):" << std::endl;
-        
-        // 验证该层的数据类型是否符合预期
-        std::map<std::string, size_t> type_counts;
-        for (size_t j = 0; j < std::min(layer_info.node_count, size_t(5)); ++j) {
-            const auto& value = louds_trie.getLayerNodeValue(i, j);
-            std::string type_name = std::visit([](auto&& arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, uint32_t>) return "uint32(编码值)";
-                else if constexpr (std::is_same_v<T, int64_t>) return "int64(原始值)";
-                else if constexpr (std::is_same_v<T, double>) return "double(原始值)";
-                else if constexpr (std::is_same_v<T, bool>) return "bool(原始值)";
-                else if constexpr (std::is_same_v<T, std::nullptr_t>) return "null";
-                else if constexpr (std::is_same_v<T, EncodedTimestamp>) return "EncodedTimestamp";
-                else if constexpr (std::is_same_v<T, EncodedLog>) return "EncodedLog";
-                else return "unknown";
-            }, value);
-            type_counts[type_name]++;
-            
-            // 打印前几个值的详细信息
-            std::cout << "  节点[" << j << "]: " << type_name << " = ";
-            std::visit([](auto&& val) {
-                using T = std::decay_t<decltype(val)>;
-                if constexpr (std::is_same_v<T, uint32_t>) {
-                    std::cout << "编码值 " << val;
-                } else if constexpr (std::is_same_v<T, int64_t>) {
-                    std::cout << "原始值 " << val;
-                } else if constexpr (std::is_same_v<T, double>) {
-                    std::cout << "原始值 " << val;
-                } else if constexpr (std::is_same_v<T, bool>) {
-                    std::cout << "原始值 " << (val ? "true" : "false");
-                } else if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                    std::cout << "null";
-                } else if constexpr (std::is_same_v<T, EncodedTimestamp>) {
-                    std::cout << "timestamp(pattern_id=" << val.pattern_id << ", epoch=" << val.epoch << ")";
-                } else if constexpr (std::is_same_v<T, EncodedLog>) {
-                    std::cout << "log(template_id=" << val.template_id << ", var_codes=[";
-                    for (size_t k = 0; k < val.var_codes.size(); ++k) {
-                        if (k > 0) std::cout << ", ";
-                        std::cout << val.var_codes[k];
-                    }
-                    std::cout << "])";
-                }
-            }, value);
-            std::cout << std::endl;
-        }
-        
-        if (layer_info.node_count > 5) {
-            std::cout << "  ... (还有 " << (layer_info.node_count - 5) << " 个节点)" << std::endl;
-        }
-        
-        // 验证数据类型是否符合字段类型
-        bool type_matches = true;
-        switch (layer_info.field_key.type) {
-            case FieldType::String:
-                // String类型应该是uint32编码值或null
-                for (const auto& [type, count] : type_counts) {
-                    if (type != "uint32(编码值)" && type != "null") {
-                        type_matches = false;
-                        break;
-                    }
-                }
-                break;
-            case FieldType::Int:
-                // Int类型应该是int64原始值
-                for (const auto& [type, count] : type_counts) {
-                    if (type != "int64(原始值)") {
-                        type_matches = false;
-                        break;
-                    }
-                }
-                break;
-            case FieldType::Double:
-                // Double类型应该是double原始值
-                for (const auto& [type, count] : type_counts) {
-                    if (type != "double(原始值)") {
-                        type_matches = false;
-                        break;
-                    }
-                }
-                break;
-            case FieldType::Bool:
-                // Bool类型应该是bool原始值
-                for (const auto& [type, count] : type_counts) {
-                    if (type != "bool(原始值)") {
-                        type_matches = false;
-                        break;
-                    }
-                }
-                break;
-            case FieldType::Timestamp:
-                // Timestamp类型应该是EncodedTimestamp
-                for (const auto& [type, count] : type_counts) {
-                    if (type != "EncodedTimestamp" && type != "null") {
-                        type_matches = false;
-                        break;
-                    }
-                }
-                break;
-            case FieldType::LogType:
-                // LogType类型应该是EncodedLog
-                for (const auto& [type, count] : type_counts) {
-                    if (type != "EncodedLog" && type != "null") {
-                        type_matches = false;
-                        break;
-                    }
-                }
-                break;
-            default:
-                type_matches = false;
-                break;
-        }
-        
-        std::cout << "  数据类型验证: " << (type_matches ? "✅ 通过" : "❌ 失败") << std::endl;
-    }
-}
-
-
-
-
-
 // 从LOUDS Trie还原TrieNode的辅助函数
 TrieNode* restoreTrieNodeFromLOUDS(const LOUDSTrie& louds, size_t idx) {
     // 防止无限递归 - 限制递归深度
@@ -628,8 +413,13 @@ void printNodeValue(const NodeValue& v) {
             std::cout << val;
         } else if constexpr (std::is_same_v<T, std::nullptr_t>) {
             std::cout << "null";
-        } else if constexpr (std::is_same_v<T, EncodedTimestamp>) {
-            std::cout << "EncodedTimestamp{pattern_id=" << val.pattern_id << ", epoch=" << val.epoch << "}";
+        } else if constexpr (std::is_same_v<T, TemplateEncodedTimestamp>) {
+            std::cout << "TemplateEncodedTimestamp{template_id=" << val.template_id << ", var_codes=[";
+            for (size_t i = 0; i < val.var_codes.size(); ++i) {
+                std::cout << val.var_codes[i];
+                if (i + 1 < val.var_codes.size()) std::cout << ", ";
+            }
+            std::cout << "]}";
         } else if constexpr (std::is_same_v<T, EncodedLog>) {
             std::cout << "EncodedLog{template_id=" << val.template_id << ", var_codes=[";
             for (size_t i = 0; i < val.var_codes.size(); ++i) {
@@ -669,8 +459,13 @@ void printDecodedNodeValue(const NodeValue& v, const FieldKey& field_key, const 
             std::cout << val;
         } else if constexpr (std::is_same_v<T, std::nullptr_t>) {
             std::cout << "null";
-        } else if constexpr (std::is_same_v<T, EncodedTimestamp>) {
-            std::cout << "Timestamp{pattern_id=" << val.pattern_id << ", epoch=" << val.epoch << "}";
+        } else if constexpr (std::is_same_v<T, TemplateEncodedTimestamp>) {
+            std::cout << "Timestamp{template_id=" << val.template_id << ", var_codes=[";
+            for (size_t i = 0; i < val.var_codes.size(); ++i) {
+                std::cout << val.var_codes[i];
+                if (i + 1 < val.var_codes.size()) std::cout << ", ";
+            }
+            std::cout << "]}";
         } else if constexpr (std::is_same_v<T, EncodedLog>) {
             std::cout << "Log{template_id=" << val.template_id << ", var_codes=[";
             for (size_t i = 0; i < val.var_codes.size(); ++i) {
@@ -693,7 +488,7 @@ int main() {
         FieldDictionaryManager manager;
         
         // 配置时间戳字段
-        std::vector<std::string> timestamp_fields = {"timestamp", "session_start"};
+        std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start"};
         manager.setTimestampFields(timestamp_fields);
         
         std::vector<FieldKey> fieldOrder;
@@ -778,8 +573,8 @@ int main() {
             return 0;
         }
 
-        std::cout << "\n=== 原始Trie树结构 ===" << std::endl;
-        printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
+        // std::cout << "\n=== 原始Trie树结构 ===" << std::endl;
+        // printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
 
         // 构建LOUDS Trie
         std::cout << "\n[DEBUG] Building LOUDSTrie from Trie..." << std::endl;
@@ -787,8 +582,57 @@ int main() {
         size_t root_children = louds_trie.buildFromTrie(*trie);
         std::cout << "LOUDS Trie构建完成，根节点子节点数: " << root_children << std::endl;
 
-        // 只输出LOUDS位图结构
-        testLoudsStructure(louds_trie, manager);
+        // === 新增：LOUDS位图和层内容序列化/反序列化测试 ===
+        {
+            std::ofstream bv_out("louds_bitmap.bin", std::ios::binary);
+            std::ofstream layers_out("louds_layers.bin", std::ios::binary);
+            louds_trie.serializeBitmap(bv_out);
+            louds_trie.getLayeredStorage().serialize(layers_out);
+            bv_out.close();
+            layers_out.close();
+        }
+        // 反序列化到新对象
+        LOUDSTrie loaded_trie;
+        {
+            std::ifstream bv_in("louds_bitmap.bin", std::ios::binary);
+            std::ifstream layers_in("louds_layers.bin", std::ios::binary);
+            loaded_trie.deserializeBitmap(bv_in);
+            loaded_trie.getLayeredStorage().deserialize(layers_in);
+            bv_in.close();
+            layers_in.close();
+        }
+        // 输出对比
+        std::cout << "\n[TEST] LOUDS位图序列化/反序列化对比：" << std::endl;
+        const auto& orig_bv = louds_trie.getLoudsBv();
+        const auto& loaded_bv = loaded_trie.getLoudsBv();
+        std::cout << "原始位图:  ";
+        for (size_t i = 0; i < std::min(orig_bv.size(), size_t(50)); ++i) std::cout << (orig_bv[i] ? "1" : "0");
+        std::cout << std::endl;
+        std::cout << "反序列化: ";
+        for (size_t i = 0; i < std::min(loaded_bv.size(), size_t(50)); ++i) std::cout << (loaded_bv[i] ? "1" : "0");
+        std::cout << std::endl;
+        std::cout << "长度一致: " << (orig_bv.size() == loaded_bv.size() ? "✅" : "❌") << std::endl;
+        bool bv_equal = (orig_bv.size() == loaded_bv.size());
+        for (size_t i = 0; bv_equal && i < orig_bv.size(); ++i) {
+            if (orig_bv[i] != loaded_bv[i]) bv_equal = false;
+        }
+        std::cout << "内容一致: " << (bv_equal ? "✅" : "❌") << std::endl;
+        // 层内容对比
+        std::cout << "\n[TEST] LOUDS每层内容序列化/反序列化对比：" << std::endl;
+        bool all_layers_equal = true;
+        for (size_t i = 0; i < louds_trie.layerCount(); ++i) {
+            const auto& orig_layer = louds_trie.getLayer(i);
+            const auto& loaded_layer = loaded_trie.getLayer(i);
+            std::cout << "层 " << i << ": 节点数(" << orig_layer.size() << ", " << loaded_layer.size() << ")";
+            bool layer_equal = (orig_layer.size() == loaded_layer.size());
+            for (size_t j = 0; layer_equal && j < orig_layer.size(); ++j) {
+                if (orig_layer[j] != loaded_layer[j]) layer_equal = false;
+            }
+            std::cout << (layer_equal ? " ✅" : " ❌") << std::endl;
+            if (!layer_equal) all_layers_equal = false;
+        }
+        std::cout << "所有层内容一致: " << (all_layers_equal ? "✅" : "❌") << std::endl;
+        // === END ===
 
         // 新增：详细LOUDS导航调试输出
         // std::cout << "\n=== LOUDS节点导航详细调试 ===" << std::endl;
@@ -808,18 +652,18 @@ int main() {
         std::cout << "\n=== LOUDS还原Trie树结构 ===" << std::endl;
         Trie restored_trie(fieldOrder);
         loudsToTrie(louds_trie, restored_trie);
-        printTrieNode(restored_trie.getRoot(), 0, fieldOrder, manager);
+        // printTrieNode(restored_trie.getRoot(), 0, fieldOrder, manager);
 
         // 新增：LOUDS还原文档输出
         std::string reconstructed_json = reconstructJsonFromTrie(restored_trie, manager);
         // 写入文件
-        std::ofstream out_file("reconstruct.json");
+        std::ofstream out_file("reconstructed.json");
         if (out_file.is_open()) {
             out_file << reconstructed_json;
             out_file.close();
-            std::cout << "\n[INFO] LOUDS还原文档已写入 reconstruct.json\n";
+            std::cout << "\n[INFO] LOUDS还原文档已写入 reconstructed.json\n";
         } else {
-            std::cerr << "[ERROR] 无法写入 reconstruct.json 文件！\n";
+            std::cerr << "[ERROR] 无法写入 reconstructed.json 文件！\n";
         }
         
     } catch (const std::exception& e) {

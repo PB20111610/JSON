@@ -21,7 +21,7 @@ namespace dom {
 namespace json2 {
 
 // 节点值类型：可以是编码值或原始值，std::nullptr_t用于空字段占位
-using NodeValue = std::variant<uint32_t, int64_t, double, bool, std::nullptr_t, EncodedTimestamp, EncodedLog>;
+using NodeValue = std::variant<uint32_t, int64_t, double, bool, std::nullptr_t, TemplateEncodedTimestamp, EncodedLog>;
 
 // NodeValue哈希函数
 struct NodeValueHash {
@@ -32,8 +32,12 @@ struct NodeValueHash {
                 return std::hash<T>{}(arg);
             } else if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return 0;
-            } else if constexpr (std::is_same_v<T, EncodedTimestamp>) {
-                return std::hash<uint32_t>{}(arg.pattern_id) ^ std::hash<int64_t>{}(arg.epoch);
+            } else if constexpr (std::is_same_v<T, TemplateEncodedTimestamp>) {
+                size_t hash = std::hash<uint32_t>{}(arg.template_id);
+                for (uint32_t var_code : arg.var_codes) {
+                    hash ^= std::hash<uint32_t>{}(var_code);
+                }
+                return hash;
             } else if constexpr (std::is_same_v<T, EncodedLog>) {
                 std::size_t h = std::hash<uint32_t>{}(arg.template_id);
                 for (auto code : arg.var_codes) h ^= std::hash<uint32_t>{}(code) + 0x9e3779b9 + (h << 6) + (h >> 2);

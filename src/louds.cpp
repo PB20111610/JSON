@@ -69,7 +69,7 @@ void LayeredNodeStorage::serialize(std::ostream& out) const {
             else if (std::holds_alternative<double>(val)) type_byte = 2;
             else if (std::holds_alternative<bool>(val)) type_byte = 3;
             else if (std::holds_alternative<std::nullptr_t>(val)) type_byte = 4;
-            else if (std::holds_alternative<EncodedTimestamp>(val)) type_byte = 5;
+                    else if (std::holds_alternative<TemplateEncodedTimestamp>(val)) type_byte = 5;
             else if (std::holds_alternative<EncodedLog>(val)) type_byte = 6;
             out.write(reinterpret_cast<const char*>(&type_byte), 1);
             switch (type_byte) {
@@ -78,7 +78,7 @@ void LayeredNodeStorage::serialize(std::ostream& out) const {
                 case 2: { double v = std::get<double>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
                 case 3: { bool v = std::get<bool>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
                 case 4: break; // nullptr
-                case 5: { const auto& ts = std::get<EncodedTimestamp>(val); out.write(reinterpret_cast<const char*>(&ts.pattern_id), sizeof(ts.pattern_id)); out.write(reinterpret_cast<const char*>(&ts.epoch), sizeof(ts.epoch)); break; }
+            case 5: { const auto& ts = std::get<TemplateEncodedTimestamp>(val); out.write(reinterpret_cast<const char*>(&ts.template_id), sizeof(ts.template_id)); uint32_t n = static_cast<uint32_t>(ts.var_codes.size()); out.write(reinterpret_cast<const char*>(&n), sizeof(n)); for (uint32_t code : ts.var_codes) { out.write(reinterpret_cast<const char*>(&code), sizeof(code)); } break; }
                 case 6: { const auto& log = std::get<EncodedLog>(val); out.write(reinterpret_cast<const char*>(&log.template_id), sizeof(log.template_id)); uint32_t n = static_cast<uint32_t>(log.var_codes.size()); out.write(reinterpret_cast<const char*>(&n), sizeof(n)); for (uint32_t code : log.var_codes) { out.write(reinterpret_cast<const char*>(&code), sizeof(code)); } break; }
             }
         }
@@ -102,7 +102,7 @@ void LayeredNodeStorage::deserialize(std::istream& in) {
                 case 2: { double v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
                 case 3: { bool v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
                 case 4: { layer.emplace_back(std::nullptr_t{}); break; }
-                case 5: { uint32_t pattern_id; int64_t epoch; in.read(reinterpret_cast<char*>(&pattern_id), sizeof(pattern_id)); in.read(reinterpret_cast<char*>(&epoch), sizeof(epoch)); layer.emplace_back(EncodedTimestamp{pattern_id, epoch}); break; }
+                case 5: { uint32_t template_id; in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id)); uint32_t n; in.read(reinterpret_cast<char*>(&n), sizeof(n)); std::vector<uint32_t> var_codes(n); for (uint32_t& code : var_codes) { in.read(reinterpret_cast<char*>(&code), sizeof(code)); } layer.emplace_back(TemplateEncodedTimestamp{template_id, var_codes}); break; }
                 case 6: { uint32_t template_id; in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id)); uint32_t n; in.read(reinterpret_cast<char*>(&n), sizeof(n)); std::vector<uint32_t> var_codes(n); for (uint32_t& code : var_codes) { in.read(reinterpret_cast<char*>(&code), sizeof(code)); } layer.emplace_back(EncodedLog{template_id, var_codes}); break; }
                 default: layer.emplace_back(std::nullptr_t{}); break; }
         }
@@ -122,7 +122,7 @@ void LayeredNodeStorage::serializeLayer(size_t layer_idx, std::ostream& out) con
         else if (std::holds_alternative<double>(val)) type_byte = 2;
         else if (std::holds_alternative<bool>(val)) type_byte = 3;
         else if (std::holds_alternative<std::nullptr_t>(val)) type_byte = 4;
-        else if (std::holds_alternative<EncodedTimestamp>(val)) type_byte = 5;
+        else if (std::holds_alternative<TemplateEncodedTimestamp>(val)) type_byte = 5;
         else if (std::holds_alternative<EncodedLog>(val)) type_byte = 6;
         out.write(reinterpret_cast<const char*>(&type_byte), 1);
         switch (type_byte) {
@@ -131,7 +131,7 @@ void LayeredNodeStorage::serializeLayer(size_t layer_idx, std::ostream& out) con
             case 2: { double v = std::get<double>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
             case 3: { bool v = std::get<bool>(val); out.write(reinterpret_cast<const char*>(&v), sizeof(v)); break; }
             case 4: break; // nullptr
-            case 5: { const auto& ts = std::get<EncodedTimestamp>(val); out.write(reinterpret_cast<const char*>(&ts.pattern_id), sizeof(ts.pattern_id)); out.write(reinterpret_cast<const char*>(&ts.epoch), sizeof(ts.epoch)); break; }
+            case 5: { const auto& ts = std::get<TemplateEncodedTimestamp>(val); out.write(reinterpret_cast<const char*>(&ts.template_id), sizeof(ts.template_id)); uint32_t n = static_cast<uint32_t>(ts.var_codes.size()); out.write(reinterpret_cast<const char*>(&n), sizeof(n)); for (uint32_t code : ts.var_codes) { out.write(reinterpret_cast<const char*>(&code), sizeof(code)); } break; }
             case 6: { const auto& log = std::get<EncodedLog>(val); out.write(reinterpret_cast<const char*>(&log.template_id), sizeof(log.template_id)); uint32_t n = static_cast<uint32_t>(log.var_codes.size()); out.write(reinterpret_cast<const char*>(&n), sizeof(n)); for (uint32_t code : log.var_codes) { out.write(reinterpret_cast<const char*>(&code), sizeof(code)); } break; }
         }
     }
@@ -152,7 +152,7 @@ void LayeredNodeStorage::deserializeLayer(size_t layer_idx, std::istream& in) {
             case 2: { double v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
             case 3: { bool v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
             case 4: { layer.emplace_back(std::nullptr_t{}); break; }
-            case 5: { uint32_t pattern_id; int64_t epoch; in.read(reinterpret_cast<char*>(&pattern_id), sizeof(pattern_id)); in.read(reinterpret_cast<char*>(&epoch), sizeof(epoch)); layer.emplace_back(EncodedTimestamp{pattern_id, epoch}); break; }
+                            case 5: { uint32_t template_id; in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id)); uint32_t n; in.read(reinterpret_cast<char*>(&n), sizeof(n)); std::vector<uint32_t> var_codes(n); for (uint32_t& code : var_codes) { in.read(reinterpret_cast<char*>(&code), sizeof(code)); } layer.emplace_back(TemplateEncodedTimestamp{template_id, var_codes}); break; }
             case 6: { uint32_t template_id; in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id)); uint32_t n; in.read(reinterpret_cast<char*>(&n), sizeof(n)); std::vector<uint32_t> var_codes(n); for (uint32_t& code : var_codes) { in.read(reinterpret_cast<char*>(&code), sizeof(code)); } layer.emplace_back(EncodedLog{template_id, var_codes}); break; }
             default: layer.emplace_back(std::nullptr_t{}); break; }
     }

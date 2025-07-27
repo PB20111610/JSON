@@ -57,7 +57,6 @@ public:
     void setOriginalFileSize(size_t size);
     bool shouldStartNewBlock() const;
     std::vector<uint8_t> serializeBlock(size_t block_index) const;
-    void setTimestampFields(const std::vector<std::string>& fields);    // 设置时间戳字段
 
     struct ChunkedBlock {
         std::vector<FieldKey> field_order;
@@ -80,8 +79,6 @@ private:
         size_t original_size = 0; // 每块的原始数据大小
     };
     std::vector<ChunkedBlockMemory> blocks_memory_;
-    // 新增：存储时间戳字段
-    std::vector<std::string> timestamp_fields_;
 };
 
 } // namespace json2

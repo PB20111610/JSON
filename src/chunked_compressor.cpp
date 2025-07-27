@@ -60,14 +60,11 @@ void ChunkedTrieCompressor::addRecord(const std::string& record, simdjson::dom::
     }
 }
 
-void ChunkedTrieCompressor::setTimestampFields(const std::vector<std::string>& fields) {
-    timestamp_fields_ = fields;
-}
+
 
 void ChunkedTrieCompressor::finalizeCurrentBlock() {
     if (current_block_count_ > 0 && !block_buffer_.empty()) {
         FieldDictionaryManager dict;
-        dict.setTimestampFields(timestamp_fields_);
         std::vector<FieldKey> ordered_fields;
         // 字段统计只用chunk_stat_buffer_
         JsonParser::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);

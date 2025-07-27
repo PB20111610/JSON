@@ -105,10 +105,8 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::s
             return ret;
         }
         case FieldType::Timestamp: {
-            // 使用新的模板化编码方式，提高压缩率
+            // 直接使用TimestampDictionary编码，与LogType保持一致
             auto encoded = timestamp_dict_.encodeTemplate(key, value);
-            // 存储完整的编码信息用于解码
-            timestamp_encodings_[key][encoded.template_id] = encoded;
             return encoded.template_id;
         }
         case FieldType::LogType: {
@@ -174,8 +172,6 @@ void FieldDictionaryManager::clear() {
     all_fields_and_types_.clear();
     field_type_seen_.clear();
     field_type_unique_values_.clear();
-    timestamp_encodings_.clear();
-    // 注意：不再需要清理 nested_fields_，因为现在使用 ~ 前缀标识
 }
 
 void FieldDictionaryManager::setTimestampFields(const std::vector<std::string>& fields) {
@@ -203,16 +199,9 @@ std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey&
         case FieldType::Bool:
             return variable_dict_.getFieldValueByCode(key, code);
         case FieldType::Timestamp: {
-            // 使用模板化解码
-            auto it = timestamp_encodings_.find(key);
-            if (it != timestamp_encodings_.end()) {
-                auto encoded_it = it->second.find(code);
-                if (encoded_it != it->second.end()) {
-                    std::string val = timestamp_dict_.decodeTemplate(key, encoded_it->second);
+            // 直接使用TimestampDictionary解码，与LogType保持一致
+            std::string val = timestamp_dict_.getTemplateById(code);
             return val.empty() ? std::nullopt : std::optional<Value>(val);
-                }
-            }
-            return std::nullopt;
         }
         case FieldType::LogType: {
             std::string val = logtype_dict_.getLogTypeById(code);

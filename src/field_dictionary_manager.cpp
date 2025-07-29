@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <sstream>
 #include <iostream> // Added for debug output
+#include <cmath> // 添加cmath头文件支持log2函数
 
 namespace json2 {
 
@@ -23,6 +24,7 @@ public:
             R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+)",  // 2023-03-27 00:26:35.719 EDT
             R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \w+)",        // 2023-03-27 00:26:35 EDT
             R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})",            // 2023-03-27 00:26:35
+            R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)",    // 2023-03-28T04:00:00.040Z (新增：支持毫秒)
             R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)",           // 2023-03-27T00:26:35Z
             R"(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})",            // 2023/03/27 00:26:35
         };
@@ -62,46 +64,31 @@ public:
 static SimpleTypeDetector type_detector;
 
 uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::string& value) {
-    FieldType actual_type = key.type;
-    if (key.type == FieldType::String) {
-        // 优先使用字段名检测（更快）
-        if (type_detector.isTimestampField(key.name)) {
-            actual_type = FieldType::Timestamp;
-        } 
-        // 兜底方案：使用正则匹配检测时间戳格式
-        else if (type_detector.isTimestampValue(value)) {
-            actual_type = FieldType::Timestamp;
-        } 
-        // 最后检查是否为日志模板
-        else if (type_detector.isLogTemplate(value)) {
-            actual_type = FieldType::LogType;
-        }
+    // 严格按照传入的FieldKey类型进行字典分配，不重新判断类型
+    field_type_total_count_[key]++;
+    if (!field_type_seen_[key]) {
+        all_fields_and_types_.push_back(key);
+        field_type_seen_[key] = true;
     }
-    FieldKey actual_key{key.name, static_cast<FieldType>(actual_type)};
-    field_type_total_count_[actual_key]++;
-    if (!field_type_seen_[actual_key]) {
-        all_fields_and_types_.push_back(actual_key);
-        field_type_seen_[actual_key] = true;
-    }
-    field_type_unique_values_[actual_key].insert(value);
-    switch (actual_type) {
+    field_type_unique_values_[key].insert(value);
+    switch (key.type) {
         case FieldType::Int: {
             int64_t v = std::stoll(value);
-            auto ret = variable_dict_.addFieldValue(key, actual_type, v);
+            auto ret = variable_dict_.addFieldValue(key, key.type, v);
             return ret;
         }
         case FieldType::Double: {
             double v = std::stod(value);
-            auto ret = variable_dict_.addFieldValue(key, actual_type, v);
+            auto ret = variable_dict_.addFieldValue(key, key.type, v);
             return ret;
         }
         case FieldType::Bool: {
             bool v = (value == "true");
-            auto ret = variable_dict_.addFieldValue(key, actual_type, v);
+            auto ret = variable_dict_.addFieldValue(key, key.type, v);
             return ret;
         }
         case FieldType::String: {
-            auto ret = variable_dict_.addFieldValue(key, actual_type, value);
+            auto ret = variable_dict_.addFieldValue(key, key.type, value);
             return ret;
         }
         case FieldType::Timestamp: {
@@ -111,11 +98,104 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::s
         }
         case FieldType::LogType: {
             // 直接调用logtype_dict_
+            // std::cout << "[DEBUG] FieldDictionaryManager::addFieldValue - LogType field: " << key.name << " = '" << value << "'" << std::endl;
             auto encoded = logtype_dict_.encodeLog(key, value, {});
+            // std::cout << "[DEBUG] FieldDictionaryManager::addFieldValue - LogType encoded template_id: " << encoded.template_id << std::endl;
             return encoded.template_id;
         }
+        case FieldType::Null:
+            return variable_dict_.addFieldValue(key, key.type, nullptr);
         default:
-            throw std::invalid_argument("Unsupported type in addFieldValue");
+            return variable_dict_.addFieldValue(key, key.type, value);
+    }
+}
+
+uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType type, const Value& value) {
+    // 严格按照传入的FieldKey类型进行字典分配，不重新判断类型
+    field_type_total_count_[key]++;
+    if (!field_type_seen_[key]) {
+        all_fields_and_types_.push_back(key);
+        field_type_seen_[key] = true;
+    }
+    
+    // 将Value转换为字符串用于唯一值统计
+    std::string value_str;
+    if (std::holds_alternative<std::string>(value)) {
+        value_str = std::get<std::string>(value);
+    } else if (std::holds_alternative<int64_t>(value)) {
+        value_str = std::to_string(std::get<int64_t>(value));
+    } else if (std::holds_alternative<double>(value)) {
+        value_str = std::to_string(std::get<double>(value));
+    } else if (std::holds_alternative<bool>(value)) {
+        value_str = std::get<bool>(value) ? "true" : "false";
+    } else if (std::holds_alternative<std::nullptr_t>(value)) {
+        value_str = "null";
+    }
+    field_type_unique_values_[key].insert(value_str);
+    
+    switch (key.type) {
+        case FieldType::Int:
+            if (std::holds_alternative<int64_t>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, std::get<int64_t>(value));
+            } else if (std::holds_alternative<double>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, static_cast<int64_t>(std::get<double>(value)));
+            } else if (std::holds_alternative<bool>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, static_cast<int64_t>(std::get<bool>(value)));
+            } else {
+                return variable_dict_.addFieldValue(key, key.type, int64_t(0));
+            }
+        case FieldType::Double:
+            if (std::holds_alternative<double>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, std::get<double>(value));
+            } else if (std::holds_alternative<int64_t>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, static_cast<double>(std::get<int64_t>(value)));
+            } else if (std::holds_alternative<bool>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, static_cast<double>(std::get<bool>(value)));
+            } else {
+                return variable_dict_.addFieldValue(key, key.type, 0.0);
+            }
+        case FieldType::Bool:
+            if (std::holds_alternative<bool>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, std::get<bool>(value));
+            } else if (std::holds_alternative<int64_t>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, std::get<int64_t>(value) != 0);
+            } else if (std::holds_alternative<double>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, std::get<double>(value) != 0.0);
+            } else {
+                return variable_dict_.addFieldValue(key, key.type, false);
+            }
+        case FieldType::String:
+            if (std::holds_alternative<std::string>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, std::get<std::string>(value));
+            } else if (std::holds_alternative<int64_t>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, std::to_string(std::get<int64_t>(value)));
+            } else if (std::holds_alternative<double>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, std::to_string(std::get<double>(value)));
+            } else if (std::holds_alternative<bool>(value)) {
+                return variable_dict_.addFieldValue(key, key.type, std::get<bool>(value) ? "true" : "false");
+            } else {
+                return variable_dict_.addFieldValue(key, key.type, "");
+            }
+        case FieldType::Timestamp:
+            if (std::holds_alternative<std::string>(value)) {
+                auto encoded = timestamp_dict_.encodeTemplate(key, std::get<std::string>(value));
+                return encoded.template_id;
+            } else {
+                return variable_dict_.addFieldValue(key, key.type, "");
+            }
+        case FieldType::LogType:
+            if (std::holds_alternative<std::string>(value)) {
+                // std::cout << "[DEBUG] FieldDictionaryManager::addFieldValue(Value) - LogType field: " << key.name << " = '" << std::get<std::string>(value) << "'" << std::endl;
+                auto encoded = logtype_dict_.encodeLog(key, std::get<std::string>(value), {});
+                // std::cout << "[DEBUG] FieldDictionaryManager::addFieldValue(Value) - LogType encoded template_id: " << encoded.template_id << std::endl;
+                return encoded.template_id;
+            } else {
+                return variable_dict_.addFieldValue(key, key.type, "");
+            }
+        case FieldType::Null:
+            return variable_dict_.addFieldValue(key, key.type, nullptr);
+        default:
+            return variable_dict_.addFieldValue(key, key.type, "");
     }
 }
 
@@ -148,7 +228,15 @@ void FieldDictionaryManager::printRedundancyStats(std::ostream& out) const {
     for (const auto& [field, type] : all_fields_and_types_) {
         size_t total = getTotalCount(FieldKey{field, type});
         size_t unique = getUniqueValueCount(FieldKey{field, type});
-        double redundancy = unique ? (double)total / unique : 0;
+        
+        // 使用与排序相同的冗余度计算方法（calculateRedundancyB）
+        double redundancy = calculateRedundancyB(FieldKey{field, type}, total, unique);
+        // double factor = (val_count > 0) ? (double)occ / val_count : 0.0;        
+        // double factor = manager.calculateRedundancyA(key, occ, val_count); // 方案A：唯一值惩罚因子 (Fifth)
+        // double factor = manager.calculateRedundancyB(key, occ, val_count); // 方案B：基于信息熵 (Best)
+        // double factor = manager.calculateRedundancyC(key, occ, val_count); // 方案C：Trie结构影响因子 (Second)
+        // double factor = manager.calculateRedundancyD(key, occ, val_count); // 方案D：自适应冗余度 (Third)
+        
         std::string type_str;
         switch (type) {
             case FieldType::Int: type_str = "Int"; break;
@@ -162,6 +250,54 @@ void FieldDictionaryManager::printRedundancyStats(std::ostream& out) const {
         }
         out << std::setw(30) << field << std::setw(12) << type_str << std::setw(12) << total << std::setw(12) << unique << std::setw(12) << redundancy << "\n";
     }
+}
+
+// 四种不同的冗余度计算方法实现
+double FieldDictionaryManager::calculateRedundancyA(const FieldKey& key, size_t total, size_t unique) const {
+    double base_redundancy = (unique > 0) ? (double)total / unique : 0.0;
+    // 唯一值惩罚因子：唯一值越多，惩罚越重
+    double uniqueness_penalty = 1.0 / (1.0 + unique * 0.1); // 可调参数  
+    return base_redundancy * uniqueness_penalty;
+}
+
+double FieldDictionaryManager::calculateRedundancyB(const FieldKey& key, size_t total, size_t unique) const {
+    if (unique == 0) return 0.0; 
+    // 计算信息熵
+    double entropy = 0.0;
+    // 假设每个唯一值出现次数相等（简化计算）
+    double p = 1.0 / unique;
+    entropy = -unique * p * log2(p);  
+    // 最大熵（完全随机）
+    double max_entropy = log2(unique);
+    // 冗余度 = 1 - 归一化熵
+    double normalized_entropy = entropy / max_entropy;
+    return (1.0 - normalized_entropy) * total;
+}
+
+double FieldDictionaryManager::calculateRedundancyC(const FieldKey& key, size_t total, size_t unique) const {
+    double base_redundancy = (unique > 0) ? (double)total / unique : 0.0;  
+    // Trie分支惩罚：唯一值越多，Trie分支越多
+    double trie_branch_penalty = 1.0 / (1.0 + log2(unique + 1));  
+    // 字段重要性权重（可配置）
+    double field_weight = 1.0;
+    if (key.name == "timestamp" || key.name == "session_start") {
+        field_weight = 0.1; // 时间戳字段降权
+    }
+    return base_redundancy * trie_branch_penalty * field_weight;
+}
+
+double FieldDictionaryManager::calculateRedundancyD(const FieldKey& key, size_t total, size_t unique) const {
+    if (unique == 0) return 0.0;
+    double base_redundancy = (double)total / unique;   
+    // 唯一值比例
+    double uniqueness_ratio = (double)unique / total;
+    // 自适应惩罚：唯一值比例越高，惩罚越重
+    double penalty = 1.0 / (1.0 + uniqueness_ratio * 10.0);  
+    // 字段类型特殊处理
+    if (key.type == FieldType::Timestamp) {
+        penalty *= 0.5; // 时间戳额外降权
+    }
+    return base_redundancy * penalty;
 }
 
 void FieldDictionaryManager::clear() {

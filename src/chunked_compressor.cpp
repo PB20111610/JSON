@@ -7,7 +7,7 @@
 #include <cstring>
 #include <set>
 #include <functional>
-#include "../include/parser.h"
+#include "../include/field_analyzer.h"
 
 namespace json2 {
 
@@ -62,12 +62,17 @@ void ChunkedTrieCompressor::addRecord(const std::string& record, simdjson::dom::
 
 
 
+void ChunkedTrieCompressor::setTimestampFields(const std::vector<std::string>& fields) {
+    timestamp_fields_ = fields;
+}
+
 void ChunkedTrieCompressor::finalizeCurrentBlock() {
     if (current_block_count_ > 0 && !block_buffer_.empty()) {
         FieldDictionaryManager dict;
+        dict.setTimestampFields(timestamp_fields_);
         std::vector<FieldKey> ordered_fields;
         // 字段统计只用chunk_stat_buffer_
-        JsonParser::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);
+        FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);
         std::cerr << "[DEBUG] Finalizing block. Record count: " << current_block_count_ << ", Field count: " << ordered_fields.size() << std::endl;
         Trie trie(ordered_fields);
         simdjson::dom::parser parser;

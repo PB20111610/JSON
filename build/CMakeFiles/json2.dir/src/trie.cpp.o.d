@@ -219,4 +219,5 @@ CMakeFiles/json2.dir/src/trie.cpp.o: /workspaces/JSON/src/trie.cpp \
  /usr/include/c++/13/bits/locale_facets_nonio.tcc \
  /usr/include/c++/13/bits/locale_conv.h \
  /usr/include/c++/13/bits/quoted_string.h \
- /workspaces/JSON/src/../include/variable_dictionary.h
+ /workspaces/JSON/src/../include/variable_dictionary.h \
+ /workspaces/JSON/src/../include/field_parser.h

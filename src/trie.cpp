@@ -6,6 +6,7 @@
 #include <iostream>
 #include <simdjson.h>
 #include "../include/variable_dictionary.h"
+#include "../include/field_parser.h"
 
 namespace json2 {
 
@@ -42,97 +43,7 @@ const std::unordered_map<NodeValue, std::unique_ptr<TrieNode>, NodeValueHash>& T
 Trie::Trie(const std::vector<FieldKey>& fields)
     : root_(std::make_unique<TrieNode>(std::vector<NodeValue>{}, true)), ordered_fields_(fields) {}
 
-// 辅助：simdjson按路径取字段
-static simdjson::dom::element getJsonFieldSimd(simdjson::dom::element node, const std::string& field) {
-    // 首先检查是否是真正的嵌套字段（包含数组索引）
-    if (field.find('[') != std::string::npos) {
-        // 这是真正的嵌套字段，使用原来的逻辑
-        simdjson::dom::element current = node;
-        size_t start = 0;
-        size_t end = field.find('.');
-        
-        while (start < field.length()) {
-            std::string part;
-            if (end == std::string::npos) {
-                part = field.substr(start);
-            } else {
-                part = field.substr(start, end - start);
-            }
-            
-            size_t bracket_pos = part.find('[');
-            if (bracket_pos != std::string::npos) {
-                std::string key = part.substr(0, bracket_pos);
-                if (!key.empty()) {
-                    auto result = current[key];
-                    if (result.error()) {
-                        throw simdjson::simdjson_error(result.error());
-                    }
-                    current = result.value();
-                }
-                size_t end_bracket_pos = part.find(']', bracket_pos);
-                int index = std::stoi(part.substr(bracket_pos + 1, end_bracket_pos - bracket_pos - 1));
-                auto result = current.at(index);
-                if (result.error()) {
-                    throw simdjson::simdjson_error(result.error());
-                }
-                current = result.value();
-            } else {
-                auto result = current[part.c_str()];
-                if (result.error()) {
-                    throw simdjson::simdjson_error(result.error());
-                }
-                current = result.value();
-            }
-            
-            if (end == std::string::npos) break;
-            start = end + 1;
-            end = field.find('.', start);
-        }
-        return current;
-    } else {
-        // 检查是否为嵌套字段（包含点号但不包含数组索引）
-        if (field.find('.') != std::string::npos) {
-            // 尝试直接访问，如果失败则按嵌套字段处理
-            auto result = node[field.c_str()];
-            if (!result.error()) {
-                // 直接访问成功，说明这是扁平字段名
-                return result.value();
-            } else {
-                // 直接访问失败，按嵌套字段处理
-                simdjson::dom::element current = node;
-                size_t start = 0;
-                size_t end = field.find('.');
-                
-                while (start < field.length()) {
-                    std::string part;
-                    if (end == std::string::npos) {
-                        part = field.substr(start);
-                    } else {
-                        part = field.substr(start, end - start);
-                    }
-                    
-                    auto result = current[part.c_str()];
-                    if (result.error()) {
-                        throw simdjson::simdjson_error(result.error());
-                    }
-                    current = result.value();
-                    
-                    if (end == std::string::npos) break;
-                    start = end + 1;
-                    end = field.find('.', start);
-                }
-                return current;
-            }
-        } else {
-            // 这是真正的扁平字段，直接访问
-            auto result = node[field.c_str()];
-            if (result.error()) {
-                throw simdjson::simdjson_error(result.error());
-            }
-            return result.value();
-        }
-    }
-}
+// 使用统一的字段解析工具
 
 // 标准Trie插入（每层一个字段）
 void Trie::insert(const std::string& record_string, FieldDictionaryManager& manager, simdjson::dom::parser& parser) {
@@ -140,7 +51,7 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
     auto error = parser.parse(record_string).get(record);
     if (error) return;
 
-    // 1. 动态扩展ordered_fields_，支持新字段
+    // 1. 动态扩展ordered_fields_，支持新字段（使用重新判断的类型）
     if (record.type() == simdjson::dom::element_type::OBJECT) {
         auto obj = record.get_object();
         for (auto field : obj) {
@@ -151,76 +62,14 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
                 if (fk.name == field_name) { found = true; break; }
             }
             if (!found) {
-                // 推断类型（支持Timestamp/LogType）
-                FieldType type;
-                std::string value_str;
-                if (field.value.type() == simdjson::dom::element_type::STRING) {
-                    auto str_res = field.value.get_string();
-                    if (!str_res.error()) value_str = std::string(str_res.value());
-                    else value_str = "";
-                    if (manager.isTimestampField(field_name) && manager.isTimestampValue(value_str)) {
-                        type = FieldType::Timestamp;
-                    } else if (manager.isLogTemplate(value_str)) {
-                        type = FieldType::LogType;
-                    } else {
-                        type = FieldType::String;
-                    }
-                } else {
-                    switch (field.value.type()) {
-                        case simdjson::dom::element_type::INT64:
-                            type = FieldType::Int; break;
-                        case simdjson::dom::element_type::DOUBLE:
-                            type = FieldType::Double; break;
-                        case simdjson::dom::element_type::BOOL:
-                            type = FieldType::Bool; break;
-                        case simdjson::dom::element_type::NULL_VALUE:
-                            type = FieldType::Null; break;
-                        default:
-                            type = FieldType::String; break;
-                    }
-                }
-                FieldKey new_fk{field_name, type};
+                // 使用默认类型，让createNodeValue统一处理类型推断
+                FieldKey new_fk{field_name, FieldType::String};  // 默认类型
                 ordered_fields_.push_back(new_fk);
-                // 同步更新FieldDictionaryManager，插入一个空值或当前值
-                switch (type) {
-                    case FieldType::String: {
-                        auto str_res = field.value.get_string();
-                        if (!str_res.error()) manager.addFieldValue(new_fk, type, std::string(str_res.value()));
-                        else manager.addFieldValue(new_fk, type, "");
-                        break;
-                    }
-                    case FieldType::Int: {
-                        auto int_res = field.value.get_int64();
-                        if (!int_res.error()) manager.addFieldValue(new_fk, type, int_res.value());
-                        else manager.addFieldValue(new_fk, type, int64_t(0));
-                        break;
-                    }
-                    case FieldType::Double: {
-                        auto dbl_res = field.value.get_double();
-                        if (!dbl_res.error()) manager.addFieldValue(new_fk, type, dbl_res.value());
-                        else manager.addFieldValue(new_fk, type, 0.0);
-                        break;
-                    }
-                    case FieldType::Bool: {
-                        auto bool_res = field.value.get_bool();
-                        if (!bool_res.error()) manager.addFieldValue(new_fk, type, bool_res.value());
-                        else manager.addFieldValue(new_fk, type, false);
-                        break;
-                    }
-                    case FieldType::Null:
-                        manager.addFieldValue(new_fk, type, nullptr);
-                        break;
-                    case FieldType::Timestamp:
-                    case FieldType::LogType: {
-                        auto str_res = field.value.get_string();
-                        if (!str_res.error()) manager.addFieldValue(new_fk, type, std::string(str_res.value()));
-                        else manager.addFieldValue(new_fk, type, "");
-                        break;
-                    }
-                    default:
-                        manager.addFieldValue(new_fk, type, "");
-                        break;
-                }
+                
+                // 使用统一的字段值提取
+                Value value = FieldParser::extractValue(field.value);
+                manager.addFieldValue(new_fk, FieldType::String, value);
+                // std::cout << "[DEBUG] Trie::insert - Added new field: " << field_name << " with default type String" << std::endl;
             }
         }
     }
@@ -238,8 +87,8 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
             }
             
             if (lookup_name.find('.') != std::string::npos) {
-                // 嵌套字段，使用 getJsonFieldSimd
-                value_node = getJsonFieldSimd(record, lookup_name);
+                // 嵌套字段，使用统一的嵌套字段访问
+                value_node = FieldParser::getNestedField(record, lookup_name);
             } else {
                 // 简单字段，直接访问
                 auto result = record[lookup_name];
@@ -249,30 +98,8 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
                 value_node = result.value();
             }
             
-            Value value;
-            switch(value_node.type()) {
-                case simdjson::dom::element_type::STRING:
-                    value = std::string(value_node.get_string().value());
-                    break;
-                case simdjson::dom::element_type::INT64:
-                    value = value_node.get_int64().value();
-                    break;
-                case simdjson::dom::element_type::UINT64:
-                    value = static_cast<int64_t>(value_node.get_uint64().value());
-                    break;
-                case simdjson::dom::element_type::DOUBLE:
-                    value = value_node.get_double().value();
-                    break;
-                case simdjson::dom::element_type::BOOL:
-                    value = value_node.get_bool().value();
-                    break;
-                case simdjson::dom::element_type::NULL_VALUE:
-                    value = nullptr;
-                    break;
-                default:
-                    value = std::string();
-                    break;
-            }
+            // 使用统一的字段值提取
+            Value value = FieldParser::extractValue(value_node);
             NodeValue node_value = createNodeValue(key, value, manager);
             values.push_back(node_value);
         } catch (const simdjson::simdjson_error& e) {
@@ -578,42 +405,93 @@ static Value alignValueType(const FieldKey& key, const Value& value) {
 NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDictionaryManager& manager) {
     Value aligned = alignValueType(key, value);
     if (std::holds_alternative<std::nullptr_t>(aligned)) return NodeValue(nullptr);
-    switch (static_cast<FieldType>(key.type)) {
+    
+    // 统一类型推断：对于字符串类型的值，根据实际内容判断类型
+    FieldType actual_type = key.type;
+    if (std::holds_alternative<std::string>(aligned)) {
+        std::string str_val = std::get<std::string>(aligned);
+        // 统一类型推断逻辑
+        if (manager.isTimestampField(key.name) || manager.isTimestampValue(str_val)) {
+            actual_type = FieldType::Timestamp;
+        } else if (manager.isLogTemplate(str_val)) {
+            actual_type = FieldType::LogType;
+        } else {
+            actual_type = FieldType::String;
+        }
+    }
+    
+    switch (actual_type) {
         case FieldType::String:
-        case FieldType::Null:
-            return NodeValue(manager.variableDict().getOrAddFieldValue(key, aligned));
+        case FieldType::Null: {
+            // 如果类型没有改变，直接使用原key
+            if (actual_type == key.type) {
+                return NodeValue(manager.variableDict().getOrAddFieldValue(key, aligned));
+            } else {
+                // 使用重新判断的类型创建新的 FieldKey
+                FieldKey actual_key{key.name, actual_type};
+                return NodeValue(manager.variableDict().getOrAddFieldValue(actual_key, aligned));
+            }
+        }
         case FieldType::Timestamp: {
+            // 快速提取字符串值
             std::string str_val;
             if (std::holds_alternative<std::string>(aligned)) {
                 str_val = std::get<std::string>(aligned);
-            } else if (std::holds_alternative<int64_t>(aligned)) {
-                str_val = std::to_string(std::get<int64_t>(aligned));
-            } else if (std::holds_alternative<double>(aligned)) {
-                str_val = std::to_string(std::get<double>(aligned));
-            } else if (std::holds_alternative<bool>(aligned)) {
-                str_val = std::get<bool>(aligned) ? "true" : "false";
             } else {
-                return NodeValue(nullptr);
+                // 对于非字符串类型，转换为字符串
+                if (std::holds_alternative<int64_t>(aligned)) {
+                    str_val = std::to_string(std::get<int64_t>(aligned));
+                } else if (std::holds_alternative<double>(aligned)) {
+                    str_val = std::to_string(std::get<double>(aligned));
+                } else if (std::holds_alternative<bool>(aligned)) {
+                    str_val = std::get<bool>(aligned) ? "true" : "false";
+                } else {
+                    return NodeValue(nullptr);
+                }
             }
-            auto encoded = manager.timestampDict().encodeTemplate(key, str_val);
-            return NodeValue(encoded);
+            // 如果类型没有改变，直接使用原key
+            if (actual_type == key.type) {
+                auto encoded = manager.timestampDict().encodeTemplate(key, str_val);
+                return NodeValue(encoded);
+            } else {
+                // 使用重新判断的类型创建新的 FieldKey
+                FieldKey actual_key{key.name, actual_type};
+                auto encoded = manager.timestampDict().encodeTemplate(actual_key, str_val);
+                return NodeValue(encoded);
+            }
         }
         case FieldType::LogType: {
+            // 快速提取字符串值
             std::string str_val;
             if (std::holds_alternative<std::string>(aligned)) {
                 str_val = std::get<std::string>(aligned);
-            } else if (std::holds_alternative<int64_t>(aligned)) {
-                str_val = std::to_string(std::get<int64_t>(aligned));
-            } else if (std::holds_alternative<double>(aligned)) {
-                str_val = std::to_string(std::get<double>(aligned));
-            } else if (std::holds_alternative<bool>(aligned)) {
-                str_val = std::get<bool>(aligned) ? "true" : "false";
             } else {
-                return NodeValue(nullptr);
+                // 对于非字符串类型，转换为字符串
+                if (std::holds_alternative<int64_t>(aligned)) {
+                    str_val = std::to_string(std::get<int64_t>(aligned));
+                } else if (std::holds_alternative<double>(aligned)) {
+                    str_val = std::to_string(std::get<double>(aligned));
+                } else if (std::holds_alternative<bool>(aligned)) {
+                    str_val = std::get<bool>(aligned) ? "true" : "false";
+                } else {
+                    return NodeValue(nullptr);
+                }
             }
+            // std::cout << "[DEBUG] Trie::createNodeValue - LogType field: " << key.name << " = '" << str_val << "'" << std::endl;
             auto [tmpl, vars] = manager.logtypeDict().extractTemplateAndVars(str_val);
-            auto encoded = manager.logtypeDict().encodeLog(key, tmpl, vars);
-            return NodeValue(encoded);
+            // std::cout << "[DEBUG] Trie::createNodeValue - extracted template: '" << tmpl << "', vars count: " << vars.size() << std::endl;
+            // 如果类型没有改变，直接使用原key
+            if (actual_type == key.type) {
+                auto encoded = manager.logtypeDict().encodeLog(key, tmpl, vars);
+                // std::cout << "[DEBUG] Trie::createNodeValue - LogType encoded template_id: " << encoded.template_id << std::endl;
+                return NodeValue(encoded);
+            } else {
+                // 使用重新判断的类型创建新的 FieldKey
+                FieldKey actual_key{key.name, actual_type};
+                auto encoded = manager.logtypeDict().encodeLog(actual_key, tmpl, vars);
+                // std::cout << "[DEBUG] Trie::createNodeValue - LogType encoded template_id: " << encoded.template_id << std::endl;
+                return NodeValue(encoded);
+            }
         }
         case FieldType::Int:
             if (std::holds_alternative<int64_t>(aligned))

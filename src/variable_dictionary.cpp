@@ -26,9 +26,10 @@ struct ValueEqual {
 
 // -------------- 底层类型分发实现 --------------
 uint32_t Dictionary::addFieldValue(const FieldKey& key, FieldType type, const std::string& value) {
-    auto& dict = global_variable_dict; // 全局字符串字典
+    auto& dict = global_variable_dict; // 全局字符串字典，所有String类型数据共享
     auto it = dict.value_to_code.find(value);
     if (it != dict.value_to_code.end()) {
+        // std::cout << "[DEBUG][Dictionary::addFieldValue] String already exists: field=" << key.name << ", code=" << it->second << ", value='" << value << "'" << std::endl;
         return it->second;
     }
     uint32_t code = dict.next_code++;
@@ -37,6 +38,7 @@ uint32_t Dictionary::addFieldValue(const FieldKey& key, FieldType type, const st
         dict.code_to_value.resize(code);
     }
     dict.code_to_value[code - 1] = value;
+    // std::cout << "[DEBUG][Dictionary::addFieldValue] String new: field=" << key.name << ", code=" << code << ", value='" << value << "'" << std::endl;
     return code;
 }
 

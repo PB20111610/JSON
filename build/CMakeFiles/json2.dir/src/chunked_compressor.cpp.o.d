@@ -309,4 +309,4 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: \
  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
  /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
  /usr/include/x86_64-linux-gnu/bits/uio_lim.h \
- /workspaces/JSON/src/../include/parser.h
+ /workspaces/JSON/src/../include/field_analyzer.h

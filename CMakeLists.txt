@@ -20,7 +20,8 @@ add_executable(json2
     # test/main_compress.cpp
     # test/main_trie.cpp
     # test/test_louds_trie.cpp
-    src/parser.cpp
+    src/field_analyzer.cpp
+    src/field_parser.cpp
     src/variable_dictionary.cpp
     src/timestamp_dictionary.cpp
     src/logtype_dictionary.cpp

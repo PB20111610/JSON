@@ -1,4 +1,4 @@
-#include "../include/parser.h"
+#include "../include/field_analyzer.h"
 #include "../include/field_dictionary_manager.h"
 #include "../include/trie.h"
 #include "../include/louds.h"
@@ -127,7 +127,7 @@ int main() {
 
         // 2. 分析字段顺序
         std::cout << "--- Processing First Chunk ---\n";
-        JsonParser::analyzeAndSortFields(first_chunk, manager, fieldOrder);
+        FieldAnalyzer::analyzeAndSortFields(first_chunk, manager, fieldOrder);
         printFieldOrder(fieldOrder);
         trie = std::make_unique<Trie>(fieldOrder);
 

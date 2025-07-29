@@ -1,4 +1,4 @@
-#include "../include/parser.h"
+#include "../include/field_analyzer.h"
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
@@ -55,11 +55,11 @@ struct EncodedField {
 // 编码单条记录
 std::vector<EncodedField> encodeRecord(const std::string& record, json2::FieldDictionaryManager& manager) {
     std::vector<EncodedField> encoded_fields;
-    auto fields = json2::JsonParser::parseFields(record);
+    auto fields = json2::FieldAnalyzer::parseFields(record);
     
     for (const auto& [field, type, value] : fields) {
         std::string value_str = variantToFieldValueString(value);
-        uint32_t code = manager.addFieldValue(field, type, value_str);
+        uint32_t code = manager.addFieldValue(json2::FieldKey{field, type}, value_str);
         
         // 重新获取实际使用的类型（可能被重新分类）
         json2::FieldType actual_type = type;
@@ -204,7 +204,7 @@ int main() {
     FieldDictionaryManager manager;
     
     // 配置时间戳字段
-    std::vector<std::string> timestamp_fields = {"timestamp", "session_start"};
+    std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start"};
     manager.setTimestampFields(timestamp_fields);
     
     std::vector<std::string> ordered_fields;
@@ -216,13 +216,13 @@ int main() {
     }
     in.close();
 
-    JsonParser::analyzeAndSortFields(records, manager, ordered_fields);
+    FieldAnalyzer::analyzeAndSortFields(records, manager, ordered_fields);
 
-    std::cout << "\nField Redundancy Statistics (Type Sensitive, includes LogType/Timestamp):\n";
-    manager.printRedundancyStats(std::cout);
+    // std::cout << "\nField Redundancy Statistics (Type Sensitive, includes LogType/Timestamp):\n";
+    // manager.printRedundancyStats(std::cout);
 
     // 完整的编码-解码测试
-    std::cout << "\n=== Complete Encoding-Decoding Test ===\n";
+    // std::cout << "\n=== Complete Encoding-Decoding Test ===\n";
     
     size_t total_records = records.size();
     size_t successful_encodings = 0;
@@ -233,79 +233,106 @@ int main() {
     size_t test_count = std::min(size_t(187), total_records);
     
     for (size_t i = 0; i < test_count; ++i) {
-        std::cout << "\n--- Record " << (i + 1) << " ---\n";
-        std::cout << "Original: " << records[i] << "\n";
+        // std::cout << "\n--- Record " << (i + 1) << " ---\n";
+        // std::cout << "Original: " << records[i] << "\n";
         
         // 编码阶段
         auto encoded_fields = encodeRecord(records[i], manager);
         successful_encodings++;
         
-        std::cout << "Encoded fields:\n";
+        // std::cout << "Encoded fields:\n";
         for (const auto& field : encoded_fields) {
-            std::string type_str;
-            switch (field.type) {
-                case FieldType::Int: type_str = "Int"; break;
-                case FieldType::Double: type_str = "Double"; break;
-                case FieldType::Bool: type_str = "Bool"; break;
-                case FieldType::String: type_str = "String"; break;
-                case FieldType::Timestamp: type_str = "Timestamp"; break;
-                case FieldType::LogType: type_str = "LogType"; break;
-                case FieldType::Null: type_str = "Null"; break;
-                default: type_str = "Unknown"; break;
-            }
-            std::cout << "  " << field.field_name << " (" << type_str << "): " 
-                     << field.original_value << " -> Code: " << field.code << "\n";
+            // std::string type_str;
+            // switch (field.type) {
+            //     case FieldType::Int: type_str = "Int"; break;
+            //     case FieldType::Double: type_str = "Double"; break;
+            //     case FieldType::Bool: type_str = "Bool"; break;
+            //     case FieldType::String: type_str = "String"; break;
+            //     case FieldType::Timestamp: type_str = "Timestamp"; break;
+            //     case FieldType::LogType: type_str = "LogType"; break;
+            //     case FieldType::Null: type_str = "Null"; break;
+            //     default: type_str = "Unknown"; break;
+            // }
+            // std::cout << "  " << field.field_name << " (" << type_str << "): " 
+            //          << field.original_value << " -> Code: " << field.code << "\n";
         }
         
         // 解码阶段
         std::string decoded_record = decodeRecord(encoded_fields, manager);
         successful_decodings++;
         
-        std::cout << "Decoded: " << decoded_record << "\n";
+        // std::cout << "Decoded: " << decoded_record << "\n";
         
         // 验证一致性
         if (records[i] == decoded_record) {
-            std::cout << "✓ Perfect match!\n";
+            // std::cout << "✓ Perfect match!\n";
             perfect_matches++;
         } else {
-            std::cout << "✗ Mismatch detected\n";
+            // std::cout << "✗ Mismatch detected\n";
             // 使用JSON对象比较，忽略字段顺序
             try {
                 json original_json = json::parse(records[i]);
                 json decoded_json = json::parse(decoded_record);
                 if (original_json == decoded_json) {
-                    std::cout << "✓ JSON content matches (field order different)\n";
+                    // std::cout << "✓ JSON content matches (field order different)\n";
                     perfect_matches++;
                 } else {
-                    std::cout << "✗ JSON content differs\n";
+                    // std::cout << "✗ JSON content differs\n";
                     // 输出差异信息
-                    std::cout << "Original JSON keys: ";
-                    for (auto it = original_json.begin(); it != original_json.end(); ++it) {
-                        std::cout << it.key() << " ";
-                    }
-                    std::cout << "\nDecoded JSON keys: ";
-                    for (auto it = decoded_json.begin(); it != decoded_json.end(); ++it) {
-                        std::cout << it.key() << " ";
-                    }
-                    std::cout << "\n";
+                    // std::cout << "Original JSON keys: ";
+                    // for (auto it = original_json.begin(); it != original_json.end(); ++it) {
+                    //     std::cout << it.key() << " ";
+                    // }
+                    // std::cout << "\nDecoded JSON keys: ";
+                    // for (auto it = decoded_json.begin(); it != decoded_json.end(); ++it) {
+                    //     std::cout << it.key() << " ";
+                    // }
+                    // std::cout << "\n";
                 }
             } catch (const std::exception& e) {
-                std::cout << "✗ JSON parsing error: " << e.what() << "\n";
+                // std::cout << "✗ JSON parsing error: " << e.what() << "\n";
             }
         }
     }
     
-    std::cout << "\n=== Test Summary ===\n";
-    std::cout << "Total records tested: " << test_count << "\n";
-    std::cout << "Successful encodings: " << successful_encodings << "\n";
-    std::cout << "Successful decodings: " << successful_decodings << "\n";
-    std::cout << "Perfect matches: " << perfect_matches << "\n";
-    std::cout << "Success rate: " << (perfect_matches * 100.0 / test_count) << "%\n";
+    // std::cout << "\n=== Test Summary ===\n";
+    // std::cout << "Total records tested: " << test_count << "\n";
+    // std::cout << "Successful encodings: " << successful_encodings << "\n";
+    // std::cout << "Successful decodings: " << successful_decodings << "\n";
+    // std::cout << "Perfect matches: " << perfect_matches << "\n";
+    // std::cout << "Success rate: " << (perfect_matches * 100.0 / test_count) << "%\n";
     
     if (perfect_matches == test_count) {
-        std::cout << "🎉 All encoding-decoding tests passed!\n";
+        // std::cout << "🎉 All encoding-decoding tests passed!\n";
     } else {
-        std::cout << "⚠️  Some tests failed. Dictionary implementation may need review.\n";
+        // std::cout << "⚠️  Some tests failed. Dictionary implementation may need review.\n";
+    }
+    
+    // 测试时间戳格式解析
+    // std::cout << "\n=== Testing Timestamp Format Parsing ===\n";
+    TimestampDictionary timestamp_test;
+    
+    std::vector<std::string> timestamp_formats = {
+        "2024-03-20 10:30:45.123 EDT",  // 带毫秒
+        "2024-03-20 10:30:45 EDT",      // 不带毫秒
+        "2024-03-20 10:31:12.456 EDT",  // 带毫秒
+        "2024-03-20 10:31:00 EDT"       // 不带毫秒
+    };
+    
+    for (const auto& ts : timestamp_formats) {
+        auto [pattern_id, epoch] = timestamp_test.addTimestamp("timestamp", ts);
+        // std::cout << "Timestamp: " << ts << " -> Pattern ID: " << pattern_id << ", Epoch: " << epoch << "\n";
+        
+        if (pattern_id != 0 && epoch != -1) {
+            std::string decoded = timestamp_test.decode({pattern_id, epoch});
+            if (decoded == ts) {
+                // std::cout << "  ✓ Decode successful: " << decoded << "\n";
+            } else {
+                // std::cout << "  ✗ Decode failed: expected " << ts << ", got " << decoded << "\n";
+            }
+        } else {
+            // std::cout << "  ✗ Parse failed\n";
+        }
     }
     
     return 0;

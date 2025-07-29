@@ -1,4 +1,4 @@
-#include "../include/parser.h"
+#include "../include/field_analyzer.h"
 #include "../include/field_dictionary_manager.h"
 // #include "../include/trie_type_aware.h"
 #include "../include/reconstruct.h"
@@ -159,8 +159,8 @@ int main() {
     try {
         FieldDictionaryManager manager;
         // 配置时间戳字段
-        // std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start"};
-        // manager.setTimestampFields(timestamp_fields);
+        std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start"};
+        manager.setTimestampFields(timestamp_fields);
         
         std::vector<FieldKey> fieldOrder;
         std::unique_ptr<Trie> trie = nullptr;
@@ -195,8 +195,11 @@ int main() {
 
             if (isFirstChunk) {
                 std::cout << "--- Processing First Chunk ---\n";
-                JsonParser::analyzeAndSortFields(records, manager, fieldOrder);
+                FieldAnalyzer::analyzeAndSortFields(records, manager, fieldOrder);
                 printFieldOrder(fieldOrder);
+                // 输出冗余度统计
+                std::cout << "\n=== Field Redundancy Stats ===\n";
+                manager.printRedundancyStats(std::cout);
                 trie = std::make_unique<Trie>(fieldOrder);
                 isFirstChunk = false;
             } else {
@@ -222,12 +225,19 @@ int main() {
         }
 
         // 插入后批量路径压缩
-        trie->compressPaths();
+        // trie->compressPaths();
 
+        // 打印String字典内容（全局唯一字符串集合，不分字段）
+        std::cout << "\n=== Global String Dictionary (variableDict) ===\n";
+        const auto& all_strings = manager.variableDict().getAllStringValues();
+        for (size_t i = 0; i < all_strings.size(); ++i) {
+            std::cout << "Code " << (i + 1) << ": '" << all_strings[i] << "'" << std::endl;
+        }
+        
         // 展开Trie树，保证重建时字段不缺失
-        trie->expandPaths();
-        std::cout << "\n=== Trie Tree Structure (Before Compression) ===\n";
-        printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
+        // trie->expandPaths();
+        // std::cout << "\n=== Trie Tree Structure (Before Compression) ===\n";
+        // printTrieNode(trie->getRoot(), 0, fieldOrder, manager);
 
         // === 调试：打印LogTypeDictionary内容 ===
         const auto& log_dict = manager.logtypeDict();

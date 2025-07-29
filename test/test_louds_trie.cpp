@@ -4,7 +4,7 @@
 #include "../include/variable_dictionary.h"
 #include "../include/timestamp_dictionary.h"
 #include "../include/logtype_dictionary.h"
-#include "../include/parser.h"
+#include "../include/field_analyzer.h"
 #include "../include/reconstruct.h"
 #include <iostream>
 #include <fstream>
@@ -512,7 +512,7 @@ int main() {
             simdjson::dom::parser parser;
             
             // 分析字段并排序
-            JsonParser::analyzeAndSortFields(test_data, manager, fieldOrder);
+            FieldAnalyzer::analyzeAndSortFields(test_data, manager, fieldOrder);
             printFieldOrder(fieldOrder);
             trie = std::make_unique<Trie>(fieldOrder);
             
@@ -550,7 +550,7 @@ int main() {
 
                 if (isFirstChunk) {
                     std::cout << "--- Processing First Chunk ---\n";
-                    JsonParser::analyzeAndSortFields(records, manager, fieldOrder);
+                    FieldAnalyzer::analyzeAndSortFields(records, manager, fieldOrder);
                     printFieldOrder(fieldOrder);
                     trie = std::make_unique<Trie>(fieldOrder);
                     isFirstChunk = false;

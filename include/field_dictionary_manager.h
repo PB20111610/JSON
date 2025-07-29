@@ -22,6 +22,7 @@ public:
     uint32_t addFieldValue(const FieldKey& key, FieldType type, double value) { return variableDict().addFieldValue(key, type, value); }
     uint32_t addFieldValue(const FieldKey& key, FieldType type, bool value) { return variableDict().addFieldValue(key, type, value); }
     uint32_t addFieldValue(const FieldKey& key, FieldType type, std::nullptr_t value) { return variableDict().addFieldValue(key, type, value); }
+    uint32_t addFieldValue(const FieldKey& key, FieldType type, const Value& value);
 
     // 获取唯一值数
     size_t getUniqueValueCount(const FieldKey& key) const;
@@ -39,6 +40,12 @@ public:
 
     // 统一输出冗余度统计（字段、类型、出现次数、唯一值数、冗余度）
     void printRedundancyStats(std::ostream& out = std::cout) const;
+
+    // 四种不同的冗余度计算方法
+    double calculateRedundancyA(const FieldKey& key, size_t total, size_t unique) const; // 唯一值惩罚因子
+    double calculateRedundancyB(const FieldKey& key, size_t total, size_t unique) const; // 基于信息熵
+    double calculateRedundancyC(const FieldKey& key, size_t total, size_t unique) const; // Trie结构影响因子
+    double calculateRedundancyD(const FieldKey& key, size_t total, size_t unique) const; // 自适应冗余度（推荐）
 
     // 清空所有字典和计数
     void clear();

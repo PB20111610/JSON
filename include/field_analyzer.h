@@ -9,7 +9,7 @@
 
 namespace json2 {
 
-class JsonParser {
+class FieldAnalyzer {
 public:
     // 解析记录，返回字段、类型和值
     static std::vector<std::tuple<std::string, FieldType, Value>> parseFields(const std::string& record);

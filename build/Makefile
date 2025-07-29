@@ -177,6 +177,30 @@ src/compress.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress.cpp.s
 .PHONY : src/compress.cpp.s
 
+src/field_analyzer.o: src/field_analyzer.cpp.o
+.PHONY : src/field_analyzer.o
+
+# target to build an object file
+src/field_analyzer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/field_analyzer.cpp.o
+.PHONY : src/field_analyzer.cpp.o
+
+src/field_analyzer.i: src/field_analyzer.cpp.i
+.PHONY : src/field_analyzer.i
+
+# target to preprocess a source file
+src/field_analyzer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/field_analyzer.cpp.i
+.PHONY : src/field_analyzer.cpp.i
+
+src/field_analyzer.s: src/field_analyzer.cpp.s
+.PHONY : src/field_analyzer.s
+
+# target to generate assembly for a file
+src/field_analyzer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/field_analyzer.cpp.s
+.PHONY : src/field_analyzer.cpp.s
+
 src/field_dictionary_manager.o: src/field_dictionary_manager.cpp.o
 .PHONY : src/field_dictionary_manager.o
 
@@ -200,6 +224,30 @@ src/field_dictionary_manager.s: src/field_dictionary_manager.cpp.s
 src/field_dictionary_manager.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/field_dictionary_manager.cpp.s
 .PHONY : src/field_dictionary_manager.cpp.s
+
+src/field_parser.o: src/field_parser.cpp.o
+.PHONY : src/field_parser.o
+
+# target to build an object file
+src/field_parser.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/field_parser.cpp.o
+.PHONY : src/field_parser.cpp.o
+
+src/field_parser.i: src/field_parser.cpp.i
+.PHONY : src/field_parser.i
+
+# target to preprocess a source file
+src/field_parser.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/field_parser.cpp.i
+.PHONY : src/field_parser.cpp.i
+
+src/field_parser.s: src/field_parser.cpp.s
+.PHONY : src/field_parser.s
+
+# target to generate assembly for a file
+src/field_parser.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/field_parser.cpp.s
+.PHONY : src/field_parser.cpp.s
 
 src/logtype_dictionary.o: src/logtype_dictionary.cpp.o
 .PHONY : src/logtype_dictionary.o
@@ -272,30 +320,6 @@ src/loudsTotrie.s: src/loudsTotrie.cpp.s
 src/loudsTotrie.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/loudsTotrie.cpp.s
 .PHONY : src/loudsTotrie.cpp.s
-
-src/parser.o: src/parser.cpp.o
-.PHONY : src/parser.o
-
-# target to build an object file
-src/parser.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/parser.cpp.o
-.PHONY : src/parser.cpp.o
-
-src/parser.i: src/parser.cpp.i
-.PHONY : src/parser.i
-
-# target to preprocess a source file
-src/parser.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/parser.cpp.i
-.PHONY : src/parser.cpp.i
-
-src/parser.s: src/parser.cpp.s
-.PHONY : src/parser.s
-
-# target to generate assembly for a file
-src/parser.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/parser.cpp.s
-.PHONY : src/parser.cpp.s
 
 src/reconstruct.o: src/reconstruct.cpp.o
 .PHONY : src/reconstruct.o
@@ -456,9 +480,15 @@ help:
 	@echo "... src/compress.o"
 	@echo "... src/compress.i"
 	@echo "... src/compress.s"
+	@echo "... src/field_analyzer.o"
+	@echo "... src/field_analyzer.i"
+	@echo "... src/field_analyzer.s"
 	@echo "... src/field_dictionary_manager.o"
 	@echo "... src/field_dictionary_manager.i"
 	@echo "... src/field_dictionary_manager.s"
+	@echo "... src/field_parser.o"
+	@echo "... src/field_parser.i"
+	@echo "... src/field_parser.s"
 	@echo "... src/logtype_dictionary.o"
 	@echo "... src/logtype_dictionary.i"
 	@echo "... src/logtype_dictionary.s"
@@ -468,9 +498,6 @@ help:
 	@echo "... src/loudsTotrie.o"
 	@echo "... src/loudsTotrie.i"
 	@echo "... src/loudsTotrie.s"
-	@echo "... src/parser.o"
-	@echo "... src/parser.i"
-	@echo "... src/parser.s"
 	@echo "... src/reconstruct.o"
 	@echo "... src/reconstruct.i"
 	@echo "... src/reconstruct.s"

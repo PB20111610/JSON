@@ -32,12 +32,8 @@ FieldType FieldParser::inferFieldType(const std::string& field_name,
         }
         return FieldType::String;
     } else if (value_node.type() == simdjson::dom::element_type::ARRAY) {
-        // 数组类型处理
-        if (manager.getStructurizeArrays()) {
-            return FieldType::StructuredArray;
-        } else {
-            return FieldType::UnstructuredArray;
-        }
+        // 数组类型处理 - 只返回 UnstructuredArray，结构化数组会被分解为具体类型字段
+        return FieldType::UnstructuredArray;
     } else {
         switch (value_node.type()) {
             case simdjson::dom::element_type::INT64:
@@ -306,7 +302,6 @@ void FieldParser::collectAllFields(simdjson::dom::element node,
                     manager.addFieldValue(key, type, nullptr);
                     break;
                 case FieldType::UnstructuredArray:
-                case FieldType::StructuredArray:
                     if (std::holds_alternative<std::string>(value)) {
                         manager.addFieldValue(key, type, std::get<std::string>(value));
                     } else {

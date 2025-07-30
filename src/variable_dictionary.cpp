@@ -144,7 +144,6 @@ std::optional<Value> Dictionary::getFieldValueByCode(const FieldKey& key, uint32
             if (code == 0 || code > dict.code_to_value.size()) return std::nullopt;
             return dict.code_to_value[code - 1];
         }
-        case FieldType::StructuredArray:
         case FieldType::UnstructuredArray:
             // 数组类型作为字符串处理，从全局字符串字典中查找
             {
@@ -170,7 +169,6 @@ uint32_t Dictionary::getOrAddFieldValue(const FieldKey& key, const Value& value)
         case FieldType::Bool:
             return addFieldValue(key, key.type, std::get<bool>(value));
         case FieldType::UnstructuredArray:
-        case FieldType::StructuredArray:
             // 数组类型作为字符串处理
             return addFieldValue(key, key.type, std::get<std::string>(value));
         case FieldType::Timestamp:

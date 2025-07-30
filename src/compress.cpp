@@ -90,7 +90,7 @@ std::vector<uint8_t> Compressor::serializeDictionary(const FieldDictionaryManage
     const Dictionary& dict = manager.variableDict();
     for (size_t fk_idx = 0; fk_idx < all_field_keys.size(); ++fk_idx) {
         const auto& fk = all_field_keys[fk_idx];
-        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray || fk.type == FieldType::StructuredArray) {
+        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
             std::vector<std::string> values;
             size_t count = dict.getFieldValueCount(fk);
             for (uint32_t code = 1; code <= count; ++code) {
@@ -450,7 +450,7 @@ CompressedData Compressor::compressLouds(const LOUDSTrie& louds, const FieldDict
         const Dictionary& dict = manager.variableDict();
         for (size_t fk_idx = 0; fk_idx < all_field_keys.size(); ++fk_idx) {
             const auto& fk = all_field_keys[fk_idx];
-            if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray || fk.type == FieldType::StructuredArray) {
+            if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
                 std::vector<std::string> values;
                 size_t count = dict.getFieldValueCount(fk);
                 for (uint32_t code = 1; code <= count; ++code) {

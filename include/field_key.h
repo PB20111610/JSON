@@ -14,8 +14,7 @@ enum class FieldType {
     Timestamp = 4,
     LogType = 5,
     Null = 6,
-    StructuredArray = 7,    // 新增：结构化数组（保持数组结构）
-    UnstructuredArray = 8   // 新增：非结构化数组（序列化为字符串）
+    UnstructuredArray = 7   // 非结构化数组（序列化为字符串）
 };
 
 struct FieldKey {

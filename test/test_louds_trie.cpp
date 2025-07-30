@@ -31,7 +31,6 @@ std::string fieldTypeToString(FieldType type) {
         case FieldType::String: return "String";
         case FieldType::Timestamp: return "Timestamp";
         case FieldType::LogType: return "LogType";
-        case FieldType::StructuredArray: return "StructuredArray";
         case FieldType::UnstructuredArray: return "UnstructuredArray";
         case FieldType::Null: return "Null";
         default: return "Unknown";

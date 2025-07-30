@@ -497,7 +497,6 @@ static Value alignValueType(const FieldKey& key, const Value& value) {
             case FieldType::Timestamp:
             case FieldType::LogType:
             case FieldType::UnstructuredArray:
-            case FieldType::StructuredArray:
             // 保持原有逻辑
                 if (std::holds_alternative<std::string>(value)) return value;
                 if (std::holds_alternative<int64_t>(value)) return std::to_string(std::get<int64_t>(value));
@@ -521,7 +520,7 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
     if (std::holds_alternative<std::string>(aligned)) {
         std::string str_val = std::get<std::string>(aligned);
         // 统一类型推断逻辑（排除数组类型）
-        if (key.type == FieldType::UnstructuredArray || key.type == FieldType::StructuredArray) {
+        if (key.type == FieldType::UnstructuredArray) {
             // 数组类型保持原类型，不进行重新推断
             actual_type = key.type;
         } else if (manager.isTimestampField(key.name) || manager.isTimestampValue(str_val)) {
@@ -622,7 +621,6 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
             else
                 return NodeValue(nullptr);
         case FieldType::UnstructuredArray:
-        case FieldType::StructuredArray:
             // 数组类型作为字符串处理
             if (std::holds_alternative<std::string>(aligned)) {
                 auto code = manager.variableDict().getOrAddFieldValue(key, aligned);
@@ -689,7 +687,6 @@ std::string Trie::reconstructFieldValue(const FieldKey& key, const NodeValue& no
             else
                 return "";
         case FieldType::UnstructuredArray:
-        case FieldType::StructuredArray:
             if (std::holds_alternative<uint32_t>(node_value)) {
                 auto code = std::get<uint32_t>(node_value);
                 auto opt_value = manager.getFieldValueByCode(lookup_key, code);

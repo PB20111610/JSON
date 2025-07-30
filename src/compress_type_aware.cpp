@@ -461,8 +461,7 @@ std::vector<uint8_t> TypeAwareCompressor::compressWithNullHandling(const std::ve
         case FieldType::String:
         case FieldType::Timestamp:
         case FieldType::LogType:
-        case FieldType::UnstructuredArray:
-        case FieldType::StructuredArray: {
+        case FieldType::UnstructuredArray: {
             // 对于编码值，null通常用特殊编码值表示
             // 直接压缩原始数据，null值在编码层面处理
             auto data_compressed = rleCompress(data);
@@ -549,8 +548,7 @@ std::vector<uint8_t> TypeAwareCompressor::decompressWithNullHandling(const std::
         case FieldType::String:
         case FieldType::Timestamp:
         case FieldType::LogType:
-        case FieldType::UnstructuredArray:
-        case FieldType::StructuredArray: {
+        case FieldType::UnstructuredArray: {
             // 直接解压原始数据
             std::vector<uint8_t> data_compressed(compressed.begin() + pos, compressed.end());
             decompressed = rleDecompress(data_compressed);
@@ -642,7 +640,7 @@ std::vector<uint8_t> TypeAwareCompressor::compressDictionaryData(const FieldDict
     const Dictionary& dict = manager.variableDict();
     
     for (const auto& fk : all_field_keys) {
-        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray || fk.type == FieldType::StructuredArray) {
+        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
             size_t count = dict.getFieldValueCount(fk);
             for (uint32_t code = 1; code <= count; ++code) {
                 auto opt_value = dict.getFieldValueByCode(fk, code);
@@ -746,7 +744,7 @@ std::unique_ptr<FieldDictionaryManager> TypeAwareCompressor::decompressDictionar
         Dictionary& dict = manager->variableDict();
         size_t value_idx = 0;
         for (const auto& fk : field_keys) {
-            if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray || fk.type == FieldType::StructuredArray) {
+            if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
                 // 为每个String字段重建字典
                 // 这里假设每个字段的字符串值按顺序存储
                 // 实际实现中可能需要更复杂的逻辑来确定每个字段有多少个值
@@ -880,7 +878,7 @@ CompressedData TypeAwareCompressor::compressLouds(const LOUDSTrie& louds, const 
     std::vector<std::string> string_values;
     const Dictionary& dict = manager.variableDict();
     for (const auto& fk : all_field_keys) {
-        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray || fk.type == FieldType::StructuredArray) {
+        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
             size_t count = dict.getFieldValueCount(fk);
             for (uint32_t code = 1; code <= count; ++code) {
                 auto opt_value = dict.getFieldValueByCode(fk, code);
@@ -896,7 +894,7 @@ CompressedData TypeAwareCompressor::compressLouds(const LOUDSTrie& louds, const 
     std::vector<std::pair<FieldKey, std::vector<std::string>>> string_dicts;
     for (size_t fk_idx = 0; fk_idx < all_field_keys.size(); ++fk_idx) {
         const auto& fk = all_field_keys[fk_idx];
-        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray || fk.type == FieldType::StructuredArray) {
+        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
             std::vector<std::string> values;
             size_t count = dict.getFieldValueCount(fk);
             for (uint32_t code = 1; code <= count; ++code) {
@@ -990,8 +988,7 @@ std::vector<uint8_t> TypeAwareCompressor::compressLayerData(const std::vector<ui
             return compressed;
         }
         case FieldType::String:
-        case FieldType::UnstructuredArray:
-        case FieldType::StructuredArray: {
+        case FieldType::UnstructuredArray: {
             // 对于字符串编码值，尝试解析为编码序列
             // 假设数据是uint32_t编码值的序列
             if (data.size() % sizeof(uint32_t) == 0) {
@@ -1050,7 +1047,7 @@ std::vector<uint8_t> TypeAwareCompressor::decompressLayerData(const std::vector<
             
             // 对于String、LogType和数组类型，需要转换回uint32_t编码序列
             if (type == FieldType::String || type == FieldType::LogType || 
-                type == FieldType::UnstructuredArray || type == FieldType::StructuredArray) {
+                type == FieldType::UnstructuredArray) {
                 std::vector<uint32_t> codes(ints.begin(), ints.end());
                 return uint32sToBytes(codes);
             } else {

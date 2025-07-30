@@ -246,7 +246,6 @@ void FieldDictionaryManager::printRedundancyStats(std::ostream& out) const {
             case FieldType::Timestamp: type_str = "Timestamp"; break;
             case FieldType::LogType: type_str = "LogType"; break;
             case FieldType::Null: type_str = "Null"; break;
-            case FieldType::StructuredArray: type_str = "StructuredArray"; break;
             case FieldType::UnstructuredArray: type_str = "UnstructuredArray"; break;
             default: type_str = "Unknown"; break;
         }
@@ -349,7 +348,6 @@ std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey&
         case FieldType::Double:
         case FieldType::Bool:
         case FieldType::UnstructuredArray:
-        case FieldType::StructuredArray:
             return variable_dict_.getFieldValueByCode(key, code);
         case FieldType::Timestamp: {
             // 直接使用TimestampDictionary解码，与LogType保持一致

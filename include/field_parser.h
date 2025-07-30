@@ -13,7 +13,8 @@ public:
     // 统一的字段类型推断（从simdjson元素）
     static FieldType inferFieldType(const std::string& field_name, 
                                    simdjson::dom::element value_node, 
-                                   FieldDictionaryManager& manager);
+                                   FieldDictionaryManager& manager,
+                                   bool is_serialized_array = false);
     
     // 统一的字段值提取
     static Value extractValue(simdjson::dom::element value_node);
@@ -32,6 +33,14 @@ public:
                                 std::set<FieldKey>& all_fields,
                                 std::unordered_map<FieldKey, size_t>& value_counts,
                                 FieldDictionaryManager& manager);
+
+    // 新增：结构化数组处理函数
+    static void parseStructuredArray(simdjson::dom::element array_node,
+                                   const std::string& prefix,
+                                   int depth,
+                                   std::set<FieldKey>& all_fields,
+                                   std::unordered_map<FieldKey, size_t>& value_counts,
+                                   FieldDictionaryManager& manager);
 };
 
 } // namespace json2 

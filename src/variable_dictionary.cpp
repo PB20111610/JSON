@@ -144,6 +144,14 @@ std::optional<Value> Dictionary::getFieldValueByCode(const FieldKey& key, uint32
             if (code == 0 || code > dict.code_to_value.size()) return std::nullopt;
             return dict.code_to_value[code - 1];
         }
+        case FieldType::StructuredArray:
+        case FieldType::UnstructuredArray:
+            // 数组类型作为字符串处理，从全局字符串字典中查找
+            {
+                const auto& dict = global_variable_dict;
+                if (code == 0 || code > dict.code_to_value.size()) return std::nullopt;
+                return dict.code_to_value[code - 1];
+            }
         default:
             return std::nullopt;
     }
@@ -161,6 +169,10 @@ uint32_t Dictionary::getOrAddFieldValue(const FieldKey& key, const Value& value)
             return addFieldValue(key, key.type, std::get<double>(value));
         case FieldType::Bool:
             return addFieldValue(key, key.type, std::get<bool>(value));
+        case FieldType::UnstructuredArray:
+        case FieldType::StructuredArray:
+            // 数组类型作为字符串处理
+            return addFieldValue(key, key.type, std::get<std::string>(value));
         case FieldType::Timestamp:
         case FieldType::LogType:
             throw std::invalid_argument("Dictionary::getOrAddFieldValue should not be used for Timestamp/LogType. Use timestampDict/logtypeDict directly.");

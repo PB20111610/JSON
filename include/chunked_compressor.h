@@ -33,6 +33,7 @@ struct CompressionStats {
 struct CompressorConfig {
     size_t block_size = 5000;           // 默认块大小
     size_t chunk_size = 1000;           // 字段统计用的chunk大小，默认1000
+    bool structurize_arrays = false;    // 是否启用结构化数组处理，默认false启用非结构化数组处理
     // bool enable_path_compression = false; // 是否启用路径压缩
 };
 
@@ -58,6 +59,7 @@ public:
     bool shouldStartNewBlock() const;
     std::vector<uint8_t> serializeBlock(size_t block_index) const;
     void setTimestampFields(const std::vector<std::string>& fields);    // 设置时间戳字段
+    void setStructurizeArrays(bool structurize);                        // 设置数组处理模式
 
     struct ChunkedBlock {
         std::vector<FieldKey> field_order;

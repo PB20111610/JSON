@@ -31,6 +31,8 @@ std::string fieldTypeToString(FieldType type) {
         case FieldType::String: return "String";
         case FieldType::Timestamp: return "Timestamp";
         case FieldType::LogType: return "LogType";
+        case FieldType::StructuredArray: return "StructuredArray";
+        case FieldType::UnstructuredArray: return "UnstructuredArray";
         case FieldType::Null: return "Null";
         default: return "Unknown";
     }
@@ -490,23 +492,24 @@ int main() {
         // 配置时间戳字段
         std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start"};
         manager.setTimestampFields(timestamp_fields);
+        manager.setStructurizeArrays(false);  // 设置为 false 启用非结构化数组处理
         
         std::vector<FieldKey> fieldOrder;
         std::unique_ptr<Trie> trie = nullptr;
 
         // 尝试从文件读取数据
-        std::ifstream in("test_data.json");
+        std::ifstream in("test_data.json"); 
         if (!in.is_open()) {
             std::cout << "Warning: Cannot open test_data.json, using synthetic test data instead." << std::endl;
             
-            // 使用合成测试数据
+            // 使用包含数组字段的合成测试数据
             std::vector<std::string> test_data = {
-                R"({"user_id": 1001, "timestamp": "2024-01-01T10:00:00Z", "action": "login", "value": 42.5})",
-                R"({"user_id": 1002, "timestamp": "2024-01-01T10:01:00Z", "action": "logout", "value": 0.0})",
-                R"({"user_id": 1001, "timestamp": "2024-01-01T10:02:00Z", "action": "purchase", "value": 99.99})",
-                R"({"user_id": 1003, "timestamp": "2024-01-01T10:03:00Z", "action": "login", "value": 15.75})",
-                R"({"user_id": 1002, "timestamp": "2024-01-01T10:04:00Z", "action": "view", "value": 25.0})",
-                R"({"user_id": 1001, "timestamp": "2024-01-01T10:05:00Z", "action": "logout", "value": 0.0})"
+                R"({"@timestamp":"2023-03-28T04:00:00.040Z", "log.level":"TRACE", "message":"scheduling refresh every 1s", "ecs.version": "1.2.0","service.name":"ES_ECS","event.dataset":"elasticsearch.server","process.thread.name":"elasticsearch[hostb9][refresh][T#7]","log.logger":"org.elasticsearch.index.IndexService","elasticsearch.cluster.uuid":"bp-xkJD1S1iyBlj6I_JRHA","elasticsearch.node.id":"iKPGCkp9RVOKXOj20uOt4g","elasticsearch.node.name":"hostb9","elasticsearch.cluster.name":"elasticsearch","tags":[" [abacus_go]"]})",
+                R"({"@timestamp":"2023-03-28T04:00:00.202Z", "log.level":"TRACE", "message":"scheduling refresh every 1s", "ecs.version": "1.2.0","service.name":"ES_ECS","event.dataset":"elasticsearch.server","process.thread.name":"elasticsearch[hostb9][refresh][T#1]","log.logger":"org.elasticsearch.index.IndexService","elasticsearch.cluster.uuid":"bp-xkJD1S1iyBlj6I_JRHA","elasticsearch.node.id":"iKPGCkp9RVOKXOj20uOt4g","elasticsearch.node.name":"hostb9","elasticsearch.cluster.name":"elasticsearch","tags":[" [rider_product_cored]"]})",
+                R"({"@timestamp":"2023-03-28T04:00:00.202Z", "log.level":"TRACE", "message":"scheduling refresh every 1s", "ecs.version": "1.2.0","service.name":"ES_ECS","event.dataset":"elasticsearch.server","process.thread.name":"elasticsearch[hostb9][refresh][T#4]","log.logger":"org.elasticsearch.index.IndexService","elasticsearch.cluster.uuid":"bp-xkJD1S1iyBlj6I_JRHA","elasticsearch.node.id":"iKPGCkp9RVOKXOj20uOt4g","elasticsearch.node.name":"hostb9","elasticsearch.cluster.name":"elasticsearch","tags":[" [fares_management]"]})",
+                R"({"@timestamp":"2023-03-28T04:00:00.201Z", "log.level":"TRACE", "message":"scheduling refresh every 1s", "ecs.version": "1.2.0","service.name":"ES_ECS","event.dataset":"elasticsearch.server","process.thread.name":"elasticsearch[hostb9][refresh][T#8]","log.logger":"org.elasticsearch.index.IndexService","elasticsearch.cluster.uuid":"bp-xkJD1S1iyBlj6I_JRHA","elasticsearch.node.id":"iKPGCkp9RVOKXOj20uOt4g","elasticsearch.node.name":"hostb9","elasticsearch.cluster.name":"elasticsearch","tags":[" [fulfillment_compatibled]"]})",
+                R"({"@timestamp":"2023-03-28T04:00:00.201Z", "log.level":"TRACE", "message":"scheduling refresh every 1s", "ecs.version": "1.2.0","service.name":"ES_ECS","event.dataset":"elasticsearch.server","process.thread.name":"elasticsearch[hostb9][refresh][T#3]","log.logger":"org.elasticsearch.index.IndexService","elasticsearch.cluster.uuid":"bp-xkJD1S1iyBlj6I_JRHA","elasticsearch.node.id":"iKPGCkp9RVOKXOj20uOt4g","elasticsearch.node.name":"hostb9","elasticsearch.cluster.name":"elasticsearch","tags":[" [k8s_apiserver]"]})",
+                R"({"@timestamp":"2023-03-28T04:00:00.202Z", "log.level":"TRACE", "message":"scheduling refresh every 1s", "ecs.version": "1.2.0","service.name":"ES_ECS","event.dataset":"elasticsearch.server","process.thread.name":"elasticsearch[hostb9][refresh][T#6]","log.logger":"org.elasticsearch.index.IndexService","elasticsearch.cluster.uuid":"bp-xkJD1S1iyBlj6I_JRHA","elasticsearch.node.id":"iKPGCkp9RVOKXOj20uOt4g","elasticsearch.node.name":"hostb9","elasticsearch.cluster.name":"elasticsearch","tags":[" [event_logs]"]})"
             };
             
             simdjson::dom::parser parser;

@@ -26,6 +26,8 @@ std::string fieldTypeToString(FieldType type) {
         case FieldType::String: return "String";
         case FieldType::Timestamp: return "Timestamp";
         case FieldType::LogType: return "LogType";
+        case FieldType::StructuredArray: return "StructuredArray";
+        case FieldType::UnstructuredArray: return "UnstructuredArray";
         case FieldType::Null: return "Null";
         default: return "Unknown";
     }
@@ -100,6 +102,7 @@ int main() {
         std::vector<FieldKey> fieldOrder;
         std::unique_ptr<Trie> trie = nullptr;
 
+        manager.setStructurizeArrays(true);  // 设置为 true 启用结构化数组处理
         std::ifstream in(DATA_PATH);
         if (!in.is_open()) {
             throw std::runtime_error(std::string("Cannot open ") + DATA_PATH + " for reading");

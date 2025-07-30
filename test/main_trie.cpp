@@ -27,6 +27,8 @@ std::string fieldTypeToString(FieldType type) {
         case FieldType::Timestamp: return "Timestamp";
         case FieldType::LogType: return "LogType";
         case FieldType::Null: return "Null";
+        case FieldType::StructuredArray: return "StructuredArray";
+        case FieldType::UnstructuredArray: return "UnstructuredArray";
         default: return "Unknown";
     }
 }
@@ -161,6 +163,9 @@ int main() {
         // 配置时间戳字段
         std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start"};
         manager.setTimestampFields(timestamp_fields);
+        
+        // 配置数组处理策略（默认使用非结构化处理，适合大多数场景）
+        manager.setStructurizeArrays(true);  // 设置为 true 启用结构化数组处理
         
         std::vector<FieldKey> fieldOrder;
         std::unique_ptr<Trie> trie = nullptr;

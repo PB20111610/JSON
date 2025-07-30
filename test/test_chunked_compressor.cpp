@@ -11,8 +11,8 @@
 using namespace json2;
 
 int main() {
-    const std::string input_file = "test_data.json";//
-    const size_t BLOCK_SIZE = 20000;
+    const std::string input_file = "test_data.json";  //"../data/postgresql.log"; //
+    const size_t BLOCK_SIZE = 40000;
     std::ifstream fin(input_file);
     if (!fin.is_open()) {
         std::cerr << "Cannot open input file: " << input_file << std::endl;
@@ -29,12 +29,16 @@ int main() {
     // 分块压缩
     CompressorConfig config;
     config.block_size = BLOCK_SIZE;
+    config.structurize_arrays = false;  // 设置为 false 启用非结构化数组处理
     ChunkedTrieCompressor compressor(config);
 
     // 设置时间戳字段
-    // std::vector<std::string> timestamp_fields = { "timestamp", "session_start"};  //"@timestamp",
-    // compressor.setTimestampFields(timestamp_fields);
-
+    std::vector<std::string> timestamp_fields = { "timestamp", "session_start"};  //"@timestamp",
+    compressor.setTimestampFields(timestamp_fields);
+    
+    // 设置数组处理模式（也可以通过setter方法设置）
+    compressor.setStructurizeArrays(false);  // 设置为 false 启用非结构化数组处理
+    
     // 设置原始文件大小
     struct stat st;
     size_t original_file_size = 0;

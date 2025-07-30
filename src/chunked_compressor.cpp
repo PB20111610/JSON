@@ -66,10 +66,16 @@ void ChunkedTrieCompressor::setTimestampFields(const std::vector<std::string>& f
     timestamp_fields_ = fields;
 }
 
+void ChunkedTrieCompressor::setStructurizeArrays(bool structurize) {
+    config_.structurize_arrays = structurize;
+    std::cerr << "[DEBUG] Set structurize arrays: " << (structurize ? "true" : "false") << std::endl;
+}
+
 void ChunkedTrieCompressor::finalizeCurrentBlock() {
     if (current_block_count_ > 0 && !block_buffer_.empty()) {
         FieldDictionaryManager dict;
         dict.setTimestampFields(timestamp_fields_);
+        dict.setStructurizeArrays(config_.structurize_arrays);  // 设置数组处理模式
         std::vector<FieldKey> ordered_fields;
         // 字段统计只用chunk_stat_buffer_
         FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);

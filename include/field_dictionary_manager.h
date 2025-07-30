@@ -73,7 +73,12 @@ public:
     // 检查是否为嵌套字段（通过 ~ 前缀标识）
     bool isNestedField(const std::string& field_name) const;
 
+    // 数组处理配置
+    void setStructurizeArrays(bool structurize) { structurize_arrays_ = structurize; }
+    bool getStructurizeArrays() const { return structurize_arrays_; }
+
 private:
+    bool structurize_arrays_ = false;  // 默认使用非结构化数组处理
     Dictionary variable_dict_;
     TimestampDictionary timestamp_dict_;
     LogTypeDictionary logtype_dict_;

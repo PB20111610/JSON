@@ -246,6 +246,8 @@ void FieldDictionaryManager::printRedundancyStats(std::ostream& out) const {
             case FieldType::Timestamp: type_str = "Timestamp"; break;
             case FieldType::LogType: type_str = "LogType"; break;
             case FieldType::Null: type_str = "Null"; break;
+            case FieldType::StructuredArray: type_str = "StructuredArray"; break;
+            case FieldType::UnstructuredArray: type_str = "UnstructuredArray"; break;
             default: type_str = "Unknown"; break;
         }
         out << std::setw(30) << field << std::setw(12) << type_str << std::setw(12) << total << std::setw(12) << unique << std::setw(12) << redundancy << "\n";
@@ -255,48 +257,61 @@ void FieldDictionaryManager::printRedundancyStats(std::ostream& out) const {
 // 四种不同的冗余度计算方法实现
 double FieldDictionaryManager::calculateRedundancyA(const FieldKey& key, size_t total, size_t unique) const {
     double base_redundancy = (unique > 0) ? (double)total / unique : 0.0;
+    
     // 唯一值惩罚因子：唯一值越多，惩罚越重
-    double uniqueness_penalty = 1.0 / (1.0 + unique * 0.1); // 可调参数  
+    double uniqueness_penalty = 1.0 / (1.0 + unique * 0.1); // 可调参数
+    
     return base_redundancy * uniqueness_penalty;
 }
 
 double FieldDictionaryManager::calculateRedundancyB(const FieldKey& key, size_t total, size_t unique) const {
-    if (unique == 0) return 0.0; 
+    if (unique == 0) return 0.0;
+    
     // 计算信息熵
     double entropy = 0.0;
     // 假设每个唯一值出现次数相等（简化计算）
     double p = 1.0 / unique;
-    entropy = -unique * p * log2(p);  
+    entropy = -unique * p * log2(p);
+    
     // 最大熵（完全随机）
     double max_entropy = log2(unique);
+    
     // 冗余度 = 1 - 归一化熵
     double normalized_entropy = entropy / max_entropy;
     return (1.0 - normalized_entropy) * total;
 }
 
 double FieldDictionaryManager::calculateRedundancyC(const FieldKey& key, size_t total, size_t unique) const {
-    double base_redundancy = (unique > 0) ? (double)total / unique : 0.0;  
+    double base_redundancy = (unique > 0) ? (double)total / unique : 0.0;
+    
     // Trie分支惩罚：唯一值越多，Trie分支越多
-    double trie_branch_penalty = 1.0 / (1.0 + log2(unique + 1));  
+    double trie_branch_penalty = 1.0 / (1.0 + log2(unique + 1));
+    
     // 字段重要性权重（可配置）
     double field_weight = 1.0;
     if (key.name == "timestamp" || key.name == "session_start") {
         field_weight = 0.1; // 时间戳字段降权
     }
+    
     return base_redundancy * trie_branch_penalty * field_weight;
 }
 
 double FieldDictionaryManager::calculateRedundancyD(const FieldKey& key, size_t total, size_t unique) const {
     if (unique == 0) return 0.0;
-    double base_redundancy = (double)total / unique;   
+    
+    double base_redundancy = (double)total / unique;
+    
     // 唯一值比例
     double uniqueness_ratio = (double)unique / total;
+    
     // 自适应惩罚：唯一值比例越高，惩罚越重
-    double penalty = 1.0 / (1.0 + uniqueness_ratio * 10.0);  
+    double penalty = 1.0 / (1.0 + uniqueness_ratio * 10.0);
+    
     // 字段类型特殊处理
     if (key.type == FieldType::Timestamp) {
         penalty *= 0.5; // 时间戳额外降权
     }
+    
     return base_redundancy * penalty;
 }
 
@@ -333,6 +348,8 @@ std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey&
         case FieldType::Int:
         case FieldType::Double:
         case FieldType::Bool:
+        case FieldType::UnstructuredArray:
+        case FieldType::StructuredArray:
             return variable_dict_.getFieldValueByCode(key, code);
         case FieldType::Timestamp: {
             // 直接使用TimestampDictionary解码，与LogType保持一致

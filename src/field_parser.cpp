@@ -10,7 +10,13 @@ namespace json2 {
 
 FieldType FieldParser::inferFieldType(const std::string& field_name, 
                                      simdjson::dom::element value_node, 
-                                     FieldDictionaryManager& manager) {
+                                     FieldDictionaryManager& manager,
+                                     bool is_serialized_array) {
+    // 如果是序列化的数组，直接返回 UnstructuredArray 类型
+    if (is_serialized_array) {
+        return FieldType::UnstructuredArray;
+    }
+    
     if (value_node.type() == simdjson::dom::element_type::STRING) {
         auto str_res = value_node.get_string();
         if (!str_res.error()) {
@@ -25,6 +31,13 @@ FieldType FieldParser::inferFieldType(const std::string& field_name,
             }
         }
         return FieldType::String;
+    } else if (value_node.type() == simdjson::dom::element_type::ARRAY) {
+        // 数组类型处理
+        if (manager.getStructurizeArrays()) {
+            return FieldType::StructuredArray;
+        } else {
+            return FieldType::UnstructuredArray;
+        }
     } else {
         switch (value_node.type()) {
             case simdjson::dom::element_type::INT64:
@@ -55,6 +68,9 @@ Value FieldParser::extractValue(simdjson::dom::element value_node) {
             return value_node.get_bool().value();
         case simdjson::dom::element_type::NULL_VALUE:
             return nullptr;
+        case simdjson::dom::element_type::ARRAY:
+            // 数组序列化为字符串
+            return std::string(simdjson::to_string(value_node));
         default:
             return std::string();
     }
@@ -169,16 +185,37 @@ std::vector<std::tuple<std::string, FieldType, Value>> FieldParser::parseFields(
                 }
                 break;
             case simdjson::dom::element_type::ARRAY: {
-                size_t i = 0;
-                for (auto child : node.get_array().value()) {
-                    std::string full_name = prefix + "[" + std::to_string(i) + "]";
-                    collect(child, full_name);
-                    ++i;
+                // 基于 clp_s 策略的数组处理
+                if (manager.getStructurizeArrays()) {
+                    // 模式1：结构化数组处理（保持数组结构）
+                    auto array = node.get_array().value();
+                    size_t index = 0;
+                    for (auto element : array) {
+                        std::string element_name = prefix + "[" + std::to_string(index) + "]";
+                        collect(element, element_name);
+                        ++index;
+                    }
+                } else {
+                    // 模式2：非结构化数组处理（序列化为字符串）
+                    std::string array_str = simdjson::to_string(node);
+                    // 创建一个临时的字符串节点来调用 inferFieldType
+                    simdjson::dom::parser temp_parser;
+                    auto temp_doc = temp_parser.parse(array_str);
+                    if (!temp_doc.error()) {
+                        FieldType type = inferFieldType(prefix, temp_doc.value(), manager, true);
+                        Value value = array_str;
+                        result.emplace_back(prefix, type, value);
+                    } else {
+                        // 如果解析失败，直接使用 UnstructuredArray 类型
+                        FieldType type = FieldType::UnstructuredArray;
+                        Value value = array_str;
+                        result.emplace_back(prefix, type, value);
+                    }
                 }
                 break;
             }
             default: {
-                FieldType type = inferFieldType(prefix, node, manager);
+                FieldType type = inferFieldType(prefix, node, manager, false);
                 Value value = extractValue(node);
                 result.emplace_back(prefix, type, value);
                 break;
@@ -203,16 +240,23 @@ void FieldParser::collectAllFields(simdjson::dom::element node,
             }
             break;
         case simdjson::dom::element_type::ARRAY: {
-            size_t i = 0;
-            for (simdjson::dom::element child : node.get_array().value()) {
-                std::string full_name = prefix + "[" + std::to_string(i) + "]";
-                collectAllFields(child, full_name, depth+1, all_fields, value_counts, manager);
-                i++;
+            // 基于 clp_s 策略的数组处理
+            if (manager.getStructurizeArrays()) {
+                // 模式1：结构化数组处理（保持数组结构）
+                parseStructuredArray(node, prefix, depth, all_fields, value_counts, manager);
+            } else {
+                // 模式2：非结构化数组处理（序列化为字符串）
+                FieldType type = inferFieldType(prefix, node, manager);
+                std::string array_str = simdjson::to_string(node);
+                FieldKey key{prefix, type};
+                all_fields.insert(key);
+                value_counts[key]++;
+                manager.addFieldValue(key, type, array_str);
             }
             break;
         }
         default: {
-            FieldType type = inferFieldType(prefix, node, manager);
+            FieldType type = inferFieldType(prefix, node, manager, false);
             
             // 检查是否为嵌套字段（通过递归访问产生的字段）
             std::string field_name = prefix;
@@ -261,12 +305,93 @@ void FieldParser::collectAllFields(simdjson::dom::element node,
                 case FieldType::Null:
                     manager.addFieldValue(key, type, nullptr);
                     break;
+                case FieldType::UnstructuredArray:
+                case FieldType::StructuredArray:
+                    if (std::holds_alternative<std::string>(value)) {
+                        manager.addFieldValue(key, type, std::get<std::string>(value));
+                    } else {
+                        manager.addFieldValue(key, type, "");
+                    }
+                    break;
                 default:
                     manager.addFieldValue(key, type, "");
                     break;
             }
             break;
         }
+    }
+}
+
+// 实现结构化数组处理函数（基于 clp_s 策略）
+void FieldParser::parseStructuredArray(simdjson::dom::element array_node,
+                                      const std::string& prefix,
+                                      int depth,
+                                      std::set<FieldKey>& all_fields,
+                                      std::unordered_map<FieldKey, size_t>& value_counts,
+                                      FieldDictionaryManager& manager) {
+    auto array = array_node.get_array().value();
+    size_t index = 0;
+    
+    for (simdjson::dom::element element : array) {
+        std::string element_name = prefix + "[" + std::to_string(index) + "]";
+        
+        switch (element.type()) {
+            case simdjson::dom::element_type::OBJECT:
+                // 处理对象数组元素
+                collectAllFields(element, element_name, depth + 1, all_fields, value_counts, manager);
+                break;
+                
+            case simdjson::dom::element_type::ARRAY:
+                // 处理嵌套数组
+                parseStructuredArray(element, element_name, depth + 1, all_fields, value_counts, manager);
+                break;
+                
+            case simdjson::dom::element_type::STRING:
+            case simdjson::dom::element_type::INT64:
+            case simdjson::dom::element_type::UINT64:
+            case simdjson::dom::element_type::DOUBLE:
+            case simdjson::dom::element_type::BOOL:
+            case simdjson::dom::element_type::NULL_VALUE:
+                // 处理简单类型数组元素 - 直接根据 simdjson 类型确定 FieldType
+                FieldType type;
+                switch (element.type()) {
+                    case simdjson::dom::element_type::STRING:
+                        type = FieldType::String;
+                        break;
+                    case simdjson::dom::element_type::INT64:
+                    case simdjson::dom::element_type::UINT64:
+                        type = FieldType::Int;
+                        break;
+                    case simdjson::dom::element_type::DOUBLE:
+                        type = FieldType::Double;
+                        break;
+                    case simdjson::dom::element_type::BOOL:
+                        type = FieldType::Bool;
+                        break;
+                    case simdjson::dom::element_type::NULL_VALUE:
+                        type = FieldType::Null;
+                        break;
+                    default:
+                        type = FieldType::String;
+                        break;
+                }
+                Value value = extractValue(element);
+                
+                // 检查是否为嵌套字段（通过递归访问产生的字段）
+                std::string field_name = element_name;
+                // 只有通过递归访问产生的字段才是嵌套字段，才添加 ~ 前缀
+                if (!element_name.empty() && depth > 1) {
+                    field_name = "~" + element_name;  // 添加 ~ 前缀标识嵌套字段
+                }
+                
+                FieldKey key{field_name, type};
+                all_fields.insert(key);
+                value_counts[key]++;
+                manager.addFieldValue(key, type, value);
+                break;
+        }
+        
+        ++index;
     }
 }
 

@@ -172,8 +172,9 @@ CMakeFiles/json2.dir/src/logtype_dictionary.cpp.o: \
  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
  /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
  /usr/include/c++/13/optional \
- /workspaces/JSON/include/variable_dictionary.h /usr/include/c++/13/regex \
- /usr/include/c++/13/bitset /usr/include/c++/13/locale \
+ /workspaces/JSON/src/../include/variable_dictionary.h \
+ /usr/include/c++/13/regex /usr/include/c++/13/bitset \
+ /usr/include/c++/13/locale \
  /usr/include/c++/13/bits/locale_facets_nonio.h /usr/include/c++/13/ctime \
  /usr/include/x86_64-linux-gnu/c++/13/bits/time_members.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/messages_members.h \

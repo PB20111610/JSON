@@ -1,5 +1,5 @@
 #include "../include/logtype_dictionary.h"
-#include "variable_dictionary.h"
+#include "../include/variable_dictionary.h"
 #include <variant>
 #include <regex>
 #include <unordered_map>

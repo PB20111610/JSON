@@ -40,10 +40,22 @@ static bool isDouble(const std::string& s) {
 static bool isBool(const std::string& s) {
     return s == "true" || s == "false";
 }
-static nlohmann::json parseValue(const std::string& s) {
+static nlohmann::json parseValue(const std::string& s, FieldType type = FieldType::String) {
     if (isBool(s)) return s == "true";
     if (isInteger(s)) return std::stoll(s);
     if (isDouble(s)) return std::stod(s);
+    
+    // 检查是否为非结构化数组字符串
+    if (type == FieldType::UnstructuredArray || 
+        (s.length() >= 2 && s[0] == '[' && s[s.length()-1] == ']')) {
+        try {
+            return nlohmann::json::parse(s);
+        } catch (const std::exception& e) {
+            // 如果解析失败，作为普通字符串处理
+            return s;
+        }
+    }
+    
     return s;
 }
 
@@ -73,6 +85,7 @@ std::string reconstructJsonFromTrie(const Trie& trie, const FieldDictionaryManag
             // 跳过 nullptr
             if (std::holds_alternative<std::nullptr_t>(node_value)) continue;
             std::string value = trie.reconstructFieldValue(key, node_value, manager);
+            // std::cerr << "[DEBUG] 重构字段: " << key.name << " = " << value << std::endl;
             currentRecord.emplace_back(key, value);
         }
         if (node->getChildren().empty() && !currentRecord.empty()) {
@@ -80,10 +93,13 @@ std::string reconstructJsonFromTrie(const Trie& trie, const FieldDictionaryManag
             json j;
             std::set<std::string> output_names;
             for (const auto& [key, val] : currentRecord) {
-                // 跳过空值
-                if (val.empty()) continue;
+                            // 跳过空值
+            if (val.empty()) {
+                // std::cerr << "[DEBUG] 跳过空值字段: " << key.name << std::endl;
+                continue;
+            }
                 
-                // 检查是否为嵌套字段（以 ~ 开头）
+                // 检查是否为嵌套字段（以 ~ 开头）或结构化数组字段（包含 [）
                 if (manager.isNestedField(key.name)) {
                     // 嵌套字段：去掉 ~ 前缀后按点号分割并创建嵌套结构
                     std::string key_without_prefix = key.name.substr(1); // 去掉 ~ 前缀
@@ -95,10 +111,26 @@ std::string reconstructJsonFromTrie(const Trie& trie, const FieldDictionaryManag
                         pos = next + 1;
                     }
                     (*curr)[key_without_prefix.substr(pos)] = parseValue(val);
+                } else if (key.name.find('[') != std::string::npos) {
+                    // 结构化数组字段：解析数组索引并构建数组
+                    size_t bracket_pos = key.name.find('[');
+                    std::string array_name = key.name.substr(0, bracket_pos);
+                    size_t end_bracket_pos = key.name.find(']', bracket_pos);
+                    int index = std::stoi(key.name.substr(bracket_pos + 1, end_bracket_pos - bracket_pos - 1));
+                    // 确保数组存在
+                    if (!j.contains(array_name)) {
+                        j[array_name] = nlohmann::json::array();
+                    }
+                    // 扩展数组到所需大小
+                    while (j[array_name].size() <= index) {
+                        j[array_name].push_back(nlohmann::json::value_t::null);
+                    }
+                    // 设置数组元素
+                    j[array_name][index] = parseValue(val, key.type);
                 } else {
                     // 扁平字段：只输出第一个有值的同名字段（类型敏感）
                     if (output_names.count(key.name)) continue;
-                    j[key.name] = parseValue(val);
+                    j[key.name] = parseValue(val, key.type);
                     output_names.insert(key.name);
                 }
             }

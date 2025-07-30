@@ -62,14 +62,70 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
                 if (fk.name == field_name) { found = true; break; }
             }
             if (!found) {
-                // 使用默认类型，让createNodeValue统一处理类型推断
-                FieldKey new_fk{field_name, FieldType::String};  // 默认类型
+                // 使用正确的类型推断
+                FieldType inferred_type = FieldParser::inferFieldType(field_name, field.value, manager, false);
+                FieldKey new_fk{field_name, inferred_type};
                 ordered_fields_.push_back(new_fk);
                 
                 // 使用统一的字段值提取
                 Value value = FieldParser::extractValue(field.value);
-                manager.addFieldValue(new_fk, FieldType::String, value);
-                // std::cout << "[DEBUG] Trie::insert - Added new field: " << field_name << " with default type String" << std::endl;
+                manager.addFieldValue(new_fk, inferred_type, value);
+                // std::cout << "[DEBUG] Trie::insert - Added new field: " << field_name << " with inferred type " << (int)inferred_type << std::endl;
+            }
+        }
+    }
+    
+    // 2. 处理结构化数组产生的字段（如 tags[0]）
+    // 这些字段在字段分析阶段已经被添加到 ordered_fields_ 中，但需要在这里处理
+    for (const auto& key : ordered_fields_) {
+        // 检查是否为结构化数组字段（包含 [）
+        if (key.name.find('[') != std::string::npos) {
+            // 检查是否已经在第一步中处理过（作为原始字段）
+            bool already_processed = false;
+            if (record.type() == simdjson::dom::element_type::OBJECT) {
+                auto obj = record.get_object();
+                for (auto field : obj) {
+                    if (std::string(field.key) == key.name) {
+                        already_processed = true;
+                        break;
+                    }
+                }
+            }
+            
+            // 如果没有处理过，说明这是结构化数组产生的字段
+            if (!already_processed) {
+                // 解析数组字段名，如 "tags[0]" -> "tags", 0
+                size_t bracket_pos = key.name.find('[');
+                std::string array_name = key.name.substr(0, bracket_pos);
+                size_t end_bracket_pos = key.name.find(']', bracket_pos);
+                int index = std::stoi(key.name.substr(bracket_pos + 1, end_bracket_pos - bracket_pos - 1));
+                
+                // 尝试从原始记录中获取数组
+                try {
+                    auto array_result = record[array_name];
+                    if (!array_result.error()) {
+                        auto array = array_result.value();
+                        if (array.type() == simdjson::dom::element_type::ARRAY) {
+                            auto array_obj = array.get_array().value();
+                            size_t array_size = 0;
+                            for (auto element : array_obj) { array_size++; }
+                            if (index < array_size) {
+                                size_t current_index = 0;
+                                for (auto element : array_obj) {
+                                    if (current_index == index) {
+                                        Value value = FieldParser::extractValue(element);
+                                        manager.addFieldValue(key, key.type, value);
+                                        // std::cout << "[DEBUG] Trie::insert - Added structured array field: " << key.name << " with value " << value << std::endl;          
+                                        break;
+                                    }
+                                    current_index++;
+                                }
+                            }
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    // 如果获取失败，忽略这个字段
+                }
             }
         }
     }
@@ -86,6 +142,14 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
                 lookup_name = key.name.substr(1);
             }
             
+            // 检查是否为结构化数组字段（包含 [）
+            if (key.name.find('[') != std::string::npos) {
+                // 结构化数组字段，暂时跳过，稍后处理
+                NodeValue node_value = NodeValue(nullptr);
+                values.push_back(node_value);
+                continue;
+            }
+            
             if (lookup_name.find('.') != std::string::npos) {
                 // 嵌套字段，使用统一的嵌套字段访问
                 value_node = FieldParser::getNestedField(record, lookup_name);
@@ -100,14 +164,56 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
             
             // 使用统一的字段值提取
             Value value = FieldParser::extractValue(value_node);
-            NodeValue node_value = createNodeValue(key, value, manager);
+            NodeValue node_value = createNodeValue(key, value, manager);            
             values.push_back(node_value);
         } catch (const simdjson::simdjson_error& e) {
-            // std::cerr << "[DEBUG] Field '" << key.name << "' failed to get value: " << e.what() << std::endl;
+
             NodeValue node_value = NodeValue(nullptr);
             values.push_back(node_value);
         }
     }
+    
+    // 3. 为结构化数组字段设置正确的值
+    for (size_t i = 0; i < ordered_fields_.size(); ++i) {
+        const auto& key = ordered_fields_[i];
+        if (key.name.find('[') != std::string::npos) {
+            // 解析数组字段名，如 "tags[0]" -> "tags", 0
+            size_t bracket_pos = key.name.find('[');
+            std::string array_name = key.name.substr(0, bracket_pos);
+            size_t end_bracket_pos = key.name.find(']', bracket_pos);
+            int index = std::stoi(key.name.substr(bracket_pos + 1, end_bracket_pos - bracket_pos - 1));
+            
+            // 尝试从原始记录中获取数组
+            try {
+                auto array_result = record[array_name];
+                if (!array_result.error()) {
+                    auto array = array_result.value();
+                    if (array.type() == simdjson::dom::element_type::ARRAY) {
+                        auto array_obj = array.get_array().value();
+                        size_t array_size = 0;
+                        for (auto element : array_obj) { array_size++; }
+                        if (index < array_size) {
+                            size_t current_index = 0;
+                            for (auto element : array_obj) {
+                                if (current_index == index) {
+                                    Value value = FieldParser::extractValue(element);
+                                    NodeValue node_value = createNodeValue(key, value, manager);
+                                    if (i < values.size()) {
+                                        values[i] = node_value;
+                                    }
+                                    break;
+                                }
+                                current_index++;
+                            }
+                        }
+                    }
+                }
+            } catch (const std::exception& e) {
+                // 如果获取失败，保持 nullptr
+            }
+        }
+    }
+    
     // 标准Trie插入
     TrieNode* cur = root_.get();
     for (size_t i = 0; i < values.size(); ++i) {
@@ -390,6 +496,8 @@ static Value alignValueType(const FieldKey& key, const Value& value) {
             case FieldType::Null:
             case FieldType::Timestamp:
             case FieldType::LogType:
+            case FieldType::UnstructuredArray:
+            case FieldType::StructuredArray:
             // 保持原有逻辑
                 if (std::holds_alternative<std::string>(value)) return value;
                 if (std::holds_alternative<int64_t>(value)) return std::to_string(std::get<int64_t>(value));
@@ -404,14 +512,19 @@ static Value alignValueType(const FieldKey& key, const Value& value) {
 // NodeValue创建（融合trie_type_aware的类型安全编码）
 NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDictionaryManager& manager) {
     Value aligned = alignValueType(key, value);
-    if (std::holds_alternative<std::nullptr_t>(aligned)) return NodeValue(nullptr);
+    if (std::holds_alternative<std::nullptr_t>(aligned)) {
+        return NodeValue(nullptr);
+    }
     
     // 统一类型推断：对于字符串类型的值，根据实际内容判断类型
     FieldType actual_type = key.type;
     if (std::holds_alternative<std::string>(aligned)) {
         std::string str_val = std::get<std::string>(aligned);
-        // 统一类型推断逻辑
-        if (manager.isTimestampField(key.name) || manager.isTimestampValue(str_val)) {
+        // 统一类型推断逻辑（排除数组类型）
+        if (key.type == FieldType::UnstructuredArray || key.type == FieldType::StructuredArray) {
+            // 数组类型保持原类型，不进行重新推断
+            actual_type = key.type;
+        } else if (manager.isTimestampField(key.name) || manager.isTimestampValue(str_val)) {
             actual_type = FieldType::Timestamp;
         } else if (manager.isLogTemplate(str_val)) {
             actual_type = FieldType::LogType;
@@ -508,6 +621,15 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
                 return NodeValue(std::get<bool>(aligned));
             else
                 return NodeValue(nullptr);
+        case FieldType::UnstructuredArray:
+        case FieldType::StructuredArray:
+            // 数组类型作为字符串处理
+            if (std::holds_alternative<std::string>(aligned)) {
+                auto code = manager.variableDict().getOrAddFieldValue(key, aligned);
+                return NodeValue(code);
+            } else {
+                return NodeValue(nullptr);
+            }
         default:
             return NodeValue(nullptr);
     }
@@ -566,6 +688,20 @@ std::string Trie::reconstructFieldValue(const FieldKey& key, const NodeValue& no
                 return std::get<bool>(node_value) ? "true" : "false";
             else
                 return "";
+        case FieldType::UnstructuredArray:
+        case FieldType::StructuredArray:
+            if (std::holds_alternative<uint32_t>(node_value)) {
+                auto code = std::get<uint32_t>(node_value);
+                auto opt_value = manager.getFieldValueByCode(lookup_key, code);
+                if (opt_value) {
+                    if (std::holds_alternative<std::string>(*opt_value)) {
+                        return std::get<std::string>(*opt_value);
+                    }
+                    if (std::holds_alternative<std::nullptr_t>(*opt_value))
+                        return "null";
+                }
+            }
+            return "";
         default:
             return "";
     }

@@ -27,6 +27,9 @@ public:
             R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)",    // 2023-03-28T04:00:00.040Z (新增：支持毫秒)
             R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)",           // 2023-03-27T00:26:35Z
             R"(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})",            // 2023/03/27 00:26:35
+            R"(\\d{4}\\.\\d{2}\\.\\d{2})", // 2005.06.03
+            R"(\\d{4}-\\d{2}-\\d{2}-\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{6})", // 2005-06-03-15.42.51.428563
+            R"(\\d{4}-\\d{2}-\\d{2}-\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{3,6})", // 兼容3~6位毫秒/微秒
         };
         for (const auto& pattern : patterns) {
             timestamp_patterns_.emplace_back(pattern);
@@ -288,7 +291,7 @@ double FieldDictionaryManager::calculateRedundancyC(const FieldKey& key, size_t 
     
     // 字段重要性权重（可配置）
     double field_weight = 1.0;
-    if (key.name == "timestamp" || key.name == "session_start") {
+    if (key.type == FieldType::Timestamp) {
         field_weight = 0.1; // 时间戳字段降权
     }
     

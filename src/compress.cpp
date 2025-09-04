@@ -212,6 +212,9 @@ std::vector<FieldKey> Compressor::deserializeMetadata(const std::vector<uint8_t>
 // 使用Zstandard压缩数据
 std::vector<uint8_t> Compressor::compressWithZstd(const std::vector<uint8_t>& data) {
 #ifdef USE_ZSTD
+    // Print ZSTD_CLEVEL_DEFAULT value for verification
+    std::cout << "[DEBUG] ZSTD_CLEVEL_DEFAULT value: " << ZSTD_CLEVEL_DEFAULT << std::endl;
+    
     size_t compressed_size = ZSTD_compressBound(data.size());
     std::vector<uint8_t> compressed_data(compressed_size);
     
@@ -674,4 +677,33 @@ std::pair<std::unique_ptr<LOUDSTrie>, std::unique_ptr<FieldDictionaryManager>> C
     return {std::move(louds), std::move(manager)};
 }
 
-} // namespace json2 
+// ========== LOUDS Trie Serialization Methods ==========
+
+std::vector<uint8_t> Compressor::serializeLoudsTrie(const LOUDSTrie& louds) {
+    std::vector<uint8_t> result;
+    
+    // LOUDSTrie 就是 01 位串，直接序列化位向量
+    std::ostringstream bv_stream(std::ios::binary);
+    louds.serializeBitmap(bv_stream);  // 使用高效的 SDSL 序列化
+    std::string bv_str = bv_stream.str();
+    
+    // 直接返回位向量数据，不需要额外的封装
+    result.assign(bv_str.begin(), bv_str.end());
+    
+    return result;
+}
+
+std::unique_ptr<LOUDSTrie> Compressor::deserializeLoudsTrie(const std::vector<uint8_t>& data, 
+                                                           const FieldDictionaryManager& dict_mgr, 
+                                                           const std::vector<FieldKey>& field_order) {
+    // LOUDSTrie 就是 01 位串，直接反序列化位向量
+    std::string bv_str(data.begin(), data.end());
+    std::istringstream bv_stream(bv_str, std::ios::binary);
+    
+    auto louds = std::make_unique<LOUDSTrie>(field_order);
+    louds->deserializeBitmap(bv_stream);  // 使用高效的 SDSL 反序列化
+    
+    return louds;
+}
+
+} // namespace json2

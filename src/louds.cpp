@@ -514,23 +514,15 @@ void LOUDSTrie::loadFromSerialized(const std::vector<bool>& bv, const std::vecto
 }
 
 void LOUDSTrie::serializeBitmap(std::ostream& out) const {
-    size_t bv_size = louds_bv_.size();
-    out.write(reinterpret_cast<const char*>(&bv_size), sizeof(bv_size));
-    for (size_t i = 0; i < bv_size; ++i) {
-        bool bit = louds_bv_[i];
-        out.write(reinterpret_cast<const char*>(&bit), sizeof(bit));
-    }
+    // 直接使用 SDSL 的高效序列化
+    louds_bv_.serialize(out);
 }
 
 void LOUDSTrie::deserializeBitmap(std::istream& in) {
-    size_t bv_size;
-    in.read(reinterpret_cast<char*>(&bv_size), sizeof(bv_size));
-    louds_bv_ = sdsl::bit_vector(bv_size);
-    for (size_t i = 0; i < bv_size; ++i) {
-        bool bit;
-        in.read(reinterpret_cast<char*>(&bit), sizeof(bit));
-        louds_bv_[i] = bit;
-    }
+    // 直接使用 SDSL 的高效反序列化
+    louds_bv_.load(in);
+    
+    // 重建辅助索引结构
     louds_rank_ = sdsl::rank_support_v<>(&louds_bv_);
     louds_select_ = sdsl::select_support_mcl<>(&louds_bv_);
     louds_select0_ = sdsl::select_support_mcl<0>(&louds_bv_);

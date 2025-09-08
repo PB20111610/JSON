@@ -16,7 +16,9 @@ add_definitions(-DUSE_ZSTD)
 
 # Add our executable and the library sources
 add_executable(json2
-    test/test_chunked_compressor.cpp
+    test/test_chunked_cmp_type_aware-custom.cpp
+    # test/test_compress_type_aware.cpp
+    # test/test_chunked_compressor.cpp
     # test/main_compress.cpp
     # test/main_trie.cpp
     # test/test_louds_trie.cpp
@@ -32,7 +34,25 @@ add_executable(json2
     src/reconstruct.cpp
     src/compress.cpp
     src/chunked_compressor.cpp
+    src/compress_type_aware.cpp
+    src/chunked_type_aware_compress.cpp
     vendor/simdjson/simdjson.cpp
+    # New modular compression system files
+    include/compression/core/compression_utils.cpp
+    include/compression/algorithms/rle_compression.cpp
+    include/compression/algorithms/varint_compression.cpp
+    include/compression/algorithms/delta_compression.cpp
+    include/compression/algorithms/bitpacking_compression.cpp
+    include/compression/algorithms/dictionary_compression.cpp
+    include/compression/backends/zstd_backend.cpp
+    include/compression/backends/brotli_backend.cpp
+    include/compression/backends/lzma_backend.cpp
+    include/compression/backends/lz4_backend.cpp
+    include/compression/backends/snappy_backend.cpp
+    include/compression/type_aware/type_aware_compressor.cpp
+    include/compression/type_aware/layer_compressor.cpp
+    include/compression/type_aware/metadata_compressor.cpp
+    include/compression/factory/compression_factory.cpp
 )
 
 # 链接库

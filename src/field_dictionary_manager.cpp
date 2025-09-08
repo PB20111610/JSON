@@ -11,7 +11,6 @@
 
 namespace json2 {
 
-// 简化的类型检测，仿照 clp_s 的方式
 class SimpleTypeDetector {
 private:
     std::vector<std::string> timestamp_fields_;
@@ -74,6 +73,8 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::s
         field_type_seen_[key] = true;
     }
     field_type_unique_values_[key].insert(value);
+    // 新增：记录字段值序列
+    field_value_sequences_[key].push_back(value);
     switch (key.type) {
         case FieldType::Int: {
             int64_t v = std::stoll(value);
@@ -113,6 +114,66 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::s
     }
 }
 
+uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType type, int64_t value) {
+    // Update counters
+    field_type_total_count_[key]++;
+    if (!field_type_seen_[key]) {
+        all_fields_and_types_.push_back(key);
+        field_type_seen_[key] = true;
+    }
+    field_type_unique_values_[key].insert(std::to_string(value));
+    // 新增：记录字段值序列
+    field_value_sequences_[key].push_back(std::to_string(value));
+    
+    // Delegate to variable dictionary
+    return variable_dict_.addFieldValue(key, type, value);
+}
+
+uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType type, double value) {
+    // Update counters
+    field_type_total_count_[key]++;
+    if (!field_type_seen_[key]) {
+        all_fields_and_types_.push_back(key);
+        field_type_seen_[key] = true;
+    }
+    field_type_unique_values_[key].insert(std::to_string(value));
+    // 新增：记录字段值序列
+    field_value_sequences_[key].push_back(std::to_string(value));
+    
+    // Delegate to variable dictionary
+    return variable_dict_.addFieldValue(key, type, value);
+}
+
+uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType type, bool value) {
+    // Update counters
+    field_type_total_count_[key]++;
+    if (!field_type_seen_[key]) {
+        all_fields_and_types_.push_back(key);
+        field_type_seen_[key] = true;
+    }
+    field_type_unique_values_[key].insert(value ? "true" : "false");
+    // 新增：记录字段值序列
+    field_value_sequences_[key].push_back(value ? "true" : "false");
+    
+    // Delegate to variable dictionary
+    return variable_dict_.addFieldValue(key, type, value);
+}
+
+uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType type, std::nullptr_t value) {
+    // Update counters
+    field_type_total_count_[key]++;
+    if (!field_type_seen_[key]) {
+        all_fields_and_types_.push_back(key);
+        field_type_seen_[key] = true;
+    }
+    field_type_unique_values_[key].insert("null");
+    // 新增：记录字段值序列
+    field_value_sequences_[key].push_back("null");
+    
+    // Delegate to variable dictionary
+    return variable_dict_.addFieldValue(key, type, value);
+}
+
 uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType type, const Value& value) {
     // 严格按照传入的FieldKey类型进行字典分配，不重新判断类型
     field_type_total_count_[key]++;
@@ -135,6 +196,8 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
         value_str = "null";
     }
     field_type_unique_values_[key].insert(value_str);
+    // 新增：记录字段值序列
+    field_value_sequences_[key].push_back(value_str);
     
     switch (key.type) {
         case FieldType::Int:
@@ -225,37 +288,6 @@ std::set<std::string> FieldDictionaryManager::getAllFields() const {
     }
     return fields;
 }
-
-void FieldDictionaryManager::printRedundancyStats(std::ostream& out) const {
-    out << std::setw(30) << "Field" << std::setw(12) << "Type" << std::setw(12) << "Total" << std::setw(12) << "Unique" << std::setw(12) << "Redundancy" << "\n";
-    for (const auto& [field, type] : all_fields_and_types_) {
-        size_t total = getTotalCount(FieldKey{field, type});
-        size_t unique = getUniqueValueCount(FieldKey{field, type});
-        
-        // 使用与排序相同的冗余度计算方法（calculateRedundancyB）
-        double redundancy = calculateRedundancyB(FieldKey{field, type}, total, unique);
-        // double factor = (val_count > 0) ? (double)occ / val_count : 0.0;        
-        // double factor = manager.calculateRedundancyA(key, occ, val_count); // 方案A：唯一值惩罚因子 (Fifth)
-        // double factor = manager.calculateRedundancyB(key, occ, val_count); // 方案B：基于信息熵 (Best)
-        // double factor = manager.calculateRedundancyC(key, occ, val_count); // 方案C：Trie结构影响因子 (Second)
-        // double factor = manager.calculateRedundancyD(key, occ, val_count); // 方案D：自适应冗余度 (Third)
-        
-        std::string type_str;
-        switch (type) {
-            case FieldType::Int: type_str = "Int"; break;
-            case FieldType::Double: type_str = "Double"; break;
-            case FieldType::Bool: type_str = "Bool"; break;
-            case FieldType::String: type_str = "String"; break;
-            case FieldType::Timestamp: type_str = "Timestamp"; break;
-            case FieldType::LogType: type_str = "LogType"; break;
-            case FieldType::Null: type_str = "Null"; break;
-            case FieldType::UnstructuredArray: type_str = "UnstructuredArray"; break;
-            default: type_str = "Unknown"; break;
-        }
-        out << std::setw(30) << field << std::setw(12) << type_str << std::setw(12) << total << std::setw(12) << unique << std::setw(12) << redundancy << "\n";
-    }
-}
-
 // 四种不同的冗余度计算方法实现
 double FieldDictionaryManager::calculateRedundancyA(const FieldKey& key, size_t total, size_t unique) const {
     double base_redundancy = (unique > 0) ? (double)total / unique : 0.0;
@@ -266,7 +298,7 @@ double FieldDictionaryManager::calculateRedundancyA(const FieldKey& key, size_t 
     return base_redundancy * uniqueness_penalty;
 }
 
-double FieldDictionaryManager::calculateRedundancyB(const FieldKey& key, size_t total, size_t unique) const {
+double FieldDictionaryManager::calculateRedundancy(const FieldKey& key, size_t total, size_t unique) const {
     if (unique == 0) return 0.0;
     
     // 计算信息熵
@@ -325,6 +357,7 @@ void FieldDictionaryManager::clear() {
     all_fields_and_types_.clear();
     field_type_seen_.clear();
     field_type_unique_values_.clear();
+    field_value_sequences_.clear(); // 新增：清空序列数据
 }
 
 void FieldDictionaryManager::setTimestampFields(const std::vector<std::string>& fields) {
@@ -368,6 +401,59 @@ std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey&
 
 bool FieldDictionaryManager::isNestedField(const std::string& field_name) const {
     return !field_name.empty() && field_name[0] == '~';
+}
+
+// 新增：长度熵计算 H_len = -∑ p(l) log p(l)
+double FieldDictionaryManager::calculateLengthEntropy(const FieldKey& key) const {
+    auto seq_it = field_value_sequences_.find(key);
+    if (seq_it == field_value_sequences_.end() || seq_it->second.empty()) {
+        return 0.0;
+    }
+    
+    const auto& values = seq_it->second;
+    std::unordered_map<size_t, size_t> length_counts;
+    
+    // 统计各种长度的出现次数
+    for (const auto& value : values) {
+        length_counts[value.length()]++;
+    }
+    
+    if (length_counts.size() <= 1) {
+        return 0.0; // 只有一种长度，熵为0
+    }
+    
+    double entropy = 0.0;
+    size_t total = values.size();
+    
+    for (const auto& [length, count] : length_counts) {
+        if (count > 0) {
+            double probability = static_cast<double>(count) / total;
+            entropy -= probability * log2(probability);
+        }
+    }
+    
+    return entropy;
+}
+
+// 新增：相邻自相似度计算 S_adj = 相邻两条日志该字段值长度相同的比例
+double FieldDictionaryManager::calculateAdjacentSelfSimilarity(const FieldKey& key) const {
+    auto seq_it = field_value_sequences_.find(key);
+    if (seq_it == field_value_sequences_.end() || seq_it->second.size() < 2) {
+        return 0.0;
+    }
+    
+    const auto& values = seq_it->second;
+    size_t same_length_pairs = 0;
+    size_t total_pairs = values.size() - 1;
+    
+    // 统计相邻对中长度相同的数量
+    for (size_t i = 0; i < values.size() - 1; ++i) {
+        if (values[i].length() == values[i + 1].length()) {
+            same_length_pairs++;
+        }
+    }
+    
+    return static_cast<double>(same_length_pairs) / total_pairs;
 }
 
 } // namespace json2 

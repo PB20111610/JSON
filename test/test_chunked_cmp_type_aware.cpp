@@ -171,7 +171,7 @@ bool verifyLosslessReconstruction(const std::string& original_file_path, const s
 
 void testChunkedTypeAwareCompression() {
     std::cout << "\n=== Chunked Type-Aware Compression Test ===" << std::endl;
-    const char* DATA_PATH = "../data/bgl-full.json"; //"test_data.json";
+    const char* DATA_PATH = "test_data.json"; //"../data/bgl-full.json"; //
 
     try {
         // Configure chunked type-aware compressor with production settings
@@ -185,9 +185,16 @@ void testChunkedTypeAwareCompression() {
         config.type_aware_config.louds_backend = compression::CompressionBackend::BIT_PACKING;  // Fast for bitmaps
         config.type_aware_config.dictionary_backend = compression::CompressionBackend::ZSTD;    // Good ratio for dictionaries
         config.type_aware_config.metadata_backend = compression::CompressionBackend::ZSTD;      // Good ratio for metadata
+        
+        // Configure ALL field type backends explicitly for optimal performance
         config.type_aware_config.layer_config.int_backend = compression::CompressionBackend::DELTA_VARINT; // Specialized for integers
         config.type_aware_config.layer_config.double_backend = compression::CompressionBackend::DELTA_VARINT; // Specialized for doubles
-        config.type_aware_config.layer_config.string_backend = compression::CompressionBackend::ZSTD;  // Good balance
+        config.type_aware_config.layer_config.bool_backend = compression::CompressionBackend::BIT_PACKING;  // Optimal for boolean values
+        config.type_aware_config.layer_config.string_backend = compression::CompressionBackend::DELTA_VARINT;  // Good balance for string dictionary codes
+        config.type_aware_config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_DELTA; // Optimal for timestamp patterns
+        config.type_aware_config.layer_config.logtype_backend = compression::CompressionBackend::DELTA_VARINT; // Good for logtype dictionary codes
+        config.type_aware_config.layer_config.array_backend = compression::CompressionBackend::RLE;       // Effective for array patterns
+        config.type_aware_config.layer_config.null_backend = compression::CompressionBackend::BIT_PACKING; // Optimal for null masks
         
         // Configure type-aware compression with optimized settings (matching original test)
         // config.type_aware_config.louds_backend = compression::CompressionBackend::BIT_PACKING;
@@ -214,9 +221,6 @@ void testChunkedTypeAwareCompression() {
         std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start", "time", "ts"};
         manager.setTimestampFields(timestamp_fields);
         manager.setStructurizeArrays(false);
-        
-        std::vector<FieldKey> fieldOrder;
-        std::unique_ptr<Trie> trie = nullptr;
         
         // Open and process input file
         std::ifstream in(DATA_PATH);
@@ -245,9 +249,8 @@ void testChunkedTypeAwareCompression() {
             return;
         }
         
-        // Analyze fields and create trie structure (same as original test)
-        FieldAnalyzer::analyzeAndSortFields(first_chunk, manager, fieldOrder);
-        trie = std::make_unique<Trie>(fieldOrder);
+        // Note: Field analysis will be performed automatically by ChunkedTypeAwareCompressor
+        // when processing the first block, so we don't need to do it manually here
         
         // Display compression configuration
         displayCompressionConfig(config.type_aware_config);
@@ -259,18 +262,6 @@ void testChunkedTypeAwareCompression() {
         std::cout << "\nChunked Configuration:" << std::endl;
         std::cout << "  Block size: " << config.block_size << " records" << std::endl;
         std::cout << "  Chunk size: " << config.chunk_size << " records" << std::endl;
-        std::cout << "\nCompression Analysis:" << std::endl;
-        std::cout << "  LOUDS Backend (" << backendToString(config.type_aware_config.louds_backend) << "): Optimized for bitmap data" << std::endl;
-        std::cout << "  Dictionary Backend (" << backendToString(config.type_aware_config.dictionary_backend) << "): " << 
-                     (config.type_aware_config.dictionary_backend == compression::CompressionBackend::ZSTD ? "Good compression + reasonable speed" :
-                      config.type_aware_config.dictionary_backend == compression::CompressionBackend::LZ4 ? "Fast speed, lower compression" :
-                      config.type_aware_config.dictionary_backend == compression::CompressionBackend::LZMA ? "Best compression, slower speed" : "Unknown") << std::endl;
-        std::cout << "  Integer Backend (" << backendToString(config.type_aware_config.layer_config.int_backend) << "): Specialized for numeric sequences" << std::endl;
-        std::cout << "  String Backend (" << backendToString(config.type_aware_config.layer_config.string_backend) << "): " << 
-                     (config.type_aware_config.layer_config.string_backend == compression::CompressionBackend::ZSTD ? "Good compression + reasonable speed" :
-                      config.type_aware_config.layer_config.string_backend == compression::CompressionBackend::LZ4 ? "Fast speed, lower compression" :
-                      config.type_aware_config.layer_config.string_backend == compression::CompressionBackend::BROTLI ? "Very good compression, slower speed" : "Unknown") << std::endl;
-        
         // Get original file size
         struct stat st;
         size_t original_file_size = 0;
@@ -319,7 +310,6 @@ void testChunkedTypeAwareCompression() {
 
         std::cout << "Processing completed:" << std::endl;
         std::cout << "Lines processed: " << line_count << std::endl;
-        std::cout << "Field types detected: " << fieldOrder.size() << std::endl;
         std::cout << "Compression completed in " << compress_duration.count() << " ms" << std::endl;
         std::cout << "Total records: " << compressor.getTotalRecords() << std::endl;
         std::cout << "Total blocks: " << compressor.getTotalBlocks() << std::endl;
@@ -470,7 +460,6 @@ void testChunkedTypeAwareCompression() {
 
 int main() {
     try {
-        std::cout << "Starting Chunked Type-Aware Compression Tests (Production Configuration)..." << std::endl;
         testChunkedTypeAwareCompression();
         std::cout << "\nAll tests completed successfully!" << std::endl;
         return 0;

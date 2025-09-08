@@ -72,5 +72,6 @@
         "thread": "cpp",
         "valarray": "cpp",
         "variant": "cpp"
-    }
+    },
+    "terminal.integrated.allowChords": true
 }

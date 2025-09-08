@@ -47,12 +47,18 @@ static compression::FieldType mapFieldType(json2::FieldType json_field_type) {
         case json2::FieldType::String:
         case json2::FieldType::UnstructuredArray:
             return compression::FieldType::STRING;
+        case json2::FieldType::Timestamp:
+            return compression::FieldType::TIMESTAMP;
+        case json2::FieldType::LogType:
+            return compression::FieldType::LOGTYPE;
         case json2::FieldType::Int:
             return compression::FieldType::INT64;
         case json2::FieldType::Double:
             return compression::FieldType::DOUBLE;
         case json2::FieldType::Bool:
             return compression::FieldType::BOOL;
+        case json2::FieldType::Null:
+            return compression::FieldType::NULL_TYPE;
         default:
             return compression::FieldType::STRING; // Safe default
     }
@@ -98,6 +104,18 @@ std::vector<uint8_t> compressWithConfig(const std::vector<uint8_t>& data,
                 break;
             case compression::FieldType::STRING:
                 backend = config.layer_config.string_backend;
+                break;
+            case compression::FieldType::TIMESTAMP:
+                backend = config.layer_config.timestamp_backend;
+                break;
+            case compression::FieldType::LOGTYPE:
+                backend = config.layer_config.logtype_backend;
+                break;
+            case compression::FieldType::ARRAY:
+                backend = config.layer_config.array_backend;
+                break;
+            case compression::FieldType::NULL_TYPE:
+                backend = config.layer_config.null_backend;
                 break;
             case compression::FieldType::INT64:
             case compression::FieldType::UINT32:

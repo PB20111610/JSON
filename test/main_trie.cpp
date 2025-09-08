@@ -1,6 +1,5 @@
 #include "../include/field_analyzer.h"
 #include "../include/field_dictionary_manager.h"
-// #include "../include/trie_type_aware.h"
 #include "../include/reconstruct.h"
 #include "../include/trie.h" // Added for Trie
 #include <iostream>
@@ -9,6 +8,7 @@
 #include <fstream>
 #include <cctype>
 #include <variant>
+#include <cmath> // Added for log2 function
 #include <nlohmann/json.hpp> // 只用于重建验证
 #include <simdjson.h>
 #include <queue>
@@ -32,14 +32,18 @@ std::string fieldTypeToString(FieldType type) {
     }
 }
 
-// Helper function to print field redundancy (now with FieldKey)
-void printFieldOrder(const std::vector<FieldKey>& ordered_fields) {
-    std::cout << "\nField Order (by redundancy factor):\n";
-    std::cout << "================================\n";
+// Simplified function to print field order (detailed redundancy info now shown by field_analyzer)
+void printFieldOrder(const std::vector<FieldKey>& ordered_fields, const FieldDictionaryManager& manager) {
+    std::cout << "\nField Order (as determined by FieldAnalyzer):" << std::endl;
+    std::cout << "==========================================" << std::endl;
+    
     for (size_t i = 0; i < ordered_fields.size(); ++i) {
         const auto& key = ordered_fields[i];
-        std::cout << (i + 1) << ". " << key.name << "[" << fieldTypeToString(key.type) << "]\n";
+        std::string field_desc = key.name + "[" + fieldTypeToString(key.type) + "]";
+        std::cout << std::setw(4) << (i + 1) << ". " << field_desc << std::endl;
     }
+    
+    std::cout << "\nNote: Detailed redundancy calculation and sorting information is shown above by FieldAnalyzer." << std::endl;
 }
 
 // 打印字典内容（适配FieldKey）
@@ -155,7 +159,7 @@ void printNodeValue(const NodeValue& v) {
 }
 
 int main() {
-    const size_t CHUNK_SIZE = 10000; // Process 10,000 records per chunk
+    const size_t CHUNK_SIZE = 1000; // Process 10,000 records per chunk
 
     try {
         FieldDictionaryManager manager;
@@ -200,10 +204,8 @@ int main() {
             if (isFirstChunk) {
                 std::cout << "--- Processing First Chunk ---\n";
                 FieldAnalyzer::analyzeAndSortFields(records, manager, fieldOrder);
-                printFieldOrder(fieldOrder);
-                // 输出冗余度统计
-                std::cout << "\n=== Field Redundancy Stats ===\n";
-                manager.printRedundancyStats(std::cout);
+                // printFieldOrder(fieldOrder, manager);
+                // The detailed redundancy information is now included in printFieldOrder above
                 trie = std::make_unique<Trie>(fieldOrder);
                 isFirstChunk = false;
             } else {

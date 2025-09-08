@@ -27,6 +27,12 @@ struct CompressionStats {
     size_t total_records;           // 总记录数
     size_t records_per_block;       // 每块记录数
     size_t total_core_data_size;     // 所有块的原始数据（core data）大小
+    
+    // Trie structure statistics
+    std::vector<double> placeholder_ratios;  // 每块的占位节点比例
+    std::vector<bool> structure_appropriateness; // 每块的结构适宜性（占位节点比例<5%）
+    double avg_placeholder_ratio = 0.0;      // 平均占位节点比例
+    size_t appropriate_blocks = 0;           // 结构适宜的块数量
 };
 
 // 压缩器配置
@@ -35,6 +41,10 @@ struct CompressorConfig {
     size_t chunk_size = 1000;           // 字段统计用的chunk大小，默认1000
     bool structurize_arrays = false;    // 是否启用结构化数组处理，默认false启用非结构化数组处理
     // bool enable_path_compression = false; // 是否启用路径压缩
+    
+    // Custom field ordering (optional)
+    std::vector<FieldKey> custom_field_order;  // 用户自定义字段排序，为空时使用冗余度计算
+    bool use_custom_order = false;             // 是否使用自定义字段排序
 };
 
 // 分块压缩器
@@ -60,6 +70,12 @@ public:
     std::vector<uint8_t> serializeBlock(size_t block_index) const;
     void setTimestampFields(const std::vector<std::string>& fields);    // 设置时间戳字段
     void setStructurizeArrays(bool structurize);                        // 设置数组处理模式
+    
+    // Custom field ordering configuration
+    void setCustomFieldOrder(const std::vector<FieldKey>& custom_order);
+    void enableCustomFieldOrder(bool enable = true);
+    bool isUsingCustomOrder() const;
+    const std::vector<FieldKey>& getCustomFieldOrder() const;
 
     struct ChunkedBlock {
         std::vector<FieldKey> field_order;
@@ -80,6 +96,8 @@ private:
     struct ChunkedBlockMemory {
         std::vector<uint8_t> compressed_data;
         size_t original_size = 0; // 每块的原始数据大小
+        double placeholder_ratio = 0.0; // 占位节点比例
+        bool is_structure_appropriate = true; // 结构是否适中
     };
     std::vector<ChunkedBlockMemory> blocks_memory_;
     // 存储时间戳字段

@@ -32,6 +32,12 @@ struct ChunkedTypeAwareStats {
     // Type-aware specific stats
     std::vector<double> block_compression_ratios; // 每块的压缩比
     compression::TypeAwareCompressionConfig config; // 使用的配置
+    
+    // Trie structure statistics
+    std::vector<double> placeholder_ratios;  // 每块的占位节点比例
+    std::vector<bool> structure_appropriateness; // 每块的结构适宜性（占位节点比例<5%）
+    double avg_placeholder_ratio = 0.0;      // 平均占位节点比例
+    size_t appropriate_blocks = 0;           // 结构适宜的块数量
 };
 
 // 分块类型感知压缩器配置
@@ -42,6 +48,10 @@ struct ChunkedTypeAwareConfig {
     
     // Type-aware compression configuration
     compression::TypeAwareCompressionConfig type_aware_config;
+    
+    // Custom field ordering (optional)
+    std::vector<FieldKey> custom_field_order;  // 用户自定义字段排序，为空时使用冗余度计算
+    bool use_custom_order = false;             // 是否使用自定义字段排序
 };
 
 // 分块类型感知压缩器
@@ -82,6 +92,12 @@ public:
     void setTimestampFields(const std::vector<std::string>& fields);
     void setStructurizeArrays(bool structurize);
     
+    // Custom field ordering configuration
+    void setCustomFieldOrder(const std::vector<FieldKey>& custom_order);
+    void enableCustomFieldOrder(bool enable = true);
+    bool isUsingCustomOrder() const;
+    const std::vector<FieldKey>& getCustomFieldOrder() const;
+    
     // Compressed block structure for deserialization
     struct ChunkedTypeAwareBlock {
         std::vector<FieldKey> field_order;
@@ -109,6 +125,8 @@ private:
         size_t original_size = 0; // 每块的原始数据大小
         double compression_ratio = 1.0; // 该块的压缩比
         compression::TypeAwareCompressionConfig block_config; // 该块使用的配置
+        double placeholder_ratio = 0.0; // 占位节点比例
+        bool is_structure_appropriate = true; // 结构是否适中
     };
     std::vector<ChunkedTypeAwareBlockMemory> blocks_memory_;
     

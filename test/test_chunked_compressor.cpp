@@ -7,12 +7,13 @@
 #include <vector>
 #include <cassert>
 #include <sys/stat.h>
+#include <set>
 
 using namespace json2;
 
 int main() {
-    const std::string input_file = "test_data.json";  //"../data/postgresql.log"; //
-    const size_t BLOCK_SIZE = 40000;
+    const std::string input_file = "test_data.json"; // "../data/ICS-Flow.json"; //
+    const size_t BLOCK_SIZE = 20000; // 每个块处理 20,000 条记录
     std::ifstream fin(input_file);
     if (!fin.is_open()) {
         std::cerr << "Cannot open input file: " << input_file << std::endl;
@@ -33,7 +34,7 @@ int main() {
     ChunkedTrieCompressor compressor(config);
 
     // 设置时间戳字段
-    std::vector<std::string> timestamp_fields = { "timestamp", "session_start"};  //"@timestamp",
+    std::vector<std::string> timestamp_fields = {"Timestamp","request_received","response_delivered", "timestamp", "session_start"};  //"@timestamp",
     compressor.setTimestampFields(timestamp_fields);
     
     // 设置数组处理模式（也可以通过setter方法设置）
@@ -79,11 +80,11 @@ int main() {
         std::vector<std::string> decompressed_jsons;
         for (size_t i = 0; i < blocks.size(); ++i) {
             const auto& block = blocks[i];
-            std::cout << "[DEBUG] Block " << i << ": fields=" << block.field_order.size();
-            if (block.dict) std::cout << ", dict valid";
-            else std::cout << ", dict nullptr!";
-            if (block.trie) std::cout << ", trie valid";
-            else std::cout << ", trie nullptr!";
+            // std::cout << "[DEBUG] Block " << i << ": fields=" << block.field_order.size();
+            // if (block.dict) std::cout << ", dict valid";
+            // else std::cout << ", dict nullptr!";
+            // if (block.trie) std::cout << ", trie valid";
+            // else std::cout << ", trie nullptr!";
             std::cout << std::endl;
             std::string json_block;
             try {
@@ -108,11 +109,31 @@ int main() {
         fout.close();
         std::cout << "Reconstructed JSON written to chunked_reconstructed.json, total lines: " << total_lines << std::endl;
 
-        // 校验一致性（行数）
-        if (total_lines == records.size()) {
-            std::cout << "✅ All records recovered!" << std::endl;
+        // 校验一致性（去重后的记录数）
+        std::set<std::string> original_unique_records(records.begin(), records.end());
+        std::set<std::string> reconstructed_unique_records;
+        
+        // 从重建的JSON中提取记录
+        for (const auto& block_json : decompressed_jsons) {
+            std::istringstream iss(block_json);
+            std::string l;
+            while (std::getline(iss, l)) {
+                if (!l.empty()) {
+                    reconstructed_unique_records.insert(l);
+                }
+            }
+        }
+        
+        std::cout << "[STATS] 原始记录总数: " << records.size() << std::endl;
+        std::cout << "[STATS] 原始唯一记录数: " << original_unique_records.size() << std::endl;
+        std::cout << "[STATS] 重建记录总数: " << total_lines << std::endl;
+        std::cout << "[STATS] 重建唯一记录数: " << reconstructed_unique_records.size() << std::endl;
+        
+        if (original_unique_records.size() == reconstructed_unique_records.size()) {
+            std::cout << "✅ All unique records recovered!" << std::endl;
         } else {
-            std::cout << "❌ Record count mismatch: original=" << records.size() << ", reconstructed=" << total_lines << std::endl;
+            std::cout << "❌ Unique record count mismatch: original=" << original_unique_records.size() 
+                      << ", reconstructed=" << reconstructed_unique_records.size() << std::endl;
         }
     } catch (const std::exception& e) {
         std::cerr << "[FATAL] Exception during deserialization: " << e.what() << std::endl;

@@ -69,19 +69,19 @@ include CMakeFiles/json2.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/json2.dir/flags.make
 
-CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o: CMakeFiles/json2.dir/flags.make
-CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o: /workspaces/JSON/test/test_chunked_compressor.cpp
-CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o -MF CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o.d -o CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o -c /workspaces/JSON/test/test_chunked_compressor.cpp
+CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o: /workspaces/JSON/test/test_compress_type_aware.cpp
+CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o -MF CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o.d -o CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o -c /workspaces/JSON/test/test_compress_type_aware.cpp
 
-CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/test/test_chunked_compressor.cpp > CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.i
+CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/test/test_compress_type_aware.cpp > CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.i
 
-CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/test/test_chunked_compressor.cpp -o CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.s
+CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/test/test_compress_type_aware.cpp -o CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.s
 
 CMakeFiles/json2.dir/src/field_analyzer.cpp.o: CMakeFiles/json2.dir/flags.make
 CMakeFiles/json2.dir/src/field_analyzer.cpp.o: /workspaces/JSON/src/field_analyzer.cpp
@@ -251,10 +251,38 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/src/chunked_compressor.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/src/chunked_compressor.cpp -o CMakeFiles/json2.dir/src/chunked_compressor.cpp.s
 
+CMakeFiles/json2.dir/src/compress_type_aware.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/src/compress_type_aware.cpp.o: /workspaces/JSON/src/compress_type_aware.cpp
+CMakeFiles/json2.dir/src/compress_type_aware.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/json2.dir/src/compress_type_aware.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/src/compress_type_aware.cpp.o -MF CMakeFiles/json2.dir/src/compress_type_aware.cpp.o.d -o CMakeFiles/json2.dir/src/compress_type_aware.cpp.o -c /workspaces/JSON/src/compress_type_aware.cpp
+
+CMakeFiles/json2.dir/src/compress_type_aware.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/src/compress_type_aware.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/src/compress_type_aware.cpp > CMakeFiles/json2.dir/src/compress_type_aware.cpp.i
+
+CMakeFiles/json2.dir/src/compress_type_aware.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/src/compress_type_aware.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/src/compress_type_aware.cpp -o CMakeFiles/json2.dir/src/compress_type_aware.cpp.s
+
+CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: /workspaces/JSON/src/chunked_type_aware_compress.cpp
+CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o -MF CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o.d -o CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o -c /workspaces/JSON/src/chunked_type_aware_compress.cpp
+
+CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/src/chunked_type_aware_compress.cpp > CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.i
+
+CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/src/chunked_type_aware_compress.cpp -o CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.s
+
 CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: CMakeFiles/json2.dir/flags.make
 CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: /workspaces/JSON/vendor/simdjson/simdjson.cpp
 CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o -MF CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o.d -o CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o -c /workspaces/JSON/vendor/simdjson/simdjson.cpp
 
 CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.i: cmake_force
@@ -265,9 +293,219 @@ CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/vendor/simdjson/simdjson.cpp -o CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.s
 
+CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o: /workspaces/JSON/include/compression/core/compression_utils.cpp
+CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o -MF CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o.d -o CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o -c /workspaces/JSON/include/compression/core/compression_utils.cpp
+
+CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/core/compression_utils.cpp > CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.i
+
+CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/core/compression_utils.cpp -o CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.s
+
+CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o: /workspaces/JSON/include/compression/algorithms/rle_compression.cpp
+CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building CXX object CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o -MF CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o.d -o CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o -c /workspaces/JSON/include/compression/algorithms/rle_compression.cpp
+
+CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/algorithms/rle_compression.cpp > CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.i
+
+CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/algorithms/rle_compression.cpp -o CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.s
+
+CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o: /workspaces/JSON/include/compression/algorithms/varint_compression.cpp
+CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Building CXX object CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o -MF CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o.d -o CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o -c /workspaces/JSON/include/compression/algorithms/varint_compression.cpp
+
+CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/algorithms/varint_compression.cpp > CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.i
+
+CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/algorithms/varint_compression.cpp -o CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.s
+
+CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o: /workspaces/JSON/include/compression/algorithms/delta_compression.cpp
+CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building CXX object CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o -MF CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o.d -o CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o -c /workspaces/JSON/include/compression/algorithms/delta_compression.cpp
+
+CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/algorithms/delta_compression.cpp > CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.i
+
+CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/algorithms/delta_compression.cpp -o CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.s
+
+CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o: /workspaces/JSON/include/compression/algorithms/bitpacking_compression.cpp
+CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Building CXX object CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o -MF CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o.d -o CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o -c /workspaces/JSON/include/compression/algorithms/bitpacking_compression.cpp
+
+CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/algorithms/bitpacking_compression.cpp > CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.i
+
+CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/algorithms/bitpacking_compression.cpp -o CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.s
+
+CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o: /workspaces/JSON/include/compression/algorithms/dictionary_compression.cpp
+CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Building CXX object CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o -MF CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o.d -o CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o -c /workspaces/JSON/include/compression/algorithms/dictionary_compression.cpp
+
+CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/algorithms/dictionary_compression.cpp > CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.i
+
+CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/algorithms/dictionary_compression.cpp -o CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.s
+
+CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o: /workspaces/JSON/include/compression/backends/zstd_backend.cpp
+CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Building CXX object CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o -MF CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o.d -o CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o -c /workspaces/JSON/include/compression/backends/zstd_backend.cpp
+
+CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/backends/zstd_backend.cpp > CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.i
+
+CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/backends/zstd_backend.cpp -o CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.s
+
+CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o: /workspaces/JSON/include/compression/backends/brotli_backend.cpp
+CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Building CXX object CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o -MF CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o.d -o CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o -c /workspaces/JSON/include/compression/backends/brotli_backend.cpp
+
+CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/backends/brotli_backend.cpp > CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.i
+
+CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/backends/brotli_backend.cpp -o CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.s
+
+CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o: /workspaces/JSON/include/compression/backends/lzma_backend.cpp
+CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Building CXX object CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o -MF CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o.d -o CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o -c /workspaces/JSON/include/compression/backends/lzma_backend.cpp
+
+CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/backends/lzma_backend.cpp > CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.i
+
+CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/backends/lzma_backend.cpp -o CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.s
+
+CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o: /workspaces/JSON/include/compression/backends/lz4_backend.cpp
+CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_26) "Building CXX object CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o -MF CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o.d -o CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o -c /workspaces/JSON/include/compression/backends/lz4_backend.cpp
+
+CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/backends/lz4_backend.cpp > CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.i
+
+CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/backends/lz4_backend.cpp -o CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.s
+
+CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o: /workspaces/JSON/include/compression/backends/snappy_backend.cpp
+CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_27) "Building CXX object CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o -MF CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o.d -o CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o -c /workspaces/JSON/include/compression/backends/snappy_backend.cpp
+
+CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/backends/snappy_backend.cpp > CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.i
+
+CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/backends/snappy_backend.cpp -o CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.s
+
+CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o: /workspaces/JSON/include/compression/type_aware/type_aware_compressor.cpp
+CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_28) "Building CXX object CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o -MF CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o.d -o CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o -c /workspaces/JSON/include/compression/type_aware/type_aware_compressor.cpp
+
+CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/type_aware/type_aware_compressor.cpp > CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.i
+
+CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/type_aware/type_aware_compressor.cpp -o CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.s
+
+CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o: /workspaces/JSON/include/compression/type_aware/layer_compressor.cpp
+CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_29) "Building CXX object CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o -MF CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o.d -o CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o -c /workspaces/JSON/include/compression/type_aware/layer_compressor.cpp
+
+CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/type_aware/layer_compressor.cpp > CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.i
+
+CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/type_aware/layer_compressor.cpp -o CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.s
+
+CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o: /workspaces/JSON/include/compression/type_aware/metadata_compressor.cpp
+CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_30) "Building CXX object CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o -MF CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o.d -o CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o -c /workspaces/JSON/include/compression/type_aware/metadata_compressor.cpp
+
+CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/type_aware/metadata_compressor.cpp > CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.i
+
+CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/type_aware/metadata_compressor.cpp -o CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.s
+
+CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o: /workspaces/JSON/include/compression/factory/compression_factory.cpp
+CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building CXX object CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o -MF CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o.d -o CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o -c /workspaces/JSON/include/compression/factory/compression_factory.cpp
+
+CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/include/compression/factory/compression_factory.cpp > CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.i
+
+CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/include/compression/factory/compression_factory.cpp -o CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.s
+
 # Object files for target json2
 json2_OBJECTS = \
-"CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o" \
+"CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o" \
 "CMakeFiles/json2.dir/src/field_analyzer.cpp.o" \
 "CMakeFiles/json2.dir/src/field_parser.cpp.o" \
 "CMakeFiles/json2.dir/src/variable_dictionary.cpp.o" \
@@ -280,12 +518,29 @@ json2_OBJECTS = \
 "CMakeFiles/json2.dir/src/reconstruct.cpp.o" \
 "CMakeFiles/json2.dir/src/compress.cpp.o" \
 "CMakeFiles/json2.dir/src/chunked_compressor.cpp.o" \
-"CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o"
+"CMakeFiles/json2.dir/src/compress_type_aware.cpp.o" \
+"CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o" \
+"CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o" \
+"CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o"
 
 # External object files for target json2
 json2_EXTERNAL_OBJECTS =
 
-json2: CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o
+json2: CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o
 json2: CMakeFiles/json2.dir/src/field_analyzer.cpp.o
 json2: CMakeFiles/json2.dir/src/field_parser.cpp.o
 json2: CMakeFiles/json2.dir/src/variable_dictionary.cpp.o
@@ -298,10 +553,27 @@ json2: CMakeFiles/json2.dir/src/loudsTotrie.cpp.o
 json2: CMakeFiles/json2.dir/src/reconstruct.cpp.o
 json2: CMakeFiles/json2.dir/src/compress.cpp.o
 json2: CMakeFiles/json2.dir/src/chunked_compressor.cpp.o
+json2: CMakeFiles/json2.dir/src/compress_type_aware.cpp.o
+json2: CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o
 json2: CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o
+json2: CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o
 json2: CMakeFiles/json2.dir/build.make
 json2: CMakeFiles/json2.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Linking CXX executable json2"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_32) "Linking CXX executable json2"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/json2.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

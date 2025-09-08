@@ -11,6 +11,51 @@
 
 namespace json2 {
 
+// Helper function to count placeholder nodes in Trie
+static size_t countPlaceholderNodes(const TrieNode* node) {
+    if (!node) return 0;
+    
+    size_t count = 0;
+    if (node->isPlaceholder()) {
+        count = 1;
+    }
+    
+    // Recursively count placeholder nodes in children
+    for (const auto& child : node->getChildren()) {
+        count += countPlaceholderNodes(child.second.get());
+    }
+    
+    return count;
+}
+
+// Helper function to count total nodes in Trie
+static size_t countTotalNodes(const TrieNode* node) {
+    if (!node) return 0;
+    
+    size_t count = 1; // Count current node
+    
+    // Recursively count nodes in children
+    for (const auto& child : node->getChildren()) {
+        count += countTotalNodes(child.second.get());
+    }
+    
+    return count;
+}
+
+// Helper function to calculate placeholder ratio and check if Trie structure is appropriate
+static std::pair<double, bool> analyzePlaceholderRatio(const Trie& trie) {
+    const TrieNode* root = trie.getRoot();
+    if (!root) return {0.0, true};
+    
+    size_t total_nodes = countTotalNodes(root);
+    size_t placeholder_nodes = countPlaceholderNodes(root);
+    
+    double ratio = (total_nodes > 0) ? static_cast<double>(placeholder_nodes) / total_nodes : 0.0;
+    bool is_appropriate = ratio < 0.05; // Less than 5% indicates appropriate structure
+    
+    return {ratio, is_appropriate};
+}
+
 ChunkedTrieCompressor::ChunkedTrieCompressor(const CompressorConfig& config)
     : config_(config), current_block_count_(0), total_records_(0), original_file_size_(0) {
     std::cerr << "[DEBUG] ChunkedTrieCompressor constructed." << std::endl;
@@ -71,14 +116,49 @@ void ChunkedTrieCompressor::setStructurizeArrays(bool structurize) {
     std::cerr << "[DEBUG] Set structurize arrays: " << (structurize ? "true" : "false") << std::endl;
 }
 
+// ========== Custom Field Ordering Methods ==========
+
+void ChunkedTrieCompressor::setCustomFieldOrder(const std::vector<FieldKey>& custom_order) {
+    config_.custom_field_order = custom_order;
+    if (!custom_order.empty()) {
+        config_.use_custom_order = true;
+        std::cout << "[CONFIG] Custom field order set with " << custom_order.size() << " fields" << std::endl;
+    } else {
+        config_.use_custom_order = false;
+        std::cout << "[CONFIG] Custom field order cleared, will use redundancy calculation" << std::endl;
+    }
+}
+
+void ChunkedTrieCompressor::enableCustomFieldOrder(bool enable) {
+    config_.use_custom_order = enable;
+    if (enable && config_.custom_field_order.empty()) {
+        std::cerr << "[WARNING] Custom field order enabled but no custom order provided" << std::endl;
+    }
+}
+
+bool ChunkedTrieCompressor::isUsingCustomOrder() const {
+    return config_.use_custom_order && !config_.custom_field_order.empty();
+}
+
+const std::vector<FieldKey>& ChunkedTrieCompressor::getCustomFieldOrder() const {
+    return config_.custom_field_order;
+}
+
 void ChunkedTrieCompressor::finalizeCurrentBlock() {
     if (current_block_count_ > 0 && !block_buffer_.empty()) {
         FieldDictionaryManager dict;
         dict.setTimestampFields(timestamp_fields_);
         dict.setStructurizeArrays(config_.structurize_arrays);  // 设置数组处理模式
         std::vector<FieldKey> ordered_fields;
-        // 字段统计只用chunk_stat_buffer_
-        FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);
+        
+        // Choose field analysis method based on configuration
+        if (isUsingCustomOrder()) {
+            // Use custom field order provided by user
+            FieldAnalyzer::analyzeWithCustomOrder(chunk_stat_buffer_, dict, config_.custom_field_order, ordered_fields);
+        } else {
+            // Use traditional redundancy-based field analysis  
+            FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);
+        }
         std::cerr << "[DEBUG] Finalizing block. Record count: " << current_block_count_ << ", Field count: " << ordered_fields.size() << std::endl;
         Trie trie(ordered_fields);
         simdjson::dom::parser parser;
@@ -87,11 +167,21 @@ void ChunkedTrieCompressor::finalizeCurrentBlock() {
         }
         LOUDSTrie louds(ordered_fields);
         louds.buildFromTrie(trie);
+        
+        // Analyze placeholder ratio
+        auto [placeholder_ratio, is_appropriate] = analyzePlaceholderRatio(trie);
+        std::cerr << "[TRIE_STATS] Block " << blocks_memory_.size() 
+                  << ": Placeholder ratio = " << std::fixed << std::setprecision(4) 
+                  << (placeholder_ratio * 100) << "%, Structure " 
+                  << (is_appropriate ? "appropriate" : "needs optimization") << std::endl;
+        
         auto compressed = Compressor::compressLouds(louds, dict, ordered_fields);
         // 直接序列化为内存块
         ChunkedBlockMemory block_mem;
         block_mem.compressed_data = Compressor::saveToMemory(compressed);
         block_mem.original_size = compressed.original_size;
+        block_mem.placeholder_ratio = placeholder_ratio;
+        block_mem.is_structure_appropriate = is_appropriate;
         blocks_memory_.push_back(std::move(block_mem));
         block_buffer_.clear();
         current_block_count_ = 0;
@@ -152,13 +242,26 @@ CompressionStats ChunkedTrieCompressor::getStats() const {
     stats.records_per_block = config_.block_size;
     size_t total_compressed = 0;
     size_t total_core_data = 0;
+    double total_placeholder_ratio = 0.0;
+    size_t appropriate_count = 0;
+    
     for (const auto& block : blocks_memory_) {
         total_compressed += block.compressed_data.size();
         total_core_data += block.original_size;
         stats.block_sizes.push_back(block.compressed_data.size());
+        stats.placeholder_ratios.push_back(block.placeholder_ratio);
+        stats.structure_appropriateness.push_back(block.is_structure_appropriate);
+        total_placeholder_ratio += block.placeholder_ratio;
+        if (block.is_structure_appropriate) {
+            appropriate_count++;
+        }
     }
+    
     stats.total_compressed_size = total_compressed;
     stats.total_core_data_size = total_core_data;
+    stats.avg_placeholder_ratio = blocks_memory_.empty() ? 0.0 : total_placeholder_ratio / blocks_memory_.size();
+    stats.appropriate_blocks = appropriate_count;
+    
     if (total_compressed > 0) {
         stats.compression_ratio = static_cast<double>(stats.original_file_size) / total_compressed;
     } else {

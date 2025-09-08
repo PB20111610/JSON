@@ -4,6 +4,7 @@
 #include "../algorithms/rle_compression.h"
 #include <algorithm>
 #include <numeric>
+#include <stdexcept>
 
 namespace json2 {
 namespace compression {

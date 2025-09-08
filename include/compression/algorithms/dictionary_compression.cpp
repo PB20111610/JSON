@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <climits>
+#include <stdexcept>
 
 namespace json2 {
 namespace compression {

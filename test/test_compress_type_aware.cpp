@@ -222,12 +222,21 @@ int main() {
         
         // Configure type-aware compression with optimized settings
         compression::TypeAwareCompressionConfig config;
+        // Configure comprehensive type-aware compression settings
         config.louds_backend = compression::CompressionBackend::BIT_PACKING;
-        config.dictionary_backend = compression::CompressionBackend::LZMA;
-        config.metadata_backend = compression::CompressionBackend::LZMA;
+        config.dictionary_backend = compression::CompressionBackend::ZSTD;
+        config.metadata_backend = compression::CompressionBackend::ZSTD;
+        
+        // Configure ALL field type backends explicitly for optimal performance
         config.layer_config.int_backend = compression::CompressionBackend::DELTA_VARINT;
         config.layer_config.double_backend = compression::CompressionBackend::DELTA_VARINT;
+        config.layer_config.bool_backend = compression::CompressionBackend::BIT_PACKING;
         config.layer_config.string_backend = compression::CompressionBackend::DELTA_VARINT;
+        config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_DELTA;
+        config.layer_config.logtype_backend = compression::CompressionBackend::DELTA_VARINT;
+        config.layer_config.array_backend = compression::CompressionBackend::RLE;
+        config.layer_config.null_backend = compression::CompressionBackend::BIT_PACKING;
+        
         // Use compression level 3 to match compress.cpp's ZSTD_CLEVEL_DEFAULT
         config.compression_level = 3;
         

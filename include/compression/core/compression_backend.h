@@ -14,9 +14,11 @@ enum class FieldType : uint8_t {
     DOUBLE = 2,       // 双精度浮点数
     BOOL = 3,         // 布尔值
     STRING = 4,       // 字符串
-    ARRAY = 5,        // 数组
-    OBJECT = 6,       // 对象
-    NULL_TYPE = 7     // 空值
+    TIMESTAMP = 5,    // 时间戳
+    LOGTYPE = 6,      // 日志类型
+    ARRAY = 7,        // 数组
+    OBJECT = 8,       // 对象
+    NULL_TYPE = 9     // 空值
 };
 
 /**

@@ -212,9 +212,6 @@ std::vector<FieldKey> Compressor::deserializeMetadata(const std::vector<uint8_t>
 // 使用Zstandard压缩数据
 std::vector<uint8_t> Compressor::compressWithZstd(const std::vector<uint8_t>& data) {
 #ifdef USE_ZSTD
-    // Print ZSTD_CLEVEL_DEFAULT value for verification
-    std::cout << "[DEBUG] ZSTD_CLEVEL_DEFAULT value: " << ZSTD_CLEVEL_DEFAULT << std::endl;
-    
     size_t compressed_size = ZSTD_compressBound(data.size());
     std::vector<uint8_t> compressed_data(compressed_size);
     

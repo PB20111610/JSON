@@ -31,9 +31,11 @@ FieldType mapFieldType(const json2::FieldType& oldType) {
         case json2::FieldType::Bool:
             return FieldType::BOOL;
         case json2::FieldType::String:
-        case json2::FieldType::Timestamp:
-        case json2::FieldType::LogType:
             return FieldType::STRING;
+        case json2::FieldType::Timestamp:
+            return FieldType::TIMESTAMP;
+        case json2::FieldType::LogType:
+            return FieldType::LOGTYPE;
         case json2::FieldType::UnstructuredArray:
             return FieldType::ARRAY;
         case json2::FieldType::Null:
@@ -235,6 +237,10 @@ CompressionBackend TypeAwareCompressor::selectBackendForFieldType(FieldType type
             return config_.layer_config.bool_backend;
         case FieldType::STRING:
             return config_.layer_config.string_backend;
+        case FieldType::TIMESTAMP:
+            return config_.layer_config.timestamp_backend;
+        case FieldType::LOGTYPE:
+            return config_.layer_config.logtype_backend;
         case FieldType::ARRAY:
             return config_.layer_config.array_backend;
         case FieldType::OBJECT:
@@ -281,7 +287,7 @@ std::vector<uint8_t> TypeAwareCompressor::compressWithBackend(const std::vector<
                         std::vector<uint8_t> compressed = delta.compressDouble(values);
                         result.insert(result.end(), compressed.begin(), compressed.end());
                     } else {
-                        // 对于其他类型，假设是编码值序列
+                        // 对于其他类型（String/Timestamp/LogType/Array），假设是编码值序列
                         std::vector<uint32_t> codes = utils::SerializationUtils::bytesToUint32s(data);
                         std::vector<int64_t> int64_codes(codes.begin(), codes.end());
                         std::vector<uint8_t> compressed = algorithms::DeltaCompression::deltaVarintCompress(int64_codes);
@@ -292,7 +298,7 @@ std::vector<uint8_t> TypeAwareCompressor::compressWithBackend(const std::vector<
                 }
                 case CompressionBackend::DELTA_DELTA: {
                     utils::SerializationUtils::writeValue(result, static_cast<uint8_t>(CompressionMethod::DELTA));
-                    if (type == FieldType::INT64) {
+                    if (type == FieldType::INT64 || type == FieldType::TIMESTAMP) {
                         std::vector<int64_t> values = utils::SerializationUtils::bytesToInt64s(data);
                         std::vector<uint8_t> compressed = algorithms::DeltaDeltaCompression::deltaDeltaCompress(values);
                         result.insert(result.end(), compressed.begin(), compressed.end());

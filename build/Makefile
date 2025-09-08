@@ -129,6 +129,366 @@ json2/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/build
 .PHONY : json2/fast
 
+include/compression/algorithms/bitpacking_compression.o: include/compression/algorithms/bitpacking_compression.cpp.o
+.PHONY : include/compression/algorithms/bitpacking_compression.o
+
+# target to build an object file
+include/compression/algorithms/bitpacking_compression.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.o
+.PHONY : include/compression/algorithms/bitpacking_compression.cpp.o
+
+include/compression/algorithms/bitpacking_compression.i: include/compression/algorithms/bitpacking_compression.cpp.i
+.PHONY : include/compression/algorithms/bitpacking_compression.i
+
+# target to preprocess a source file
+include/compression/algorithms/bitpacking_compression.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.i
+.PHONY : include/compression/algorithms/bitpacking_compression.cpp.i
+
+include/compression/algorithms/bitpacking_compression.s: include/compression/algorithms/bitpacking_compression.cpp.s
+.PHONY : include/compression/algorithms/bitpacking_compression.s
+
+# target to generate assembly for a file
+include/compression/algorithms/bitpacking_compression.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/bitpacking_compression.cpp.s
+.PHONY : include/compression/algorithms/bitpacking_compression.cpp.s
+
+include/compression/algorithms/delta_compression.o: include/compression/algorithms/delta_compression.cpp.o
+.PHONY : include/compression/algorithms/delta_compression.o
+
+# target to build an object file
+include/compression/algorithms/delta_compression.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.o
+.PHONY : include/compression/algorithms/delta_compression.cpp.o
+
+include/compression/algorithms/delta_compression.i: include/compression/algorithms/delta_compression.cpp.i
+.PHONY : include/compression/algorithms/delta_compression.i
+
+# target to preprocess a source file
+include/compression/algorithms/delta_compression.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.i
+.PHONY : include/compression/algorithms/delta_compression.cpp.i
+
+include/compression/algorithms/delta_compression.s: include/compression/algorithms/delta_compression.cpp.s
+.PHONY : include/compression/algorithms/delta_compression.s
+
+# target to generate assembly for a file
+include/compression/algorithms/delta_compression.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/delta_compression.cpp.s
+.PHONY : include/compression/algorithms/delta_compression.cpp.s
+
+include/compression/algorithms/dictionary_compression.o: include/compression/algorithms/dictionary_compression.cpp.o
+.PHONY : include/compression/algorithms/dictionary_compression.o
+
+# target to build an object file
+include/compression/algorithms/dictionary_compression.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.o
+.PHONY : include/compression/algorithms/dictionary_compression.cpp.o
+
+include/compression/algorithms/dictionary_compression.i: include/compression/algorithms/dictionary_compression.cpp.i
+.PHONY : include/compression/algorithms/dictionary_compression.i
+
+# target to preprocess a source file
+include/compression/algorithms/dictionary_compression.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.i
+.PHONY : include/compression/algorithms/dictionary_compression.cpp.i
+
+include/compression/algorithms/dictionary_compression.s: include/compression/algorithms/dictionary_compression.cpp.s
+.PHONY : include/compression/algorithms/dictionary_compression.s
+
+# target to generate assembly for a file
+include/compression/algorithms/dictionary_compression.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/dictionary_compression.cpp.s
+.PHONY : include/compression/algorithms/dictionary_compression.cpp.s
+
+include/compression/algorithms/rle_compression.o: include/compression/algorithms/rle_compression.cpp.o
+.PHONY : include/compression/algorithms/rle_compression.o
+
+# target to build an object file
+include/compression/algorithms/rle_compression.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.o
+.PHONY : include/compression/algorithms/rle_compression.cpp.o
+
+include/compression/algorithms/rle_compression.i: include/compression/algorithms/rle_compression.cpp.i
+.PHONY : include/compression/algorithms/rle_compression.i
+
+# target to preprocess a source file
+include/compression/algorithms/rle_compression.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.i
+.PHONY : include/compression/algorithms/rle_compression.cpp.i
+
+include/compression/algorithms/rle_compression.s: include/compression/algorithms/rle_compression.cpp.s
+.PHONY : include/compression/algorithms/rle_compression.s
+
+# target to generate assembly for a file
+include/compression/algorithms/rle_compression.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/rle_compression.cpp.s
+.PHONY : include/compression/algorithms/rle_compression.cpp.s
+
+include/compression/algorithms/varint_compression.o: include/compression/algorithms/varint_compression.cpp.o
+.PHONY : include/compression/algorithms/varint_compression.o
+
+# target to build an object file
+include/compression/algorithms/varint_compression.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.o
+.PHONY : include/compression/algorithms/varint_compression.cpp.o
+
+include/compression/algorithms/varint_compression.i: include/compression/algorithms/varint_compression.cpp.i
+.PHONY : include/compression/algorithms/varint_compression.i
+
+# target to preprocess a source file
+include/compression/algorithms/varint_compression.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.i
+.PHONY : include/compression/algorithms/varint_compression.cpp.i
+
+include/compression/algorithms/varint_compression.s: include/compression/algorithms/varint_compression.cpp.s
+.PHONY : include/compression/algorithms/varint_compression.s
+
+# target to generate assembly for a file
+include/compression/algorithms/varint_compression.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/algorithms/varint_compression.cpp.s
+.PHONY : include/compression/algorithms/varint_compression.cpp.s
+
+include/compression/backends/brotli_backend.o: include/compression/backends/brotli_backend.cpp.o
+.PHONY : include/compression/backends/brotli_backend.o
+
+# target to build an object file
+include/compression/backends/brotli_backend.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.o
+.PHONY : include/compression/backends/brotli_backend.cpp.o
+
+include/compression/backends/brotli_backend.i: include/compression/backends/brotli_backend.cpp.i
+.PHONY : include/compression/backends/brotli_backend.i
+
+# target to preprocess a source file
+include/compression/backends/brotli_backend.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.i
+.PHONY : include/compression/backends/brotli_backend.cpp.i
+
+include/compression/backends/brotli_backend.s: include/compression/backends/brotli_backend.cpp.s
+.PHONY : include/compression/backends/brotli_backend.s
+
+# target to generate assembly for a file
+include/compression/backends/brotli_backend.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/brotli_backend.cpp.s
+.PHONY : include/compression/backends/brotli_backend.cpp.s
+
+include/compression/backends/lz4_backend.o: include/compression/backends/lz4_backend.cpp.o
+.PHONY : include/compression/backends/lz4_backend.o
+
+# target to build an object file
+include/compression/backends/lz4_backend.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.o
+.PHONY : include/compression/backends/lz4_backend.cpp.o
+
+include/compression/backends/lz4_backend.i: include/compression/backends/lz4_backend.cpp.i
+.PHONY : include/compression/backends/lz4_backend.i
+
+# target to preprocess a source file
+include/compression/backends/lz4_backend.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.i
+.PHONY : include/compression/backends/lz4_backend.cpp.i
+
+include/compression/backends/lz4_backend.s: include/compression/backends/lz4_backend.cpp.s
+.PHONY : include/compression/backends/lz4_backend.s
+
+# target to generate assembly for a file
+include/compression/backends/lz4_backend.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/lz4_backend.cpp.s
+.PHONY : include/compression/backends/lz4_backend.cpp.s
+
+include/compression/backends/lzma_backend.o: include/compression/backends/lzma_backend.cpp.o
+.PHONY : include/compression/backends/lzma_backend.o
+
+# target to build an object file
+include/compression/backends/lzma_backend.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.o
+.PHONY : include/compression/backends/lzma_backend.cpp.o
+
+include/compression/backends/lzma_backend.i: include/compression/backends/lzma_backend.cpp.i
+.PHONY : include/compression/backends/lzma_backend.i
+
+# target to preprocess a source file
+include/compression/backends/lzma_backend.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.i
+.PHONY : include/compression/backends/lzma_backend.cpp.i
+
+include/compression/backends/lzma_backend.s: include/compression/backends/lzma_backend.cpp.s
+.PHONY : include/compression/backends/lzma_backend.s
+
+# target to generate assembly for a file
+include/compression/backends/lzma_backend.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/lzma_backend.cpp.s
+.PHONY : include/compression/backends/lzma_backend.cpp.s
+
+include/compression/backends/snappy_backend.o: include/compression/backends/snappy_backend.cpp.o
+.PHONY : include/compression/backends/snappy_backend.o
+
+# target to build an object file
+include/compression/backends/snappy_backend.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.o
+.PHONY : include/compression/backends/snappy_backend.cpp.o
+
+include/compression/backends/snappy_backend.i: include/compression/backends/snappy_backend.cpp.i
+.PHONY : include/compression/backends/snappy_backend.i
+
+# target to preprocess a source file
+include/compression/backends/snappy_backend.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.i
+.PHONY : include/compression/backends/snappy_backend.cpp.i
+
+include/compression/backends/snappy_backend.s: include/compression/backends/snappy_backend.cpp.s
+.PHONY : include/compression/backends/snappy_backend.s
+
+# target to generate assembly for a file
+include/compression/backends/snappy_backend.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/snappy_backend.cpp.s
+.PHONY : include/compression/backends/snappy_backend.cpp.s
+
+include/compression/backends/zstd_backend.o: include/compression/backends/zstd_backend.cpp.o
+.PHONY : include/compression/backends/zstd_backend.o
+
+# target to build an object file
+include/compression/backends/zstd_backend.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.o
+.PHONY : include/compression/backends/zstd_backend.cpp.o
+
+include/compression/backends/zstd_backend.i: include/compression/backends/zstd_backend.cpp.i
+.PHONY : include/compression/backends/zstd_backend.i
+
+# target to preprocess a source file
+include/compression/backends/zstd_backend.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.i
+.PHONY : include/compression/backends/zstd_backend.cpp.i
+
+include/compression/backends/zstd_backend.s: include/compression/backends/zstd_backend.cpp.s
+.PHONY : include/compression/backends/zstd_backend.s
+
+# target to generate assembly for a file
+include/compression/backends/zstd_backend.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/backends/zstd_backend.cpp.s
+.PHONY : include/compression/backends/zstd_backend.cpp.s
+
+include/compression/core/compression_utils.o: include/compression/core/compression_utils.cpp.o
+.PHONY : include/compression/core/compression_utils.o
+
+# target to build an object file
+include/compression/core/compression_utils.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.o
+.PHONY : include/compression/core/compression_utils.cpp.o
+
+include/compression/core/compression_utils.i: include/compression/core/compression_utils.cpp.i
+.PHONY : include/compression/core/compression_utils.i
+
+# target to preprocess a source file
+include/compression/core/compression_utils.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.i
+.PHONY : include/compression/core/compression_utils.cpp.i
+
+include/compression/core/compression_utils.s: include/compression/core/compression_utils.cpp.s
+.PHONY : include/compression/core/compression_utils.s
+
+# target to generate assembly for a file
+include/compression/core/compression_utils.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/core/compression_utils.cpp.s
+.PHONY : include/compression/core/compression_utils.cpp.s
+
+include/compression/factory/compression_factory.o: include/compression/factory/compression_factory.cpp.o
+.PHONY : include/compression/factory/compression_factory.o
+
+# target to build an object file
+include/compression/factory/compression_factory.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.o
+.PHONY : include/compression/factory/compression_factory.cpp.o
+
+include/compression/factory/compression_factory.i: include/compression/factory/compression_factory.cpp.i
+.PHONY : include/compression/factory/compression_factory.i
+
+# target to preprocess a source file
+include/compression/factory/compression_factory.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.i
+.PHONY : include/compression/factory/compression_factory.cpp.i
+
+include/compression/factory/compression_factory.s: include/compression/factory/compression_factory.cpp.s
+.PHONY : include/compression/factory/compression_factory.s
+
+# target to generate assembly for a file
+include/compression/factory/compression_factory.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.s
+.PHONY : include/compression/factory/compression_factory.cpp.s
+
+include/compression/type_aware/layer_compressor.o: include/compression/type_aware/layer_compressor.cpp.o
+.PHONY : include/compression/type_aware/layer_compressor.o
+
+# target to build an object file
+include/compression/type_aware/layer_compressor.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.o
+.PHONY : include/compression/type_aware/layer_compressor.cpp.o
+
+include/compression/type_aware/layer_compressor.i: include/compression/type_aware/layer_compressor.cpp.i
+.PHONY : include/compression/type_aware/layer_compressor.i
+
+# target to preprocess a source file
+include/compression/type_aware/layer_compressor.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.i
+.PHONY : include/compression/type_aware/layer_compressor.cpp.i
+
+include/compression/type_aware/layer_compressor.s: include/compression/type_aware/layer_compressor.cpp.s
+.PHONY : include/compression/type_aware/layer_compressor.s
+
+# target to generate assembly for a file
+include/compression/type_aware/layer_compressor.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/type_aware/layer_compressor.cpp.s
+.PHONY : include/compression/type_aware/layer_compressor.cpp.s
+
+include/compression/type_aware/metadata_compressor.o: include/compression/type_aware/metadata_compressor.cpp.o
+.PHONY : include/compression/type_aware/metadata_compressor.o
+
+# target to build an object file
+include/compression/type_aware/metadata_compressor.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.o
+.PHONY : include/compression/type_aware/metadata_compressor.cpp.o
+
+include/compression/type_aware/metadata_compressor.i: include/compression/type_aware/metadata_compressor.cpp.i
+.PHONY : include/compression/type_aware/metadata_compressor.i
+
+# target to preprocess a source file
+include/compression/type_aware/metadata_compressor.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.i
+.PHONY : include/compression/type_aware/metadata_compressor.cpp.i
+
+include/compression/type_aware/metadata_compressor.s: include/compression/type_aware/metadata_compressor.cpp.s
+.PHONY : include/compression/type_aware/metadata_compressor.s
+
+# target to generate assembly for a file
+include/compression/type_aware/metadata_compressor.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/type_aware/metadata_compressor.cpp.s
+.PHONY : include/compression/type_aware/metadata_compressor.cpp.s
+
+include/compression/type_aware/type_aware_compressor.o: include/compression/type_aware/type_aware_compressor.cpp.o
+.PHONY : include/compression/type_aware/type_aware_compressor.o
+
+# target to build an object file
+include/compression/type_aware/type_aware_compressor.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o
+.PHONY : include/compression/type_aware/type_aware_compressor.cpp.o
+
+include/compression/type_aware/type_aware_compressor.i: include/compression/type_aware/type_aware_compressor.cpp.i
+.PHONY : include/compression/type_aware/type_aware_compressor.i
+
+# target to preprocess a source file
+include/compression/type_aware/type_aware_compressor.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.i
+.PHONY : include/compression/type_aware/type_aware_compressor.cpp.i
+
+include/compression/type_aware/type_aware_compressor.s: include/compression/type_aware/type_aware_compressor.cpp.s
+.PHONY : include/compression/type_aware/type_aware_compressor.s
+
+# target to generate assembly for a file
+include/compression/type_aware/type_aware_compressor.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.s
+.PHONY : include/compression/type_aware/type_aware_compressor.cpp.s
+
 src/chunked_compressor.o: src/chunked_compressor.cpp.o
 .PHONY : src/chunked_compressor.o
 
@@ -153,6 +513,30 @@ src/chunked_compressor.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/chunked_compressor.cpp.s
 .PHONY : src/chunked_compressor.cpp.s
 
+src/chunked_type_aware_compress.o: src/chunked_type_aware_compress.cpp.o
+.PHONY : src/chunked_type_aware_compress.o
+
+# target to build an object file
+src/chunked_type_aware_compress.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o
+.PHONY : src/chunked_type_aware_compress.cpp.o
+
+src/chunked_type_aware_compress.i: src/chunked_type_aware_compress.cpp.i
+.PHONY : src/chunked_type_aware_compress.i
+
+# target to preprocess a source file
+src/chunked_type_aware_compress.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.i
+.PHONY : src/chunked_type_aware_compress.cpp.i
+
+src/chunked_type_aware_compress.s: src/chunked_type_aware_compress.cpp.s
+.PHONY : src/chunked_type_aware_compress.s
+
+# target to generate assembly for a file
+src/chunked_type_aware_compress.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.s
+.PHONY : src/chunked_type_aware_compress.cpp.s
+
 src/compress.o: src/compress.cpp.o
 .PHONY : src/compress.o
 
@@ -176,6 +560,30 @@ src/compress.s: src/compress.cpp.s
 src/compress.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress.cpp.s
 .PHONY : src/compress.cpp.s
+
+src/compress_type_aware.o: src/compress_type_aware.cpp.o
+.PHONY : src/compress_type_aware.o
+
+# target to build an object file
+src/compress_type_aware.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress_type_aware.cpp.o
+.PHONY : src/compress_type_aware.cpp.o
+
+src/compress_type_aware.i: src/compress_type_aware.cpp.i
+.PHONY : src/compress_type_aware.i
+
+# target to preprocess a source file
+src/compress_type_aware.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress_type_aware.cpp.i
+.PHONY : src/compress_type_aware.cpp.i
+
+src/compress_type_aware.s: src/compress_type_aware.cpp.s
+.PHONY : src/compress_type_aware.s
+
+# target to generate assembly for a file
+src/compress_type_aware.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/compress_type_aware.cpp.s
+.PHONY : src/compress_type_aware.cpp.s
 
 src/field_analyzer.o: src/field_analyzer.cpp.o
 .PHONY : src/field_analyzer.o
@@ -417,29 +825,29 @@ src/variable_dictionary.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/variable_dictionary.cpp.s
 .PHONY : src/variable_dictionary.cpp.s
 
-test/test_chunked_compressor.o: test/test_chunked_compressor.cpp.o
-.PHONY : test/test_chunked_compressor.o
+test/test_compress_type_aware.o: test/test_compress_type_aware.cpp.o
+.PHONY : test/test_compress_type_aware.o
 
 # target to build an object file
-test/test_chunked_compressor.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.o
-.PHONY : test/test_chunked_compressor.cpp.o
+test/test_compress_type_aware.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o
+.PHONY : test/test_compress_type_aware.cpp.o
 
-test/test_chunked_compressor.i: test/test_chunked_compressor.cpp.i
-.PHONY : test/test_chunked_compressor.i
+test/test_compress_type_aware.i: test/test_compress_type_aware.cpp.i
+.PHONY : test/test_compress_type_aware.i
 
 # target to preprocess a source file
-test/test_chunked_compressor.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.i
-.PHONY : test/test_chunked_compressor.cpp.i
+test/test_compress_type_aware.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.i
+.PHONY : test/test_compress_type_aware.cpp.i
 
-test/test_chunked_compressor.s: test/test_chunked_compressor.cpp.s
-.PHONY : test/test_chunked_compressor.s
+test/test_compress_type_aware.s: test/test_compress_type_aware.cpp.s
+.PHONY : test/test_compress_type_aware.s
 
 # target to generate assembly for a file
-test/test_chunked_compressor.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_chunked_compressor.cpp.s
-.PHONY : test/test_chunked_compressor.cpp.s
+test/test_compress_type_aware.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.s
+.PHONY : test/test_compress_type_aware.cpp.s
 
 vendor/simdjson/simdjson.o: vendor/simdjson/simdjson.cpp.o
 .PHONY : vendor/simdjson/simdjson.o
@@ -474,12 +882,63 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... json2"
+	@echo "... include/compression/algorithms/bitpacking_compression.o"
+	@echo "... include/compression/algorithms/bitpacking_compression.i"
+	@echo "... include/compression/algorithms/bitpacking_compression.s"
+	@echo "... include/compression/algorithms/delta_compression.o"
+	@echo "... include/compression/algorithms/delta_compression.i"
+	@echo "... include/compression/algorithms/delta_compression.s"
+	@echo "... include/compression/algorithms/dictionary_compression.o"
+	@echo "... include/compression/algorithms/dictionary_compression.i"
+	@echo "... include/compression/algorithms/dictionary_compression.s"
+	@echo "... include/compression/algorithms/rle_compression.o"
+	@echo "... include/compression/algorithms/rle_compression.i"
+	@echo "... include/compression/algorithms/rle_compression.s"
+	@echo "... include/compression/algorithms/varint_compression.o"
+	@echo "... include/compression/algorithms/varint_compression.i"
+	@echo "... include/compression/algorithms/varint_compression.s"
+	@echo "... include/compression/backends/brotli_backend.o"
+	@echo "... include/compression/backends/brotli_backend.i"
+	@echo "... include/compression/backends/brotli_backend.s"
+	@echo "... include/compression/backends/lz4_backend.o"
+	@echo "... include/compression/backends/lz4_backend.i"
+	@echo "... include/compression/backends/lz4_backend.s"
+	@echo "... include/compression/backends/lzma_backend.o"
+	@echo "... include/compression/backends/lzma_backend.i"
+	@echo "... include/compression/backends/lzma_backend.s"
+	@echo "... include/compression/backends/snappy_backend.o"
+	@echo "... include/compression/backends/snappy_backend.i"
+	@echo "... include/compression/backends/snappy_backend.s"
+	@echo "... include/compression/backends/zstd_backend.o"
+	@echo "... include/compression/backends/zstd_backend.i"
+	@echo "... include/compression/backends/zstd_backend.s"
+	@echo "... include/compression/core/compression_utils.o"
+	@echo "... include/compression/core/compression_utils.i"
+	@echo "... include/compression/core/compression_utils.s"
+	@echo "... include/compression/factory/compression_factory.o"
+	@echo "... include/compression/factory/compression_factory.i"
+	@echo "... include/compression/factory/compression_factory.s"
+	@echo "... include/compression/type_aware/layer_compressor.o"
+	@echo "... include/compression/type_aware/layer_compressor.i"
+	@echo "... include/compression/type_aware/layer_compressor.s"
+	@echo "... include/compression/type_aware/metadata_compressor.o"
+	@echo "... include/compression/type_aware/metadata_compressor.i"
+	@echo "... include/compression/type_aware/metadata_compressor.s"
+	@echo "... include/compression/type_aware/type_aware_compressor.o"
+	@echo "... include/compression/type_aware/type_aware_compressor.i"
+	@echo "... include/compression/type_aware/type_aware_compressor.s"
 	@echo "... src/chunked_compressor.o"
 	@echo "... src/chunked_compressor.i"
 	@echo "... src/chunked_compressor.s"
+	@echo "... src/chunked_type_aware_compress.o"
+	@echo "... src/chunked_type_aware_compress.i"
+	@echo "... src/chunked_type_aware_compress.s"
 	@echo "... src/compress.o"
 	@echo "... src/compress.i"
 	@echo "... src/compress.s"
+	@echo "... src/compress_type_aware.o"
+	@echo "... src/compress_type_aware.i"
+	@echo "... src/compress_type_aware.s"
 	@echo "... src/field_analyzer.o"
 	@echo "... src/field_analyzer.i"
 	@echo "... src/field_analyzer.s"
@@ -510,9 +969,9 @@ help:
 	@echo "... src/variable_dictionary.o"
 	@echo "... src/variable_dictionary.i"
 	@echo "... src/variable_dictionary.s"
-	@echo "... test/test_chunked_compressor.o"
-	@echo "... test/test_chunked_compressor.i"
-	@echo "... test/test_chunked_compressor.s"
+	@echo "... test/test_compress_type_aware.o"
+	@echo "... test/test_compress_type_aware.i"
+	@echo "... test/test_compress_type_aware.s"
 	@echo "... vendor/simdjson/simdjson.o"
 	@echo "... vendor/simdjson/simdjson.i"
 	@echo "... vendor/simdjson/simdjson.s"

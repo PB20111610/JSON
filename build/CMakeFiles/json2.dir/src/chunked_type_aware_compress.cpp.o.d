@@ -315,4 +315,5 @@ CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: \
  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
  /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
  /usr/include/x86_64-linux-gnu/bits/uio_lim.h \
- /workspaces/JSON/src/../include/field_analyzer.h
+ /workspaces/JSON/src/../include/field_analyzer.h \
+ /workspaces/JSON/src/../include/field_parser.h

@@ -825,29 +825,29 @@ src/variable_dictionary.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/src/variable_dictionary.cpp.s
 .PHONY : src/variable_dictionary.cpp.s
 
-test/test_compress_type_aware.o: test/test_compress_type_aware.cpp.o
-.PHONY : test/test_compress_type_aware.o
+test/test_chunked_cmp_type_aware-custom.o: test/test_chunked_cmp_type_aware-custom.cpp.o
+.PHONY : test/test_chunked_cmp_type_aware-custom.o
 
 # target to build an object file
-test/test_compress_type_aware.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o
-.PHONY : test/test_compress_type_aware.cpp.o
+test/test_chunked_cmp_type_aware-custom.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o
+.PHONY : test/test_chunked_cmp_type_aware-custom.cpp.o
 
-test/test_compress_type_aware.i: test/test_compress_type_aware.cpp.i
-.PHONY : test/test_compress_type_aware.i
+test/test_chunked_cmp_type_aware-custom.i: test/test_chunked_cmp_type_aware-custom.cpp.i
+.PHONY : test/test_chunked_cmp_type_aware-custom.i
 
 # target to preprocess a source file
-test/test_compress_type_aware.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.i
-.PHONY : test/test_compress_type_aware.cpp.i
+test/test_chunked_cmp_type_aware-custom.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.i
+.PHONY : test/test_chunked_cmp_type_aware-custom.cpp.i
 
-test/test_compress_type_aware.s: test/test_compress_type_aware.cpp.s
-.PHONY : test/test_compress_type_aware.s
+test/test_chunked_cmp_type_aware-custom.s: test/test_chunked_cmp_type_aware-custom.cpp.s
+.PHONY : test/test_chunked_cmp_type_aware-custom.s
 
 # target to generate assembly for a file
-test/test_compress_type_aware.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.s
-.PHONY : test/test_compress_type_aware.cpp.s
+test/test_chunked_cmp_type_aware-custom.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/json2.dir/build.make CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.s
+.PHONY : test/test_chunked_cmp_type_aware-custom.cpp.s
 
 vendor/simdjson/simdjson.o: vendor/simdjson/simdjson.cpp.o
 .PHONY : vendor/simdjson/simdjson.o
@@ -969,9 +969,9 @@ help:
 	@echo "... src/variable_dictionary.o"
 	@echo "... src/variable_dictionary.i"
 	@echo "... src/variable_dictionary.s"
-	@echo "... test/test_compress_type_aware.o"
-	@echo "... test/test_compress_type_aware.i"
-	@echo "... test/test_compress_type_aware.s"
+	@echo "... test/test_chunked_cmp_type_aware-custom.o"
+	@echo "... test/test_chunked_cmp_type_aware-custom.i"
+	@echo "... test/test_chunked_cmp_type_aware-custom.s"
 	@echo "... vendor/simdjson/simdjson.o"
 	@echo "... vendor/simdjson/simdjson.i"
 	@echo "... vendor/simdjson/simdjson.s"

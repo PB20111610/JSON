@@ -259,8 +259,14 @@ CompressedData Compressor::compress(const Trie& trie, const FieldDictionaryManag
     // 1. 构建 LOUDS Trie
     LOUDSTrie louds(trie.getOrderedFields());
     louds.buildFromTrie(trie);
-    // 2. 用 LOUDS Trie 进行压缩
-    return compressLouds(louds, manager, trie.getOrderedFields());
+    
+    // Use dynamically expanded field order from LOUDS
+    auto expanded_field_order = louds.getFieldOrder();
+    std::cout << "[DEBUG] Compressor::compress - field order sizes: initial="
+              << trie.getOrderedFields().size() << ", expanded=" << expanded_field_order.size() << std::endl;
+    
+    // 2. 用 LOUDS Trie 进行压缩，使用扩展后的字段顺序
+    return compressLouds(louds, manager, expanded_field_order);
 }
 
 std::pair<std::unique_ptr<Trie>, std::unique_ptr<FieldDictionaryManager>>

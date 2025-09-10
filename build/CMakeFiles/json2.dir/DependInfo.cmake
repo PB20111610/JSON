@@ -37,7 +37,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/workspaces/JSON/src/timestamp_dictionary.cpp" "CMakeFiles/json2.dir/src/timestamp_dictionary.cpp.o" "gcc" "CMakeFiles/json2.dir/src/timestamp_dictionary.cpp.o.d"
   "/workspaces/JSON/src/trie.cpp" "CMakeFiles/json2.dir/src/trie.cpp.o" "gcc" "CMakeFiles/json2.dir/src/trie.cpp.o.d"
   "/workspaces/JSON/src/variable_dictionary.cpp" "CMakeFiles/json2.dir/src/variable_dictionary.cpp.o" "gcc" "CMakeFiles/json2.dir/src/variable_dictionary.cpp.o.d"
-  "/workspaces/JSON/test/test_compress_type_aware.cpp" "CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o" "gcc" "CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o.d"
+  "/workspaces/JSON/test/test_chunked_cmp_type_aware-custom.cpp" "CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o" "gcc" "CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o.d"
   "/workspaces/JSON/vendor/simdjson/simdjson.cpp" "CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o" "gcc" "CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o.d"
   )
 

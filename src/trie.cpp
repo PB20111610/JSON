@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iostream>
 #include <simdjson.h>
+#include <functional>
 #include "../include/variable_dictionary.h"
 #include "../include/field_parser.h"
 
@@ -54,23 +55,49 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
     // 1. 动态扩展ordered_fields_，支持新字段（使用重新判断的类型）
     if (record.type() == simdjson::dom::element_type::OBJECT) {
         auto obj = record.get_object();
+        // 递归收集嵌套对象字段（展开为 ~a.b.c）
+        std::function<void(const std::string&, simdjson::dom::element)> add_nested_fields = [&](const std::string& prefix, simdjson::dom::element elem) {
+            if (elem.type() != simdjson::dom::element_type::OBJECT) return;
+            auto nested_obj = elem.get_object();
+            for (auto sub : nested_obj) {
+                std::string base_name = prefix.empty() ? std::string(sub.key) : (prefix + "." + std::string(sub.key));
+                std::string nested_name = "~" + base_name;
+                FieldType nested_type = FieldParser::inferFieldType(nested_name, sub.value, manager, false);
+                bool has_same_nested_name_type = false;
+                for (const auto& fk : ordered_fields_) {
+                    if (fk.name == nested_name && fk.type == nested_type) { has_same_nested_name_type = true; break; }
+                }
+                if (!has_same_nested_name_type) {
+                    FieldKey nested_fk{nested_name, nested_type};
+                    ordered_fields_.push_back(nested_fk);
+                    Value nested_val = FieldParser::extractValue(sub.value);
+                    manager.addFieldValue(nested_fk, nested_type, nested_val);
+                }
+                // 继续向下展开
+                if (sub.value.type() == simdjson::dom::element_type::OBJECT) {
+                    add_nested_fields(base_name, sub.value);
+                }
+            }
+        };
         for (auto field : obj) {
             const std::string& field_name = std::string(field.key);
-            // 检查是否已存在
-            bool found = false;
+            // 对同名不同类型：允许追加新类型（按 name+type 去重）
+            FieldType inferred_type = FieldParser::inferFieldType(field_name, field.value, manager, false);
+            bool has_same_name_type = false;
             for (const auto& fk : ordered_fields_) {
-                if (fk.name == field_name) { found = true; break; }
+                if (fk.name == field_name && fk.type == inferred_type) { has_same_name_type = true; break; }
             }
-            if (!found) {
-                // 使用正确的类型推断
-                FieldType inferred_type = FieldParser::inferFieldType(field_name, field.value, manager, false);
+            if (!has_same_name_type) {
                 FieldKey new_fk{field_name, inferred_type};
                 ordered_fields_.push_back(new_fk);
                 
                 // 使用统一的字段值提取
                 Value value = FieldParser::extractValue(field.value);
                 manager.addFieldValue(new_fk, inferred_type, value);
-                // std::cout << "[DEBUG] Trie::insert - Added new field: " << field_name << " with inferred type " << (int)inferred_type << std::endl;
+            }
+            // 对于对象类型，展开其嵌套字段
+            if (field.value.type() == simdjson::dom::element_type::OBJECT) {
+                add_nested_fields(field_name, field.value);
             }
         }
     }
@@ -115,7 +142,6 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
                                     if (current_index == index) {
                                         Value value = FieldParser::extractValue(element);
                                         manager.addFieldValue(key, key.type, value);
-                                        // std::cout << "[DEBUG] Trie::insert - Added structured array field: " << key.name << " with value " << value << std::endl;          
                                         break;
                                     }
                                     current_index++;
@@ -125,6 +151,7 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
                     }
                 } catch (const std::exception& e) {
                     // 如果获取失败，忽略这个字段
+                    std::cout << "[DEBUG] Trie::insert - Failed to add structured array field: " << key.name << ", reason: " << e.what() << std::endl;
                 }
             }
         }
@@ -167,7 +194,6 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
             NodeValue node_value = createNodeValue(key, value, manager);            
             values.push_back(node_value);
         } catch (const simdjson::simdjson_error& e) {
-
             NodeValue node_value = NodeValue(nullptr);
             values.push_back(node_value);
         }
@@ -210,6 +236,7 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
                 }
             } catch (const std::exception& e) {
                 // 如果获取失败，保持 nullptr
+                std::cout << "[DEBUG] Trie::insert - Structured array value missing: " << key.name << ", reason: " << e.what() << std::endl;
             }
         }
     }
@@ -515,34 +542,25 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
         return NodeValue(nullptr);
     }
     
-    // 统一类型推断：对于字符串类型的值，根据实际内容判断类型
-    FieldType actual_type = key.type;
-    if (std::holds_alternative<std::string>(aligned)) {
-        std::string str_val = std::get<std::string>(aligned);
-        // 统一类型推断逻辑（排除数组类型）
-        if (key.type == FieldType::UnstructuredArray) {
-            // 数组类型保持原类型，不进行重新推断
-            actual_type = key.type;
-        } else if (manager.isTimestampField(key.name) || manager.isTimestampValue(str_val)) {
-            actual_type = FieldType::Timestamp;
-        } else if (manager.isLogTemplate(str_val)) {
-            actual_type = FieldType::LogType;
-        } else {
-            actual_type = FieldType::String;
-        }
-    }
-    
-    switch (actual_type) {
+    // 使用传入的字段类型进行编码，避免类型漂移导致的字典不匹配
+    switch (key.type) {
         case FieldType::String:
         case FieldType::Null: {
-            // 如果类型没有改变，直接使用原key
-            if (actual_type == key.type) {
-                return NodeValue(manager.variableDict().getOrAddFieldValue(key, aligned));
+            uint32_t code = 0;
+            if (std::holds_alternative<std::string>(aligned)) {
+                code = manager.addFieldValue(key, key.type, std::get<std::string>(aligned));
+            } else if (std::holds_alternative<std::nullptr_t>(aligned)) {
+                code = manager.addFieldValue(key, key.type, nullptr);
+            } else if (std::holds_alternative<int64_t>(aligned)) {
+                code = manager.addFieldValue(key, key.type, std::get<int64_t>(aligned));
+            } else if (std::holds_alternative<double>(aligned)) {
+                code = manager.addFieldValue(key, key.type, std::get<double>(aligned));
+            } else if (std::holds_alternative<bool>(aligned)) {
+                code = manager.addFieldValue(key, key.type, std::get<bool>(aligned));
             } else {
-                // 使用重新判断的类型创建新的 FieldKey
-                FieldKey actual_key{key.name, actual_type};
-                return NodeValue(manager.variableDict().getOrAddFieldValue(actual_key, aligned));
+                return NodeValue(nullptr);
             }
+            return NodeValue(code);
         }
         case FieldType::Timestamp: {
             // 快速提取字符串值
@@ -561,16 +579,8 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
                     return NodeValue(nullptr);
                 }
             }
-            // 如果类型没有改变，直接使用原key
-            if (actual_type == key.type) {
-                auto encoded = manager.timestampDict().encodeTemplate(key, str_val);
-                return NodeValue(encoded);
-            } else {
-                // 使用重新判断的类型创建新的 FieldKey
-                FieldKey actual_key{key.name, actual_type};
-                auto encoded = manager.timestampDict().encodeTemplate(actual_key, str_val);
-                return NodeValue(encoded);
-            }
+            auto encoded = manager.timestampDict().encodeTemplate(key, str_val);
+            return NodeValue(encoded);
         }
         case FieldType::LogType: {
             // 快速提取字符串值
@@ -589,21 +599,9 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
                     return NodeValue(nullptr);
                 }
             }
-            // std::cout << "[DEBUG] Trie::createNodeValue - LogType field: " << key.name << " = '" << str_val << "'" << std::endl;
             auto [tmpl, vars] = manager.logtypeDict().extractTemplateAndVars(str_val);
-            // std::cout << "[DEBUG] Trie::createNodeValue - extracted template: '" << tmpl << "', vars count: " << vars.size() << std::endl;
-            // 如果类型没有改变，直接使用原key
-            if (actual_type == key.type) {
-                auto encoded = manager.logtypeDict().encodeLog(key, tmpl, vars);
-                // std::cout << "[DEBUG] Trie::createNodeValue - LogType encoded template_id: " << encoded.template_id << std::endl;
-                return NodeValue(encoded);
-            } else {
-                // 使用重新判断的类型创建新的 FieldKey
-                FieldKey actual_key{key.name, actual_type};
-                auto encoded = manager.logtypeDict().encodeLog(actual_key, tmpl, vars);
-                // std::cout << "[DEBUG] Trie::createNodeValue - LogType encoded template_id: " << encoded.template_id << std::endl;
-                return NodeValue(encoded);
-            }
+            auto encoded = manager.logtypeDict().encodeLog(key, tmpl, vars);
+            return NodeValue(encoded);
         }
         case FieldType::Int:
             if (std::holds_alternative<int64_t>(aligned))
@@ -623,7 +621,19 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
         case FieldType::UnstructuredArray:
             // 数组类型作为字符串处理
             if (std::holds_alternative<std::string>(aligned)) {
-                auto code = manager.variableDict().getOrAddFieldValue(key, aligned);
+                uint32_t code = manager.addFieldValue(key, key.type, std::get<std::string>(aligned));
+                return NodeValue(code);
+            } else if (std::holds_alternative<std::nullptr_t>(aligned)) {
+                uint32_t code = manager.addFieldValue(key, key.type, nullptr);
+                return NodeValue(code);
+            } else if (std::holds_alternative<int64_t>(aligned)) {
+                uint32_t code = manager.addFieldValue(key, key.type, std::get<int64_t>(aligned));
+                return NodeValue(code);
+            } else if (std::holds_alternative<double>(aligned)) {
+                uint32_t code = manager.addFieldValue(key, key.type, std::get<double>(aligned));
+                return NodeValue(code);
+            } else if (std::holds_alternative<bool>(aligned)) {
+                uint32_t code = manager.addFieldValue(key, key.type, std::get<bool>(aligned));
                 return NodeValue(code);
             } else {
                 return NodeValue(nullptr);

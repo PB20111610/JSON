@@ -69,19 +69,19 @@ include CMakeFiles/json2.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/json2.dir/flags.make
 
-CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o: CMakeFiles/json2.dir/flags.make
-CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o: /workspaces/JSON/test/test_compress_type_aware.cpp
-CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o -MF CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o.d -o CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o -c /workspaces/JSON/test/test_compress_type_aware.cpp
+CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o: CMakeFiles/json2.dir/flags.make
+CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o: /workspaces/JSON/test/test_chunked_cmp_type_aware-custom.cpp
+CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o: CMakeFiles/json2.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/workspaces/JSON/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o -MF CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o.d -o CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o -c /workspaces/JSON/test/test_chunked_cmp_type_aware-custom.cpp
 
-CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/test/test_compress_type_aware.cpp > CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.i
+CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /workspaces/JSON/test/test_chunked_cmp_type_aware-custom.cpp > CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.i
 
-CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/test/test_compress_type_aware.cpp -o CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.s
+CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /workspaces/JSON/test/test_chunked_cmp_type_aware-custom.cpp -o CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.s
 
 CMakeFiles/json2.dir/src/field_analyzer.cpp.o: CMakeFiles/json2.dir/flags.make
 CMakeFiles/json2.dir/src/field_analyzer.cpp.o: /workspaces/JSON/src/field_analyzer.cpp
@@ -505,7 +505,7 @@ CMakeFiles/json2.dir/include/compression/factory/compression_factory.cpp.s: cmak
 
 # Object files for target json2
 json2_OBJECTS = \
-"CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o" \
+"CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o" \
 "CMakeFiles/json2.dir/src/field_analyzer.cpp.o" \
 "CMakeFiles/json2.dir/src/field_parser.cpp.o" \
 "CMakeFiles/json2.dir/src/variable_dictionary.cpp.o" \
@@ -540,7 +540,7 @@ json2_OBJECTS = \
 # External object files for target json2
 json2_EXTERNAL_OBJECTS =
 
-json2: CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o
+json2: CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware-custom.cpp.o
 json2: CMakeFiles/json2.dir/src/field_analyzer.cpp.o
 json2: CMakeFiles/json2.dir/src/field_parser.cpp.o
 json2: CMakeFiles/json2.dir/src/variable_dictionary.cpp.o

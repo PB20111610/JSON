@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <sstream>
 #include <iostream> // Added for debug output
-#include <cmath> // 添加cmath头文件支持log2函数
+#include <cmath> 
 
 namespace json2 {
 
@@ -73,8 +73,6 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::s
         field_type_seen_[key] = true;
     }
     field_type_unique_values_[key].insert(value);
-    // 新增：记录字段值序列
-    field_value_sequences_[key].push_back(value);
     switch (key.type) {
         case FieldType::Int: {
             int64_t v = std::stoll(value);
@@ -101,10 +99,7 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::s
             return encoded.template_id;
         }
         case FieldType::LogType: {
-            // 直接调用logtype_dict_
-            // std::cout << "[DEBUG] FieldDictionaryManager::addFieldValue - LogType field: " << key.name << " = '" << value << "'" << std::endl;
             auto encoded = logtype_dict_.encodeLog(key, value, {});
-            // std::cout << "[DEBUG] FieldDictionaryManager::addFieldValue - LogType encoded template_id: " << encoded.template_id << std::endl;
             return encoded.template_id;
         }
         case FieldType::Null:
@@ -122,8 +117,6 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
         field_type_seen_[key] = true;
     }
     field_type_unique_values_[key].insert(std::to_string(value));
-    // 新增：记录字段值序列
-    field_value_sequences_[key].push_back(std::to_string(value));
     
     // Delegate to variable dictionary
     return variable_dict_.addFieldValue(key, type, value);
@@ -137,8 +130,6 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
         field_type_seen_[key] = true;
     }
     field_type_unique_values_[key].insert(std::to_string(value));
-    // 新增：记录字段值序列
-    field_value_sequences_[key].push_back(std::to_string(value));
     
     // Delegate to variable dictionary
     return variable_dict_.addFieldValue(key, type, value);
@@ -152,9 +143,6 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
         field_type_seen_[key] = true;
     }
     field_type_unique_values_[key].insert(value ? "true" : "false");
-    // 新增：记录字段值序列
-    field_value_sequences_[key].push_back(value ? "true" : "false");
-    
     // Delegate to variable dictionary
     return variable_dict_.addFieldValue(key, type, value);
 }
@@ -167,8 +155,6 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
         field_type_seen_[key] = true;
     }
     field_type_unique_values_[key].insert("null");
-    // 新增：记录字段值序列
-    field_value_sequences_[key].push_back("null");
     
     // Delegate to variable dictionary
     return variable_dict_.addFieldValue(key, type, value);
@@ -196,8 +182,6 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
         value_str = "null";
     }
     field_type_unique_values_[key].insert(value_str);
-    // 新增：记录字段值序列
-    field_value_sequences_[key].push_back(value_str);
     
     switch (key.type) {
         case FieldType::Int:
@@ -251,9 +235,7 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
             }
         case FieldType::LogType:
             if (std::holds_alternative<std::string>(value)) {
-                // std::cout << "[DEBUG] FieldDictionaryManager::addFieldValue(Value) - LogType field: " << key.name << " = '" << std::get<std::string>(value) << "'" << std::endl;
                 auto encoded = logtype_dict_.encodeLog(key, std::get<std::string>(value), {});
-                // std::cout << "[DEBUG] FieldDictionaryManager::addFieldValue(Value) - LogType encoded template_id: " << encoded.template_id << std::endl;
                 return encoded.template_id;
             } else {
                 return variable_dict_.addFieldValue(key, key.type, "");
@@ -288,15 +270,6 @@ std::set<std::string> FieldDictionaryManager::getAllFields() const {
     }
     return fields;
 }
-// 四种不同的冗余度计算方法实现
-double FieldDictionaryManager::calculateRedundancyA(const FieldKey& key, size_t total, size_t unique) const {
-    double base_redundancy = (unique > 0) ? (double)total / unique : 0.0;
-    
-    // 唯一值惩罚因子：唯一值越多，惩罚越重
-    double uniqueness_penalty = 1.0 / (1.0 + unique * 0.1); // 可调参数
-    
-    return base_redundancy * uniqueness_penalty;
-}
 
 double FieldDictionaryManager::calculateRedundancy(const FieldKey& key, size_t total, size_t unique) const {
     if (unique == 0) return 0.0;
@@ -315,40 +288,6 @@ double FieldDictionaryManager::calculateRedundancy(const FieldKey& key, size_t t
     return (1.0 - normalized_entropy) * total;
 }
 
-double FieldDictionaryManager::calculateRedundancyC(const FieldKey& key, size_t total, size_t unique) const {
-    double base_redundancy = (unique > 0) ? (double)total / unique : 0.0;
-    
-    // Trie分支惩罚：唯一值越多，Trie分支越多
-    double trie_branch_penalty = 1.0 / (1.0 + log2(unique + 1));
-    
-    // 字段重要性权重（可配置）
-    double field_weight = 1.0;
-    if (key.type == FieldType::Timestamp) {
-        field_weight = 0.1; // 时间戳字段降权
-    }
-    
-    return base_redundancy * trie_branch_penalty * field_weight;
-}
-
-double FieldDictionaryManager::calculateRedundancyD(const FieldKey& key, size_t total, size_t unique) const {
-    if (unique == 0) return 0.0;
-    
-    double base_redundancy = (double)total / unique;
-    
-    // 唯一值比例
-    double uniqueness_ratio = (double)unique / total;
-    
-    // 自适应惩罚：唯一值比例越高，惩罚越重
-    double penalty = 1.0 / (1.0 + uniqueness_ratio * 10.0);
-    
-    // 字段类型特殊处理
-    if (key.type == FieldType::Timestamp) {
-        penalty *= 0.5; // 时间戳额外降权
-    }
-    
-    return base_redundancy * penalty;
-}
-
 void FieldDictionaryManager::clear() {
     variable_dict_.clear();
     timestamp_dict_.clear();
@@ -357,7 +296,6 @@ void FieldDictionaryManager::clear() {
     all_fields_and_types_.clear();
     field_type_seen_.clear();
     field_type_unique_values_.clear();
-    field_value_sequences_.clear(); // 新增：清空序列数据
 }
 
 void FieldDictionaryManager::setTimestampFields(const std::vector<std::string>& fields) {
@@ -401,59 +339,6 @@ std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey&
 
 bool FieldDictionaryManager::isNestedField(const std::string& field_name) const {
     return !field_name.empty() && field_name[0] == '~';
-}
-
-// 新增：长度熵计算 H_len = -∑ p(l) log p(l)
-double FieldDictionaryManager::calculateLengthEntropy(const FieldKey& key) const {
-    auto seq_it = field_value_sequences_.find(key);
-    if (seq_it == field_value_sequences_.end() || seq_it->second.empty()) {
-        return 0.0;
-    }
-    
-    const auto& values = seq_it->second;
-    std::unordered_map<size_t, size_t> length_counts;
-    
-    // 统计各种长度的出现次数
-    for (const auto& value : values) {
-        length_counts[value.length()]++;
-    }
-    
-    if (length_counts.size() <= 1) {
-        return 0.0; // 只有一种长度，熵为0
-    }
-    
-    double entropy = 0.0;
-    size_t total = values.size();
-    
-    for (const auto& [length, count] : length_counts) {
-        if (count > 0) {
-            double probability = static_cast<double>(count) / total;
-            entropy -= probability * log2(probability);
-        }
-    }
-    
-    return entropy;
-}
-
-// 新增：相邻自相似度计算 S_adj = 相邻两条日志该字段值长度相同的比例
-double FieldDictionaryManager::calculateAdjacentSelfSimilarity(const FieldKey& key) const {
-    auto seq_it = field_value_sequences_.find(key);
-    if (seq_it == field_value_sequences_.end() || seq_it->second.size() < 2) {
-        return 0.0;
-    }
-    
-    const auto& values = seq_it->second;
-    size_t same_length_pairs = 0;
-    size_t total_pairs = values.size() - 1;
-    
-    // 统计相邻对中长度相同的数量
-    for (size_t i = 0; i < values.size() - 1; ++i) {
-        if (values[i].length() == values[i + 1].length()) {
-            same_length_pairs++;
-        }
-    }
-    
-    return static_cast<double>(same_length_pairs) / total_pairs;
 }
 
 } // namespace json2 

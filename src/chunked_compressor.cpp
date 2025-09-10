@@ -154,7 +154,7 @@ void ChunkedTrieCompressor::finalizeCurrentBlock() {
         // Choose field analysis method based on configuration
         if (isUsingCustomOrder()) {
             // Use custom field order provided by user
-            FieldAnalyzer::analyzeWithCustomOrder(chunk_stat_buffer_, dict, config_.custom_field_order, ordered_fields);
+            FieldAnalyzer::analyzeWithCustomOrder(config_.custom_field_order, ordered_fields);
         } else {
             // Use traditional redundancy-based field analysis  
             FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);
@@ -165,8 +165,28 @@ void ChunkedTrieCompressor::finalizeCurrentBlock() {
         for (const auto& rec : block_buffer_) {
             trie.insert(rec, dict, parser);
         }
+        
+        // Build LOUDS structure
         LOUDSTrie louds(ordered_fields);
         louds.buildFromTrie(trie);
+        
+        // Use dynamically expanded field order from trie/LOUDS
+        auto expanded_field_order = louds.getFieldOrder();
+        std::cout << "[DEBUG] finalizeCurrentBlock - field order sizes: initial="
+                  << ordered_fields.size() << ", expanded=" << expanded_field_order.size() << std::endl;
+
+        // If field order expanded during insertion, rebuild trie with the final order
+        if (expanded_field_order.size() > ordered_fields.size()) {
+            Trie rebuilt_trie(expanded_field_order);
+            simdjson::dom::parser reparser;
+            for (const auto& rec : block_buffer_) {
+                rebuilt_trie.insert(rec, dict, reparser);
+            }
+            // Rebuild LOUDS from rebuilt trie
+            LOUDSTrie rebuilt_louds(expanded_field_order);
+            rebuilt_louds.buildFromTrie(rebuilt_trie);
+            louds = std::move(rebuilt_louds);
+        }
         
         // Analyze placeholder ratio
         auto [placeholder_ratio, is_appropriate] = analyzePlaceholderRatio(trie);
@@ -175,7 +195,8 @@ void ChunkedTrieCompressor::finalizeCurrentBlock() {
                   << (placeholder_ratio * 100) << "%, Structure " 
                   << (is_appropriate ? "appropriate" : "needs optimization") << std::endl;
         
-        auto compressed = Compressor::compressLouds(louds, dict, ordered_fields);
+        // Use expanded field order for compression
+        auto compressed = Compressor::compressLouds(louds, dict, louds.getFieldOrder());
         // 直接序列化为内存块
         ChunkedBlockMemory block_mem;
         block_mem.compressed_data = Compressor::saveToMemory(compressed);

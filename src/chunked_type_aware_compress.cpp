@@ -9,6 +9,7 @@
 #include <set>
 #include <functional>
 #include "../include/field_analyzer.h"
+#include "../include/field_parser.h"
 
 namespace json2 {
 
@@ -161,7 +162,11 @@ void ChunkedTypeAwareCompressor::finalizeCurrentBlock() {
             // Choose field analysis method based on configuration
             if (isUsingCustomOrder()) {
                 // Use custom field order provided by user
-                FieldAnalyzer::analyzeWithCustomOrder(chunk_stat_buffer_, dict, config_.custom_field_order, ordered_fields);
+                FieldAnalyzer::analyzeWithCustomOrder(config_.custom_field_order, ordered_fields);
+                // std::cout << "[DEBUG] Using custom field order, count=" << ordered_fields.size() << std::endl;
+                // for (size_t i = 0; i < std::min<size_t>(ordered_fields.size(), 20); ++i) {
+                //     std::cout << "  [" << i << "] " << ordered_fields[i].name << " (type=" << static_cast<int>(ordered_fields[i].type) << ")" << std::endl;
+                // }
             } else {
                 // Use traditional redundancy-based field analysis
                 FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);
@@ -169,14 +174,43 @@ void ChunkedTypeAwareCompressor::finalizeCurrentBlock() {
             
             // Build trie structure
             Trie trie(ordered_fields);
+            {
+                const auto& of = trie.getOrderedFields();
+            }
             simdjson::dom::parser parser;
             for (const auto& rec : block_buffer_) {
                 trie.insert(rec, dict, parser);
+            }
+            {
+                const auto& of = trie.getOrderedFields();
             }
             
             // Build LOUDS structure
             LOUDSTrie louds(ordered_fields);
             louds.buildFromTrie(trie);
+            // Use dynamically expanded field order from trie/LOUDS
+            auto expanded_field_order = louds.getFieldOrder();
+            std::cout << "[DEBUG] finalizeCurrentBlock - field order sizes: initial="
+                      << ordered_fields.size() << ", expanded=" << expanded_field_order.size() << std::endl;
+            // if (!expanded_field_order.empty()) {
+            //     std::cout << "[DEBUG] Expanded field order (first 20):" << std::endl;
+            //     for (size_t i = 0; i < std::min<size_t>(expanded_field_order.size(), 20); ++i) {
+            //         std::cout << "  [" << i << "] " << expanded_field_order[i].name << " (type=" << static_cast<int>(expanded_field_order[i].type) << ")" << std::endl;
+            //     }
+            // }
+
+            // If field order expanded during insertion, rebuild trie with the final order
+            if (expanded_field_order.size() > ordered_fields.size()) {
+                Trie rebuilt_trie(expanded_field_order);
+                simdjson::dom::parser reparser;
+                for (const auto& rec : block_buffer_) {
+                    rebuilt_trie.insert(rec, dict, reparser);
+                }
+                // Rebuild LOUDS from rebuilt trie
+                LOUDSTrie rebuilt_louds(expanded_field_order);
+                rebuilt_louds.buildFromTrie(rebuilt_trie);
+                louds = std::move(rebuilt_louds);
+            }
             
             // Analyze placeholder ratio
             auto [placeholder_ratio, is_appropriate] = analyzePlaceholderRatio(trie);
@@ -185,8 +219,8 @@ void ChunkedTypeAwareCompressor::finalizeCurrentBlock() {
                       << (placeholder_ratio * 100) << "%, Structure " 
                       << (is_appropriate ? "appropriate" : "needs optimization") << std::endl;
             
-            // Use TypeAware compression instead of regular compression
-            auto compressed = TypeAwareCompressor::compressLouds(louds, dict, ordered_fields, config_.type_aware_config);
+            // Use TypeAware compression with expanded field order
+            auto compressed = TypeAwareCompressor::compressLouds(louds, dict, louds.getFieldOrder(), config_.type_aware_config);
             
             // Save to memory using the existing Compressor for serialization (delegate file I/O operations)
             ChunkedTypeAwareBlockMemory block_mem;

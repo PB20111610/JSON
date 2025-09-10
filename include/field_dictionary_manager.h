@@ -38,15 +38,9 @@ public:
     // 获取所有出现过的字段
     std::set<std::string> getAllFields() const;
 
-    // 统一输出冗余度统计（字段、类型、出现次数、唯一值数、冗余度）
-    void printRedundancyStats(std::ostream& out = std::cout) const;
-
-    // 四种不同的冗余度计算方法
-    double calculateRedundancyA(const FieldKey& key, size_t total, size_t unique) const; // 唯一值惩罚因子
+    // 信息熵基础的冗余度计算方法（当前使用的方法）
     double calculateRedundancy(const FieldKey& key, size_t total, size_t unique) const; // 基于信息熵
-    double calculateRedundancyC(const FieldKey& key, size_t total, size_t unique) const; // Trie结构影响因子
-    double calculateRedundancyD(const FieldKey& key, size_t total, size_t unique) const; // 自适应冗余度（推荐）
-
+    
     // 清空所有字典和计数
     void clear();
 
@@ -77,10 +71,6 @@ public:
     void setStructurizeArrays(bool structurize) { structurize_arrays_ = structurize; }
     bool getStructurizeArrays() const { return structurize_arrays_; }
 
-    // 新增：长度熵和相邻自相似度计算
-    double calculateLengthEntropy(const FieldKey& key) const;
-    double calculateAdjacentSelfSimilarity(const FieldKey& key) const;
-
 private:
     bool structurize_arrays_ = false;  // 默认使用非结构化数组处理
     Dictionary variable_dict_;
@@ -94,8 +84,7 @@ private:
     std::unordered_map<FieldKey, bool> field_type_seen_;
     // 统计每个字段每种类型的唯一值
     std::unordered_map<FieldKey, std::set<std::string>> field_type_unique_values_;
-    // 新增：记录字段值的序列（用于计算长度熵和相邻自相似度）
-    mutable std::unordered_map<FieldKey, std::vector<std::string>> field_value_sequences_;
+    
 };
 
 } // namespace json2 

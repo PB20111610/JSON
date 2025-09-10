@@ -204,7 +204,13 @@ CompressedData TypeAwareCompressor::compress(const Trie& trie, const FieldDictio
         // Build LOUDS trie and delegate to configuration-driven LOUDS compression
         LOUDSTrie louds(trie.getOrderedFields());
         louds.buildFromTrie(trie);
-        return compressLouds(louds, manager, trie.getOrderedFields(), config);
+        
+        // Use dynamically expanded field order from LOUDS
+        auto expanded_field_order = louds.getFieldOrder();
+        std::cout << "[DEBUG] TypeAwareCompressor::compress - field order sizes: initial="
+                  << trie.getOrderedFields().size() << ", expanded=" << expanded_field_order.size() << std::endl;
+        
+        return compressLouds(louds, manager, expanded_field_order, config);
         
     } catch (const std::exception& e) {
         throw std::runtime_error("TypeAware trie compression failed: " + std::string(e.what()));

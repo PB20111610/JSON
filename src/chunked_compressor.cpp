@@ -170,23 +170,10 @@ void ChunkedTrieCompressor::finalizeCurrentBlock() {
         LOUDSTrie louds(ordered_fields);
         louds.buildFromTrie(trie);
         
-        // Use dynamically expanded field order from trie/LOUDS
+        // Use dynamically expanded field order from LOUDS (already contains all fields from trie)
         auto expanded_field_order = louds.getFieldOrder();
         std::cout << "[DEBUG] finalizeCurrentBlock - field order sizes: initial="
                   << ordered_fields.size() << ", expanded=" << expanded_field_order.size() << std::endl;
-
-        // If field order expanded during insertion, rebuild trie with the final order
-        if (expanded_field_order.size() > ordered_fields.size()) {
-            Trie rebuilt_trie(expanded_field_order);
-            simdjson::dom::parser reparser;
-            for (const auto& rec : block_buffer_) {
-                rebuilt_trie.insert(rec, dict, reparser);
-            }
-            // Rebuild LOUDS from rebuilt trie
-            LOUDSTrie rebuilt_louds(expanded_field_order);
-            rebuilt_louds.buildFromTrie(rebuilt_trie);
-            louds = std::move(rebuilt_louds);
-        }
         
         // Analyze placeholder ratio
         auto [placeholder_ratio, is_appropriate] = analyzePlaceholderRatio(trie);

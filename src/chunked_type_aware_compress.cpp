@@ -163,10 +163,6 @@ void ChunkedTypeAwareCompressor::finalizeCurrentBlock() {
             if (isUsingCustomOrder()) {
                 // Use custom field order provided by user
                 FieldAnalyzer::analyzeWithCustomOrder(config_.custom_field_order, ordered_fields);
-                // std::cout << "[DEBUG] Using custom field order, count=" << ordered_fields.size() << std::endl;
-                // for (size_t i = 0; i < std::min<size_t>(ordered_fields.size(), 20); ++i) {
-                //     std::cout << "  [" << i << "] " << ordered_fields[i].name << " (type=" << static_cast<int>(ordered_fields[i].type) << ")" << std::endl;
-                // }
             } else {
                 // Use traditional redundancy-based field analysis
                 FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);
@@ -188,29 +184,11 @@ void ChunkedTypeAwareCompressor::finalizeCurrentBlock() {
             // Build LOUDS structure
             LOUDSTrie louds(ordered_fields);
             louds.buildFromTrie(trie);
-            // Use dynamically expanded field order from trie/LOUDS
+            
+            // Use dynamically expanded field order from LOUDS (already contains all fields from trie)
             auto expanded_field_order = louds.getFieldOrder();
             std::cout << "[DEBUG] finalizeCurrentBlock - field order sizes: initial="
                       << ordered_fields.size() << ", expanded=" << expanded_field_order.size() << std::endl;
-            // if (!expanded_field_order.empty()) {
-            //     std::cout << "[DEBUG] Expanded field order (first 20):" << std::endl;
-            //     for (size_t i = 0; i < std::min<size_t>(expanded_field_order.size(), 20); ++i) {
-            //         std::cout << "  [" << i << "] " << expanded_field_order[i].name << " (type=" << static_cast<int>(expanded_field_order[i].type) << ")" << std::endl;
-            //     }
-            // }
-
-            // If field order expanded during insertion, rebuild trie with the final order
-            if (expanded_field_order.size() > ordered_fields.size()) {
-                Trie rebuilt_trie(expanded_field_order);
-                simdjson::dom::parser reparser;
-                for (const auto& rec : block_buffer_) {
-                    rebuilt_trie.insert(rec, dict, reparser);
-                }
-                // Rebuild LOUDS from rebuilt trie
-                LOUDSTrie rebuilt_louds(expanded_field_order);
-                rebuilt_louds.buildFromTrie(rebuilt_trie);
-                louds = std::move(rebuilt_louds);
-            }
             
             // Analyze placeholder ratio
             auto [placeholder_ratio, is_appropriate] = analyzePlaceholderRatio(trie);

@@ -390,4 +390,92 @@ void FieldParser::parseStructuredArray(simdjson::dom::element array_node,
     }
 }
 
+void FieldParser::extractAllFieldValues(simdjson::dom::element node,
+                                      const std::string& prefix,
+                                      std::unordered_map<FieldKey, std::string>& field_values) {
+    if (node.type() == simdjson::dom::element_type::OBJECT) {
+        for (auto [key, value] : simdjson::dom::object(node)) {
+            std::string field_name = prefix.empty() ? std::string(key) : prefix + "." + std::string(key);
+            
+            if (value.type() == simdjson::dom::element_type::OBJECT) {
+                // 递归处理嵌套对象
+                extractAllFieldValues(value, field_name, field_values);
+            } else if (value.type() == simdjson::dom::element_type::ARRAY) {
+                // 处理数组 - 只提取第一个元素作为代表值
+                auto array = simdjson::dom::array(value);
+                auto it = array.begin();
+                if (it != array.end()) {
+                    extractAllFieldValues(*it, field_name, field_values);
+                }
+            } else {
+                // 处理简单类型
+                std::string value_str;
+                switch (value.type()) {
+                    case simdjson::dom::element_type::STRING: {
+                        auto str_res = value.get_string();
+                        if (!str_res.error()) {
+                            value_str = std::string(str_res.value());
+                        }
+                        break;
+                    }
+                    case simdjson::dom::element_type::INT64: {
+                        auto int_res = value.get_int64();
+                        if (!int_res.error()) {
+                            value_str = std::to_string(int_res.value());
+                        }
+                        break;
+                    }
+                    case simdjson::dom::element_type::UINT64: {
+                        auto uint_res = value.get_uint64();
+                        if (!uint_res.error()) {
+                            value_str = std::to_string(uint_res.value());
+                        }
+                        break;
+                    }
+                    case simdjson::dom::element_type::DOUBLE: {
+                        auto double_res = value.get_double();
+                        if (!double_res.error()) {
+                            value_str = std::to_string(double_res.value());
+                        }
+                        break;
+                    }
+                    case simdjson::dom::element_type::BOOL: {
+                        auto bool_res = value.get_bool();
+                        if (!bool_res.error()) {
+                            value_str = bool_res.value() ? "true" : "false";
+                        }
+                        break;
+                    }
+                    case simdjson::dom::element_type::NULL_VALUE:
+                        value_str = "null";
+                        break;
+                    default:
+                        value_str = "";
+                        break;
+                }
+                
+                // 推断字段类型
+                FieldType type = FieldType::String; // 默认类型
+                if (value.type() == simdjson::dom::element_type::INT64 || 
+                    value.type() == simdjson::dom::element_type::UINT64) {
+                    type = FieldType::Int;
+                } else if (value.type() == simdjson::dom::element_type::DOUBLE) {
+                    type = FieldType::Double;
+                } else if (value.type() == simdjson::dom::element_type::BOOL) {
+                    type = FieldType::Bool;
+                } else if (value.type() == simdjson::dom::element_type::NULL_VALUE) {
+                    type = FieldType::Null;
+                } else if (value.type() == simdjson::dom::element_type::STRING) {
+                    // 对于字符串，需要进一步判断是否为时间戳或日志模板
+                    // 这里简化处理，直接设为String类型
+                    type = FieldType::String;
+                }
+                
+                FieldKey key{field_name, type};
+                field_values[key] = value_str;
+            }
+        }
+    }
+}
+
 } // namespace json2

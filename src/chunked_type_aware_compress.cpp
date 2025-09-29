@@ -152,10 +152,10 @@ void ChunkedTypeAwareCompressor::addRecord(const std::string& record, simdjson::
 void ChunkedTypeAwareCompressor::finalizeCurrentBlock() {
     if (current_block_count_ > 0 && !block_buffer_.empty()) {
         try {
-            // Setup dictionary manager with configuration
-            FieldDictionaryManager dict;
-            dict.setTimestampFields(timestamp_fields_);
-            dict.setStructurizeArrays(config_.structurize_arrays);
+            // Setup analysis dictionary manager (used only for field order analysis)
+            FieldDictionaryManager analysis_dict;
+            analysis_dict.setTimestampFields(timestamp_fields_);
+            analysis_dict.setStructurizeArrays(config_.structurize_arrays);
             
             std::vector<FieldKey> ordered_fields;
             
@@ -164,9 +164,14 @@ void ChunkedTypeAwareCompressor::finalizeCurrentBlock() {
                 // Use custom field order provided by user
                 FieldAnalyzer::analyzeWithCustomOrder(config_.custom_field_order, ordered_fields);
             } else {
-                // Use traditional redundancy-based field analysis
-                FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);
+                // Use traditional redundancy-based field analysis on analysis_dict (sample-only)
+                FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, analysis_dict, ordered_fields);
             }
+            
+            // Create a clean dictionary for actual Trie building and compression
+            FieldDictionaryManager dict;
+            dict.setTimestampFields(timestamp_fields_);
+            dict.setStructurizeArrays(config_.structurize_arrays);
             
             // Build trie structure
             Trie trie(ordered_fields);

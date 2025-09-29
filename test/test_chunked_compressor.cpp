@@ -12,8 +12,8 @@
 using namespace json2;
 
 int main() {
-    const std::string input_file = "test_data.json"; // "../data/ICS-Flow.json"; //
-    const size_t BLOCK_SIZE = 20000; // 每个块处理 20,000 条记录
+    const std::string input_file = "test_data.json"; // "../data/hdfs-full.json"; //
+    const size_t BLOCK_SIZE = 40000; // 每个块处理 50,000 条记录
     std::ifstream fin(input_file);
     if (!fin.is_open()) {
         std::cerr << "Cannot open input file: " << input_file << std::endl;
@@ -34,7 +34,7 @@ int main() {
     ChunkedTrieCompressor compressor(config);
 
     // 设置时间戳字段
-    std::vector<std::string> timestamp_fields = {"Timestamp","request_received","response_delivered", "timestamp", "session_start"};  //"@timestamp",
+    std::vector<std::string> timestamp_fields = {"@timestamp","request_received","response_delivered", "timestamp", "session_start"};  //"@timestamp",
     compressor.setTimestampFields(timestamp_fields);
     
     // 设置数组处理模式（也可以通过setter方法设置）
@@ -85,7 +85,7 @@ int main() {
             // else std::cout << ", dict nullptr!";
             // if (block.trie) std::cout << ", trie valid";
             // else std::cout << ", trie nullptr!";
-            std::cout << std::endl;
+            // std::cout << std::endl;
             std::string json_block;
             try {
                 json_block = reconstructJsonFromTrie(*block.trie, *block.dict);

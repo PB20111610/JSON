@@ -6,10 +6,12 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <tuple>
 #include <vector>
 #include <set>
 #include <optional>
+#include <functional>
 
 namespace json2 {
 
@@ -84,7 +86,7 @@ private:
     std::unordered_map<FieldKey, bool> field_type_seen_;
     // 统计每个字段每种类型的唯一值
     std::unordered_map<FieldKey, std::set<std::string>> field_type_unique_values_;
-    
+      
 };
 
 } // namespace json2 

@@ -7,7 +7,11 @@
 #include <iomanip>
 #include <sstream>
 #include <iostream> // Added for debug output
-#include <cmath> 
+#include <cmath>
+#include <unordered_set>
+#include <functional>
+#include <simdjson.h>
+#include "../include/field_parser.h" 
 
 namespace json2 {
 

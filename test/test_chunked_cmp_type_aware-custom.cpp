@@ -19,6 +19,43 @@
 
 using namespace json2;
 
+// Helper function to count trie nodes recursively
+size_t countTrieNodes(const TrieNode* node) {
+    if (!node) return 0;
+    size_t count = 1; // Current node
+    for (const auto& child : node->getChildren()) {
+        count += countTrieNodes(child.second.get());
+    }
+    return count;
+}
+
+// Helper function to analyze trie structure and print statistics
+void analyzeTrieStructure(const std::string& block_name, const Trie& trie, const FieldDictionaryManager& manager) {
+    const TrieNode* root = trie.getRoot();
+    if (!root) {
+        std::cout << "  " << block_name << ": No trie root found" << std::endl;
+        return;
+    }
+    
+    size_t total_nodes = countTrieNodes(root);
+    size_t field_count = manager.getAllFieldsAndTypes().size();
+    
+    std::cout << "  " << block_name << ":" << std::endl;
+    std::cout << "    Total trie nodes: " << total_nodes << std::endl;
+    std::cout << "    Field count: " << field_count << std::endl;
+    std::cout << "    Nodes per field: " << std::fixed << std::setprecision(2) 
+              << (field_count > 0 ? (double)total_nodes / field_count : 0.0) << std::endl;
+    
+    // Analyze field order used in this trie
+    std::cout << "    Field order (first 5): ";
+    for (size_t i = 0; i < std::min(size_t(5), trie.getOrderedFields().size()); ++i) {
+        std::cout << trie.getOrderedFields()[i].name;
+        if (i < std::min(size_t(5), trie.getOrderedFields().size()) - 1) std::cout << " → ";
+    }
+    if (trie.getOrderedFields().size() > 5) std::cout << " ...";
+    std::cout << std::endl;
+}
+
 // Helper function to convert compression backend enum to readable string
 std::string backendToString(compression::CompressionBackend backend) {
     switch (backend) {
@@ -171,12 +208,12 @@ bool verifyLosslessReconstruction(const std::string& original_file_path, const s
 
 void testChunkedTypeAwareCompression() {
     std::cout << "\n=== Chunked Type-Aware Compression Test ===" << std::endl;
-    const char* DATA_PATH = "test_data.json"; //"../data/bgl-full.json"; //
+    const char* DATA_PATH = "test_data.json"; //"../data/postgresql.log"; //
 
     try {
         // Configure chunked type-aware compressor with production settings
         ChunkedTypeAwareConfig config;
-        config.block_size = 20000;     // Production block size
+        config.block_size = 10000;     // Production block size
         config.chunk_size = 1000;      // Production chunk size for field analysis
         config.structurize_arrays = false;
         
@@ -218,7 +255,7 @@ void testChunkedTypeAwareCompression() {
         
         // Initialize field dictionary manager
         FieldDictionaryManager manager;
-        std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start", "time", "ts"};
+        std::vector<std::string> timestamp_fields = {"request_received", "response_delivered", "timestamp", "session_start"};
         manager.setTimestampFields(timestamp_fields);
         manager.setStructurizeArrays(false);
         
@@ -261,39 +298,42 @@ void testChunkedTypeAwareCompression() {
         
         // Apply custom field ordering based on user requirements
         std::vector<FieldKey> custom_field_order = {
-            {"user", FieldType::String},
-            {"application_name", FieldType::String},
-            {"remote_host", FieldType::String},
-            {"dbname", FieldType::String},
-            {"query_id", FieldType::Int}, 
-            {"backend_type", FieldType::LogType},
-            {"session_start", FieldType::Timestamp},
-            {"error_severity", FieldType::String},
-            {"vxid", FieldType::String},
-            {"session_id", FieldType::String},
-            {"pid", FieldType::Int},
-            {"txid", FieldType::Int},
-            {"timestamp", FieldType::Timestamp},
-            {"line_num", FieldType::Int}, 
-            {"message", FieldType::LogType},
-            {"ps", FieldType::String},
-            {"ps", FieldType::LogType},
-            {"statement", FieldType::String}
+            {"clicked", FieldType::String},
+            {"category", FieldType::String},
+            {"cbf_feature_type", FieldType::String},
+            {"processingTime", FieldType::Int},
+            {"cbf_feature_count", FieldType::Int},
+            {"recommendation_class", FieldType::String},
+            {"request_received", FieldType::Timestamp},
+            {"response_delivered", FieldType::Timestamp},
+            {"cbf_feature_count", FieldType::String},
+            {"recommendation_id", FieldType::Int}
         };
+        // std::vector<FieldKey> custom_field_order = {
+        //     {"application_name", FieldType::String},
+        //     {"backend_type", FieldType::LogType},
+        //     {"dbname", FieldType::String},
+        //     {"query_id", FieldType::Int}, 
+        //     {"remote_host", FieldType::String},
+        //     {"session_start", FieldType::Timestamp},
+        //     {"user", FieldType::String},
+        //     {"vxid", FieldType::String},
+        //     {"session_id", FieldType::String},
+        //     {"pid", FieldType::Int},
+        //     {"txid", FieldType::Int},
+        //     {"line_num", FieldType::Int}, 
+        //     {"error_severity", FieldType::String},
+        //     {"message", FieldType::LogType},
+        //     {"timestamp", FieldType::Timestamp},
+        //     {"ps", FieldType::String},
+        //     {"ps", FieldType::LogType},
+        //     {"statement", FieldType::String}
+        // };
         compressor.setCustomFieldOrder(custom_field_order);
         compressor.enableCustomFieldOrder(true);
         
         std::cout << "\nCustom Field Ordering Applied:" << std::endl;
         std::cout << "Total custom fields: " << custom_field_order.size() << std::endl;
-        std::cout << "Using custom field order: " << (compressor.isUsingCustomOrder() ? "Yes" : "No") << std::endl;
-        
-        // Display the custom field order
-        std::cout << "\nCustom Field Order:" << std::endl;
-        for (size_t i = 0; i < custom_field_order.size(); ++i) {
-            const auto& field = custom_field_order[i];
-            std::cout << "  " << (i + 1) << ". " << field.name << ": " << fieldTypeToString(field.type) << std::endl;
-        }
-        
         std::cout << "\nChunked Configuration:" << std::endl;
         std::cout << "  Block size: " << config.block_size << " records" << std::endl;
         std::cout << "  Chunk size: " << config.chunk_size << " records" << std::endl;
@@ -422,34 +462,34 @@ void testChunkedTypeAwareCompression() {
         std::cout << "Deserialization completed in " << deserialize_duration.count() << " ms" << std::endl;
         std::cout << "Deserialized blocks: " << deserialized_blocks.size() << std::endl;
         
+        // Analyze trie structure for all blocks
+        // std::cout << "\n=== Trie Structure Analysis ===" << std::endl;
+        // size_t total_trie_nodes = 0;
+        // size_t total_blocks_analyzed = 0;
+        
+        // for (size_t block_idx = 0; block_idx < deserialized_blocks.size(); ++block_idx) {
+        //     const auto& block = deserialized_blocks[block_idx];
+        //     if (block.trie && block.dict) {
+        //         analyzeTrieStructure("Block " + std::to_string(block_idx), *block.trie, *block.dict);
+        //         total_trie_nodes += countTrieNodes(block.trie->getRoot());
+        //         total_blocks_analyzed++;
+        //     }
+        // }
+        
+        // if (total_blocks_analyzed > 0) {
+        //     std::cout << "\nOverall Trie Statistics:" << std::endl;
+        //     std::cout << "  Total blocks analyzed: " << total_blocks_analyzed << std::endl;
+        //     std::cout << "  Total trie nodes across all blocks: " << total_trie_nodes << std::endl;
+        //     std::cout << "  Average nodes per block: " << std::fixed << std::setprecision(2) 
+        //               << (double)total_trie_nodes / total_blocks_analyzed << std::endl;
+        // }
+        
         // Verify some data from first block
         if (!deserialized_blocks.empty()) {
             const auto& first_block = deserialized_blocks[0];
+            std::cout << "\n=== First Block Analysis ===" << std::endl;
             std::cout << "First block field count: " << first_block.field_order.size() << std::endl;
             std::cout << "First block configuration level: " << first_block.config.compression_level << std::endl;
-            
-            // Display actual field order used in compression (first 10 fields)
-            // std::cout << "\nActual field order used in first block (top 10):" << std::endl;
-            // size_t display_count = std::min(size_t(10), first_block.field_order.size());
-            // for (size_t i = 0; i < display_count; i++) {
-            //     const auto& field = first_block.field_order[i];
-            //     std::cout << "  " << (i + 1) << ". " << field.name << ": " << fieldTypeToString(field.type) << std::endl;
-            // }
-            // if (first_block.field_order.size() > 10) {
-            //     std::cout << "  ... (" << (first_block.field_order.size() - 10) << " more fields)" << std::endl;
-            // }
-            
-            // Verify if custom ordering was applied by checking first few fields
-            bool custom_order_applied = false;
-            if (first_block.field_order.size() >= 3) {
-                custom_order_applied = (first_block.field_order[0].name == "error_severity" &&
-                                      first_block.field_order[1].name == "vxid" &&
-                                      first_block.field_order[2].name == "query_id");
-            }
-            std::cout << "\nCustom field order verification: " << (custom_order_applied ? "APPLIED" : "NOT APPLIED") << std::endl;
-            if (!custom_order_applied) {
-                std::cout << "Note: Custom order may not match if fields are missing from data or redundancy calculation was used." << std::endl;
-            }
         }
         
         // Reconstruct and verify (following original test pattern)
@@ -503,12 +543,7 @@ void testChunkedTypeAwareCompression() {
         auto total_time = std::chrono::high_resolution_clock::now();
         auto total_duration = std::chrono::duration_cast<std::chrono::milliseconds>(total_time - start_time);
         
-        std::cout << "\n=== Final Results ===" << std::endl;
-        std::cout << "Custom Field Ordering Summary:" << std::endl;
-        std::cout << "  User-defined field priority applied: YES" << std::endl;
-        std::cout << "  Priority fields: error_severity, vxid, query_id, user, ps, statement" << std::endl;
-        std::cout << "  Field ordering method: User-specified (bypasses redundancy calculation)" << std::endl;
-        std::cout << "  Expected benefit: Optimized Trie structure for user's access patterns" << std::endl;
+        std::cout << "\n=== Final Results ===" << std::endl; 
         std::cout << "Total processing time: " << total_duration.count() << " ms" << std::endl;
         std::cout << "Processing speed: " << std::fixed << std::setprecision(2) 
                   << (static_cast<double>(original_file_size) / (1024 * 1024) / (total_duration.count() / 1000.0)) << " MB/s" << std::endl;

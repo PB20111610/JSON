@@ -146,9 +146,10 @@ const std::vector<FieldKey>& ChunkedTrieCompressor::getCustomFieldOrder() const 
 
 void ChunkedTrieCompressor::finalizeCurrentBlock() {
     if (current_block_count_ > 0 && !block_buffer_.empty()) {
-        FieldDictionaryManager dict;
-        dict.setTimestampFields(timestamp_fields_);
-        dict.setStructurizeArrays(config_.structurize_arrays);  // 设置数组处理模式
+        // Use a separate dictionary for analysis to avoid polluting the real compression dictionary
+        FieldDictionaryManager analysis_dict;
+        analysis_dict.setTimestampFields(timestamp_fields_);
+        analysis_dict.setStructurizeArrays(config_.structurize_arrays);  // 设置数组处理模式
         std::vector<FieldKey> ordered_fields;
         
         // Choose field analysis method based on configuration
@@ -156,10 +157,14 @@ void ChunkedTrieCompressor::finalizeCurrentBlock() {
             // Use custom field order provided by user
             FieldAnalyzer::analyzeWithCustomOrder(config_.custom_field_order, ordered_fields);
         } else {
-            // Use traditional redundancy-based field analysis  
-            FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, dict, ordered_fields);
+            // Use traditional redundancy-based field analysis on analysis_dict (sample-only)
+            FieldAnalyzer::analyzeAndSortFields(chunk_stat_buffer_, analysis_dict, ordered_fields);
         }
         std::cerr << "[DEBUG] Finalizing block. Record count: " << current_block_count_ << ", Field count: " << ordered_fields.size() << std::endl;
+        // Create a clean dictionary for actual Trie building and compression
+        FieldDictionaryManager dict;
+        dict.setTimestampFields(timestamp_fields_);
+        dict.setStructurizeArrays(config_.structurize_arrays);  // 设置数组处理模式
         Trie trie(ordered_fields);
         simdjson::dom::parser parser;
         for (const auto& rec : block_buffer_) {

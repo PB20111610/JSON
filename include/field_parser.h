@@ -41,6 +41,11 @@ public:
                                    std::set<FieldKey>& all_fields,
                                    std::unordered_map<FieldKey, size_t>& value_counts,
                                    FieldDictionaryManager& manager);
+
+    // 新增：提取所有字段的值到映射中
+    static void extractAllFieldValues(simdjson::dom::element node,
+                                    const std::string& prefix,
+                                    std::unordered_map<FieldKey, std::string>& field_values);
 };
 
 } // namespace json2 

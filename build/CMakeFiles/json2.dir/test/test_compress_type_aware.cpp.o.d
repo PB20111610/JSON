@@ -1,7 +1,7 @@
-CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: \
- /workspaces/JSON/test/test_chunked_cmp_type_aware.cpp \
+CMakeFiles/json2.dir/test/test_compress_type_aware.cpp.o: \
+ /workspaces/JSON/test/test_compress_type_aware.cpp \
  /usr/include/stdc-predef.h \
- /workspaces/JSON/test/../include/chunked_type_aware_compress.h \
+ /workspaces/JSON/test/../include/field_analyzer.h \
  /usr/include/c++/13/string /usr/include/c++/13/bits/requires_hosted.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/os_defines.h \
@@ -156,16 +156,7 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: \
  /usr/include/c++/13/bits/atomic_lockfree_defines.h \
  /usr/include/c++/13/backward/auto_ptr.h \
  /usr/include/c++/13/pstl/glue_memory_defs.h \
- /usr/include/c++/13/pstl/execution_defs.h /usr/include/c++/13/cstdint \
- /workspaces/JSON/test/../include/trie.h \
- /usr/include/c++/13/unordered_map \
- /usr/include/c++/13/bits/unordered_map.h \
- /usr/include/c++/13/bits/hashtable.h \
- /usr/include/c++/13/bits/hashtable_policy.h \
- /usr/include/c++/13/bits/enable_special_members.h \
- /usr/include/c++/13/bits/node_handle.h \
- /usr/include/c++/13/bits/erase_if.h /usr/include/c++/13/variant \
- /usr/include/c++/13/bits/parse_numbers.h \
+ /usr/include/c++/13/pstl/execution_defs.h \
  /workspaces/JSON/test/../include/field_key.h \
  /usr/include/c++/13/iostream /usr/include/c++/13/ostream \
  /usr/include/c++/13/ios /usr/include/c++/13/bits/ios_base.h \
@@ -184,14 +175,21 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: \
  /usr/include/c++/13/bits/locale_facets.tcc \
  /usr/include/c++/13/bits/basic_ios.tcc \
  /usr/include/c++/13/bits/ostream.tcc /usr/include/c++/13/istream \
- /usr/include/c++/13/bits/istream.tcc \
+ /usr/include/c++/13/bits/istream.tcc /usr/include/c++/13/unordered_map \
+ /usr/include/c++/13/bits/unordered_map.h \
+ /usr/include/c++/13/bits/hashtable.h \
+ /usr/include/c++/13/bits/hashtable_policy.h \
+ /usr/include/c++/13/bits/enable_special_members.h \
+ /usr/include/c++/13/bits/node_handle.h \
+ /usr/include/c++/13/bits/erase_if.h \
+ /workspaces/JSON/test/../include/field_dictionary_manager.h \
  /workspaces/JSON/test/../include/variable_dictionary.h \
- /usr/include/c++/13/optional \
+ /usr/include/c++/13/variant /usr/include/c++/13/bits/parse_numbers.h \
+ /usr/include/c++/13/cstdint /usr/include/c++/13/optional \
  /workspaces/JSON/test/../include/timestamp_dictionary.h \
  /usr/include/c++/13/unordered_set \
  /usr/include/c++/13/bits/unordered_set.h /usr/include/c++/13/limits \
  /usr/include/c++/13/utility /usr/include/c++/13/bits/stl_relops.h \
- /workspaces/JSON/test/../include/field_dictionary_manager.h \
  /workspaces/JSON/test/../include/logtype_dictionary.h \
  /usr/include/c++/13/set /usr/include/c++/13/bits/stl_tree.h \
  /usr/include/c++/13/bits/stl_set.h \
@@ -201,14 +199,7 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: \
  /usr/include/c++/13/bits/algorithmfwd.h \
  /usr/include/c++/13/bits/stl_heap.h \
  /usr/include/c++/13/bits/uniform_int_dist.h \
- /workspaces/JSON/test/../include/compress_type_aware.h \
- /workspaces/JSON/test/../include/compression/type_aware/type_aware_compressor.h \
- /workspaces/JSON/test/../include/compression/type_aware/../factory/compression_factory.h \
- /workspaces/JSON/test/../include/compression/type_aware/../factory/../core/compression_interface.h \
- /workspaces/JSON/test/../include/compression/type_aware/../factory/../core/compression_backend.h \
- /usr/include/c++/13/chrono /usr/include/c++/13/bits/chrono.h \
- /usr/include/c++/13/ratio /usr/include/c++/13/ctime \
- /workspaces/JSON/test/../include/compress.h \
+ /workspaces/JSON/test/../include/trie.h \
  /workspaces/JSON/test/../include/louds.h \
  /usr/include/sdsl/bit_vectors.hpp /usr/include/sdsl/int_vector.hpp \
  /usr/include/sdsl/bits.hpp /usr/include/c++/13/cassert \
@@ -222,7 +213,9 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: \
  /usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/c++io.h \
  /usr/include/c++/13/bits/fstream.tcc /usr/include/sdsl/ram_fs.hpp \
- /usr/include/c++/13/mutex /usr/include/c++/13/bits/std_mutex.h \
+ /usr/include/c++/13/mutex /usr/include/c++/13/bits/chrono.h \
+ /usr/include/c++/13/ratio /usr/include/c++/13/ctime \
+ /usr/include/c++/13/bits/std_mutex.h \
  /usr/include/c++/13/bits/unique_lock.h /usr/include/sdsl/ram_filebuf.hpp \
  /usr/include/sdsl/ram_fs.hpp /usr/include/string.h \
  /usr/include/strings.h /usr/include/c++/13/iomanip \
@@ -259,8 +252,8 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: \
  /usr/include/c++/13/tr1/riemann_zeta.tcc \
  /usr/include/c++/13/bits/random.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/opt_random.h \
- /usr/include/c++/13/bits/random.tcc /usr/include/c++/13/atomic \
- /usr/include/c++/13/algorithm \
+ /usr/include/c++/13/bits/random.tcc /usr/include/c++/13/chrono \
+ /usr/include/c++/13/atomic /usr/include/c++/13/algorithm \
  /usr/include/c++/13/pstl/glue_algorithm_defs.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/include/x86_64-linux-gnu/sys/resource.h \
@@ -304,8 +297,13 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: \
  /usr/include/sdsl/select_support_scan.hpp \
  /usr/include/sdsl/hyb_vector.hpp \
  /workspaces/JSON/test/../include/loudsTotrie.h \
- /workspaces/JSON/test/../include/field_analyzer.h \
  /workspaces/JSON/test/../include/reconstruct.h \
+ /workspaces/JSON/test/../include/compress_type_aware.h \
+ /workspaces/JSON/test/../include/compression/type_aware/type_aware_compressor.h \
+ /workspaces/JSON/test/../include/compression/type_aware/../factory/compression_factory.h \
+ /workspaces/JSON/test/../include/compression/type_aware/../factory/../core/compression_interface.h \
+ /workspaces/JSON/test/../include/compression/type_aware/../factory/../core/compression_backend.h \
+ /workspaces/JSON/test/../include/compress.h \
  /workspaces/JSON/vendor/simdjson/simdjson.h /usr/include/c++/13/version \
  /usr/include/c++/13/cfloat \
  /usr/lib/gcc/x86_64-linux-gnu/13/include/float.h \

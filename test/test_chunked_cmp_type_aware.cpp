@@ -171,7 +171,7 @@ bool verifyLosslessReconstruction(const std::string& original_file_path, const s
 
 void testChunkedTypeAwareCompression() {
     std::cout << "\n=== Chunked Type-Aware Compression Test ===" << std::endl;
-    const char* DATA_PATH = "test_data.json"; //"../data/bgl-full.json"; //
+    const char* DATA_PATH = "test_data.json"; // 
 
     try {
         // Configure chunked type-aware compressor with production settings
@@ -218,7 +218,7 @@ void testChunkedTypeAwareCompression() {
         
         // Initialize field dictionary manager
         FieldDictionaryManager manager;
-        std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start", "time", "ts"};
+        std::vector<std::string> timestamp_fields = {"@timestamp", "request_received", "response_delivered", "timestamp", "session_start"};
         manager.setTimestampFields(timestamp_fields);
         manager.setStructurizeArrays(false);
         
@@ -227,7 +227,7 @@ void testChunkedTypeAwareCompression() {
         if (!in.is_open()) {
             throw std::runtime_error(std::string("Cannot open ") + DATA_PATH + " for reading");
         }
-        
+        std::cout << "Loaded records from " << DATA_PATH << std::endl;
         simdjson::dom::parser parser;
         std::vector<std::string> first_chunk;
         std::string line;

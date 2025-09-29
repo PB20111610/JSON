@@ -168,7 +168,7 @@ int main() {
     const char* DATA_PATH = "test_data.json";
     try {
         FieldDictionaryManager manager;
-        std::vector<std::string> timestamp_fields = {"@timestamp", "timestamp", "session_start"};
+        std::vector<std::string> timestamp_fields = {"request_received", "response_delivered", "timestamp", "session_start"};
         manager.setTimestampFields(timestamp_fields);
         std::vector<FieldKey> fieldOrder;
         std::unique_ptr<Trie> trie = nullptr;

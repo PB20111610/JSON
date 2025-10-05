@@ -151,6 +151,100 @@ std::vector<uint8_t> Compressor::serializeDictionary(const FieldDictionaryManage
     return data;
 }
 
+// ========== 新的分离字典序列化方法 ==========
+
+std::vector<uint8_t> Compressor::serializeStringDictionary(const FieldDictionaryManager& manager) {
+    std::vector<uint8_t> data;
+    
+    // 序列化String字典（按FieldKey分组）
+    std::vector<FieldKey> all_field_keys = manager.getAllFieldsAndTypes();
+    uint32_t string_dict_count = 0;
+    std::vector<std::pair<FieldKey, std::vector<std::string>>> string_dicts;
+    
+    const Dictionary& dict = manager.variableDict();
+    for (size_t fk_idx = 0; fk_idx < all_field_keys.size(); ++fk_idx) {
+        const auto& fk = all_field_keys[fk_idx];
+        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
+            std::vector<std::string> values;
+            size_t count = dict.getFieldValueCount(fk);
+            for (uint32_t code = 1; code <= count; ++code) {
+                auto opt_value = dict.getFieldValueByCode(fk, code);
+                if (opt_value && std::holds_alternative<std::string>(*opt_value)) {
+                    values.push_back(std::get<std::string>(*opt_value));
+                }
+            }
+            if (!values.empty()) {
+                string_dicts.emplace_back(fk, values);
+                ++string_dict_count;
+            }
+        }
+    }
+    
+    writeValue(data, string_dict_count);
+    for (size_t i = 0; i < string_dicts.size(); ++i) {
+        const auto& [fk, values] = string_dicts[i];
+        writeString(data, fk.name);
+        writeValue(data, static_cast<uint32_t>(fk.type));
+        writeVector(data, values);
+    }
+    
+    return data;
+}
+
+std::vector<uint8_t> Compressor::serializeTimestampDictionary(const FieldDictionaryManager& manager) {
+    std::vector<uint8_t> data;
+    
+    // 序列化Timestamp模板和变量列表
+    const auto& ts_dict = manager.timestampDict();
+    
+    // 序列化模板
+    std::vector<std::string> templates;
+    for (uint32_t i = 1; i <= ts_dict.getTemplateCount(); ++i) {
+        std::string template_str = ts_dict.getTemplateById(i);
+        if (!template_str.empty()) {
+            templates.push_back(template_str);
+        }
+    }
+    writeVector(data, templates);
+    
+    // 序列化变量
+    std::vector<std::string> variables;
+    for (uint32_t i = 1; i <= ts_dict.getVariableCount(); ++i) {
+        std::string variable = ts_dict.getVariableByCode(i);
+        if (!variable.empty()) {
+            variables.push_back(variable);
+        }
+    }
+    writeVector(data, variables);
+    
+    return data;
+}
+
+std::vector<uint8_t> Compressor::serializeLogTypeDictionary(const FieldDictionaryManager& manager) {
+    std::vector<uint8_t> data;
+    
+    // 序列化LogType模板和变量字典
+    const auto& log_dict = manager.logtypeDict();
+    
+    // 模板
+    std::vector<std::string> log_templates;
+    for (uint32_t i = 1; i <= log_dict.getLogTypeCount(); ++i) {
+        log_templates.push_back(log_dict.getLogTypeById(i));
+    }
+    writeVector(data, log_templates);
+    
+    // 变量字典
+    std::vector<std::string> log_vars;
+    for (uint32_t i = 1; i < 100000; ++i) { // 假定变量数不会超过10万
+        std::string var = log_dict.decodeVariable(i);
+        if (var.empty()) break;
+        log_vars.push_back(var);
+    }
+    writeVector(data, log_vars);
+    
+    return data;
+}
+
 // ========== 重构：反序列化字典数据 ==========
 std::unique_ptr<FieldDictionaryManager> Compressor::deserializeDictionary(const std::vector<uint8_t>& data) {
     auto manager = std::make_unique<FieldDictionaryManager>();
@@ -194,6 +288,72 @@ std::unique_ptr<FieldDictionaryManager> Compressor::deserializeDictionary(const 
         log_dict.encodeVariable(var);
     }
     return manager;
+}
+
+// ========== 新的分离字典反序列化方法 ==========
+
+void Compressor::deserializeStringDictionary(const std::vector<uint8_t>& data, FieldDictionaryManager& manager) {
+    size_t pos = 0;
+    
+    // 反序列化String字典
+    uint32_t string_dict_count = readValue<uint32_t>(data, pos);
+    for (uint32_t i = 0; i < string_dict_count; ++i) {
+        std::string name = readString(data, pos);
+        FieldType type = static_cast<FieldType>(readValue<uint32_t>(data, pos));
+        std::vector<std::string> values = readVector(data, pos);
+        FieldKey fk{name, type};
+        for (const auto& v : values) {
+            manager.variableDict().addFieldValue(fk, type, v);
+        }
+    }
+}
+
+void Compressor::deserializeTimestampDictionary(const std::vector<uint8_t>& data, FieldDictionaryManager& manager) {
+    size_t pos = 0;
+    
+    // 反序列化Timestamp模板和变量列表
+    std::vector<std::string> templates = readVector(data, pos);
+    std::vector<std::string> variables = readVector(data, pos);
+    
+    auto& ts_dict = manager.timestampDict();
+    
+    // 预注册模板
+    for (const auto& template_str : templates) {
+        if (!template_str.empty()) {
+            ts_dict.registerTemplate(template_str);
+        }
+    }
+    
+    // 预注册变量
+    for (const auto& variable : variables) {
+        if (!variable.empty()) {
+            ts_dict.registerVariable(variable);
+        }
+    }
+}
+
+void Compressor::deserializeLogTypeDictionary(const std::vector<uint8_t>& data, FieldDictionaryManager& manager) {
+    size_t pos = 0;
+    
+    // 反序列化LogType模板和变量字典
+    std::vector<std::string> log_templates = readVector(data, pos);
+    std::vector<std::string> log_vars = readVector(data, pos);
+    
+    auto& log_dict = manager.logtypeDict();
+    
+    // 预注册模板
+    for (const auto& template_str : log_templates) {
+        if (!template_str.empty()) {
+            log_dict.addLogType(template_str);
+        }
+    }
+    
+    // 预注册变量
+    for (const auto& var : log_vars) {
+        if (!var.empty()) {
+            log_dict.encodeVariable(var);
+        }
+    }
 }
 
 // ========== 重构：序列化元数据 ==========
@@ -707,6 +867,349 @@ std::unique_ptr<LOUDSTrie> Compressor::deserializeLoudsTrie(const std::vector<ui
     louds->deserializeBitmap(bv_stream);  // 使用高效的 SDSL 反序列化
     
     return louds;
+}
+
+// ========== 细粒度压缩实现 ==========
+
+GranularCompressedData Compressor::compressGranular(const Trie& trie, const FieldDictionaryManager& manager, bool use_layer_separation) {
+    GranularCompressedData result;
+    result.use_layer_separation = use_layer_separation;
+    
+    // 1. 分别序列化各类字典
+    std::vector<uint8_t> string_dict_raw = serializeStringDictionary(manager);
+    std::vector<uint8_t> timestamp_dict_raw = serializeTimestampDictionary(manager);
+    std::vector<uint8_t> logtype_dict_raw = serializeLogTypeDictionary(manager);
+    
+    // 2. 序列化Trie位图
+    LOUDSTrie louds(trie.getOrderedFields());
+    louds.buildFromTrie(trie);
+    std::ostringstream bv_stream(std::ios::binary);
+    louds.serializeBitmap(bv_stream);
+    std::string bv_str = bv_stream.str();
+    std::vector<uint8_t> trie_raw(bv_str.begin(), bv_str.end());
+    
+    // 3. 序列化分层内容
+    std::vector<uint8_t> layer_raw;
+    if (use_layer_separation) {
+        // 按层分别序列化和压缩
+        size_t layer_count = louds.getLayeredStorage().getLayerCount();
+        result.layer_data_by_level.reserve(layer_count);
+        
+        for (size_t i = 0; i < layer_count; ++i) {
+            std::ostringstream layer_stream(std::ios::binary);
+            louds.getLayeredStorage().serializeLayer(i, layer_stream);
+            std::string layer_str = layer_stream.str();
+            std::vector<uint8_t> layer_data(layer_str.begin(), layer_str.end());
+            std::vector<uint8_t> compressed_layer = compressWithZstd(layer_data);
+            result.layer_data_by_level.push_back(std::move(compressed_layer));
+            
+            // 累计原始大小
+            layer_raw.insert(layer_raw.end(), layer_data.begin(), layer_data.end());
+        }
+    } else {
+        // 整体序列化和压缩
+        // Serialize all layers individually and combine
+        std::ostringstream all_layers_stream(std::ios::binary);
+        louds.getLayeredStorage().serialize(all_layers_stream);
+        std::string all_layers_str = all_layers_stream.str();
+        layer_raw.assign(all_layers_str.begin(), all_layers_str.end());
+        result.layer_data_combined = compressWithZstd(layer_raw);
+    }
+    
+    // 4. 序列化元数据
+    std::vector<uint8_t> metadata_raw = serializeMetadata(trie.getOrderedFields(), manager);
+    
+    // 5. 分别压缩各组件
+    result.trie_bitmap = compressWithZstd(trie_raw);
+    result.string_dict = compressWithZstd(string_dict_raw);
+    result.timestamp_dict = compressWithZstd(timestamp_dict_raw);
+    result.logtype_dict = compressWithZstd(logtype_dict_raw);
+    result.metadata = compressWithZstd(metadata_raw);
+    
+    // 6. 记录原始大小
+    result.trie_original_size = trie_raw.size();
+    result.string_dict_original_size = string_dict_raw.size();
+    result.timestamp_dict_original_size = timestamp_dict_raw.size();
+    result.logtype_dict_original_size = logtype_dict_raw.size();
+    result.layer_original_size = layer_raw.size();
+    result.metadata_original_size = metadata_raw.size();
+    
+    result.original_size = result.trie_original_size + result.string_dict_original_size + 
+                          result.timestamp_dict_original_size + result.logtype_dict_original_size + 
+                          result.layer_original_size + result.metadata_original_size;
+    
+    // 7. 计算压缩后总大小
+    result.compressed_size = result.trie_bitmap.size() + result.string_dict.size() + 
+                            result.timestamp_dict.size() + result.logtype_dict.size() + 
+                            result.metadata.size();
+    
+    if (use_layer_separation) {
+        for (const auto& layer : result.layer_data_by_level) {
+            result.compressed_size += layer.size();
+        }
+    } else {
+        result.compressed_size += result.layer_data_combined.size();
+    }
+    
+    return result;
+}
+
+GranularCompressedData Compressor::compressGranularLouds(const LOUDSTrie& louds, const FieldDictionaryManager& manager, const std::vector<FieldKey>& field_order, bool use_layer_separation) {
+    GranularCompressedData result;
+    result.use_layer_separation = use_layer_separation;
+    
+    // 1. 分别序列化各类字典
+    std::vector<uint8_t> string_dict_raw = serializeStringDictionary(manager);
+    std::vector<uint8_t> timestamp_dict_raw = serializeTimestampDictionary(manager);
+    std::vector<uint8_t> logtype_dict_raw = serializeLogTypeDictionary(manager);
+    
+    // 2. 序列化LOUDS Trie位图
+    std::vector<uint8_t> trie_raw = serializeLoudsTrie(louds);
+    
+    // 3. 序列化分层内容
+    std::vector<uint8_t> layer_raw;
+    if (use_layer_separation) {
+        // 按层分别序列化和压缩
+        size_t layer_count = louds.getLayeredStorage().getLayerCount();
+        result.layer_data_by_level.reserve(layer_count);
+        
+        for (size_t i = 0; i < layer_count; ++i) {
+            std::ostringstream layer_stream(std::ios::binary);
+            louds.getLayeredStorage().serializeLayer(i, layer_stream);
+            std::string layer_str = layer_stream.str();
+            std::vector<uint8_t> layer_data(layer_str.begin(), layer_str.end());
+            std::vector<uint8_t> compressed_layer = compressWithZstd(layer_data);
+            result.layer_data_by_level.push_back(std::move(compressed_layer));
+            
+            // 累计原始大小
+            layer_raw.insert(layer_raw.end(), layer_data.begin(), layer_data.end());
+        }
+    } else {
+        // 整体序列化和压缩
+        // Serialize all layers individually and combine
+        std::ostringstream all_layers_stream(std::ios::binary);
+        louds.getLayeredStorage().serialize(all_layers_stream);
+        std::string all_layers_str = all_layers_stream.str();
+        layer_raw.assign(all_layers_str.begin(), all_layers_str.end());
+        result.layer_data_combined = compressWithZstd(layer_raw);
+    }
+    
+    // 4. 序列化元数据
+    std::vector<uint8_t> metadata_raw = serializeMetadata(field_order, manager);
+    
+    // 5. 分别压缩各组件
+    result.trie_bitmap = compressWithZstd(trie_raw);
+    result.string_dict = compressWithZstd(string_dict_raw);
+    result.timestamp_dict = compressWithZstd(timestamp_dict_raw);
+    result.logtype_dict = compressWithZstd(logtype_dict_raw);
+    result.metadata = compressWithZstd(metadata_raw);
+    
+    // 6. 记录原始大小
+    result.trie_original_size = trie_raw.size();
+    result.string_dict_original_size = string_dict_raw.size();
+    result.timestamp_dict_original_size = timestamp_dict_raw.size();
+    result.logtype_dict_original_size = logtype_dict_raw.size();
+    result.layer_original_size = layer_raw.size();
+    result.metadata_original_size = metadata_raw.size();
+    
+    result.original_size = result.trie_original_size + result.string_dict_original_size + 
+                          result.timestamp_dict_original_size + result.logtype_dict_original_size + 
+                          result.layer_original_size + result.metadata_original_size;
+    
+    // 7. 计算压缩后总大小
+    result.compressed_size = result.trie_bitmap.size() + result.string_dict.size() + 
+                            result.timestamp_dict.size() + result.logtype_dict.size() + 
+                            result.metadata.size();
+    
+    if (use_layer_separation) {
+        for (const auto& layer : result.layer_data_by_level) {
+            result.compressed_size += layer.size();
+        }
+    } else {
+        result.compressed_size += result.layer_data_combined.size();
+    }
+    
+    return result;
+}
+
+double Compressor::getGranularCompressionRatio(const GranularCompressedData& compressed_data) {
+    if (compressed_data.compressed_size == 0) return 0.0;
+    return static_cast<double>(compressed_data.original_size) / compressed_data.compressed_size;
+}
+
+// ========== 细粒度解压缩实现 ==========
+
+std::pair<std::unique_ptr<Trie>, std::unique_ptr<FieldDictionaryManager>> 
+Compressor::decompressGranular(const GranularCompressedData& compressed_data) {
+    // 1. 解压缩元数据
+    std::vector<uint8_t> metadata_raw = decompressWithZstd(compressed_data.metadata);
+    std::vector<FieldKey> field_order = deserializeMetadata(metadata_raw);
+    
+    // 2. 重建字典管理器
+    auto manager = std::make_unique<FieldDictionaryManager>();
+    
+    // 分别解压缩和反序列化各类字典
+    if (!compressed_data.string_dict.empty()) {
+        std::vector<uint8_t> string_dict_raw = decompressWithZstd(compressed_data.string_dict);
+        deserializeStringDictionary(string_dict_raw, *manager);
+    }
+    
+    if (!compressed_data.timestamp_dict.empty()) {
+        std::vector<uint8_t> timestamp_dict_raw = decompressWithZstd(compressed_data.timestamp_dict);
+        deserializeTimestampDictionary(timestamp_dict_raw, *manager);
+    }
+    
+    if (!compressed_data.logtype_dict.empty()) {
+        std::vector<uint8_t> logtype_dict_raw = decompressWithZstd(compressed_data.logtype_dict);
+        deserializeLogTypeDictionary(logtype_dict_raw, *manager);
+    }
+    
+    // 3. 重建LOUDS Trie结构，然后转换为Trie
+    std::vector<uint8_t> trie_raw = decompressWithZstd(compressed_data.trie_bitmap);
+    auto louds = deserializeLoudsTrie(trie_raw, *manager, field_order);
+    
+    // 4. 重建分层内容
+    if (compressed_data.use_layer_separation) {
+        // 按层分别解压缩
+        for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
+            std::vector<uint8_t> layer_data = decompressWithZstd(compressed_data.layer_data_by_level[i]);
+            std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
+            louds->getLayeredStorage().deserializeLayer(i, layer_stream);
+        }
+    } else {
+        // 整体解压缩
+        std::vector<uint8_t> layer_raw = decompressWithZstd(compressed_data.layer_data_combined);
+        std::istringstream all_layers_stream(std::string(layer_raw.begin(), layer_raw.end()), std::ios::binary);
+        louds->getLayeredStorage().deserialize(all_layers_stream);
+    }
+    
+    // 5. 将LOUDS Trie转换为普通Trie
+    auto trie = std::make_unique<Trie>(field_order);
+    loudsToTrie(*louds, *trie);
+    
+    return std::make_pair(std::move(trie), std::move(manager));
+}
+
+std::pair<std::unique_ptr<LOUDSTrie>, std::unique_ptr<FieldDictionaryManager>> 
+Compressor::decompressGranularLouds(const GranularCompressedData& compressed_data) {
+    // 1. 解压缩元数据
+    std::vector<uint8_t> metadata_raw = decompressWithZstd(compressed_data.metadata);
+    std::vector<FieldKey> field_order = deserializeMetadata(metadata_raw);
+    
+    // 2. 重建字典管理器
+    auto manager = std::make_unique<FieldDictionaryManager>();
+    
+    // 分别解压缩和反序列化各类字典
+    if (!compressed_data.string_dict.empty()) {
+        std::vector<uint8_t> string_dict_raw = decompressWithZstd(compressed_data.string_dict);
+        deserializeStringDictionary(string_dict_raw, *manager);
+    }
+    
+    if (!compressed_data.timestamp_dict.empty()) {
+        std::vector<uint8_t> timestamp_dict_raw = decompressWithZstd(compressed_data.timestamp_dict);
+        deserializeTimestampDictionary(timestamp_dict_raw, *manager);
+    }
+    
+    if (!compressed_data.logtype_dict.empty()) {
+        std::vector<uint8_t> logtype_dict_raw = decompressWithZstd(compressed_data.logtype_dict);
+        deserializeLogTypeDictionary(logtype_dict_raw, *manager);
+    }
+    
+    // 3. 重建LOUDS Trie结构
+    std::vector<uint8_t> trie_raw = decompressWithZstd(compressed_data.trie_bitmap);
+    auto louds = deserializeLoudsTrie(trie_raw, *manager, field_order);
+    
+    // 4. 重建分层内容
+    if (compressed_data.use_layer_separation) {
+        // 按层分别解压缩
+        for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
+            std::vector<uint8_t> layer_data = decompressWithZstd(compressed_data.layer_data_by_level[i]);
+            std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
+            louds->getLayeredStorage().deserializeLayer(i, layer_stream);
+        }
+    } else {
+        // 整体解压缩
+        std::vector<uint8_t> layer_raw = decompressWithZstd(compressed_data.layer_data_combined);
+        std::istringstream all_layers_stream(std::string(layer_raw.begin(), layer_raw.end()), std::ios::binary);
+        louds->getLayeredStorage().deserialize(all_layers_stream);
+    }
+    
+    return std::make_pair(std::move(louds), std::move(manager));
+}
+
+// ========== 部分解压缩实现 ==========
+
+std::pair<std::unique_ptr<Trie>, std::unique_ptr<FieldDictionaryManager>> 
+Compressor::decompressGranularPartial(const GranularCompressedData& compressed_data, const PartialDecompressionOptions& options) {
+    std::unique_ptr<Trie> trie = nullptr;
+    auto manager = std::make_unique<FieldDictionaryManager>();
+    
+    // 1. 解压缩元数据（通常需要）
+    std::vector<FieldKey> field_order;
+    if (options.load_metadata) {
+        std::vector<uint8_t> metadata_raw = decompressWithZstd(compressed_data.metadata);
+        field_order = deserializeMetadata(metadata_raw);
+    }
+    
+    // 2. 按需解压缩字典
+    if (options.load_string_dict && !compressed_data.string_dict.empty()) {
+        std::vector<uint8_t> string_dict_raw = decompressWithZstd(compressed_data.string_dict);
+        deserializeStringDictionary(string_dict_raw, *manager);
+    }
+    
+    if (options.load_timestamp_dict && !compressed_data.timestamp_dict.empty()) {
+        std::vector<uint8_t> timestamp_dict_raw = decompressWithZstd(compressed_data.timestamp_dict);
+        deserializeTimestampDictionary(timestamp_dict_raw, *manager);
+    }
+    
+    if (options.load_logtype_dict && !compressed_data.logtype_dict.empty()) {
+        std::vector<uint8_t> logtype_dict_raw = decompressWithZstd(compressed_data.logtype_dict);
+        deserializeLogTypeDictionary(logtype_dict_raw, *manager);
+    }
+    
+    // 3. 按需重建Trie结构
+    std::unique_ptr<LOUDSTrie> louds = nullptr;
+    if (options.load_trie && !field_order.empty()) {
+        // 先重建LOUDS Trie结构
+        std::vector<uint8_t> trie_raw = decompressWithZstd(compressed_data.trie_bitmap);
+        louds = deserializeLoudsTrie(trie_raw, *manager, field_order);
+    }
+    
+    // 4. 按需重建分层内容
+    if (options.load_layers && louds) {
+        if (compressed_data.use_layer_separation) {
+            // 按指定层解压缩
+            if (!options.specific_layers.empty()) {
+                for (size_t layer_idx : options.specific_layers) {
+                    if (layer_idx < compressed_data.layer_data_by_level.size()) {
+                        std::vector<uint8_t> layer_data = decompressWithZstd(compressed_data.layer_data_by_level[layer_idx]);
+                        std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
+                        louds->getLayeredStorage().deserializeLayer(layer_idx, layer_stream);
+                    }
+                }
+            } else {
+                // 解压缩所有层
+                for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
+                    std::vector<uint8_t> layer_data = decompressWithZstd(compressed_data.layer_data_by_level[i]);
+                    std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
+                    louds->getLayeredStorage().deserializeLayer(i, layer_stream);
+                }
+            }
+        } else {
+            // 整体解压缩
+            std::vector<uint8_t> layer_raw = decompressWithZstd(compressed_data.layer_data_combined);
+            std::istringstream all_layers_stream(std::string(layer_raw.begin(), layer_raw.end()), std::ios::binary);
+            louds->getLayeredStorage().deserialize(all_layers_stream);
+        }
+    }
+    
+    // 5. 如果需要Trie，将LOUDS Trie转换为普通Trie
+    if (louds && options.load_trie) {
+        trie = std::make_unique<Trie>(field_order);
+        loudsToTrie(*louds, *trie);
+    }
+    
+    return std::make_pair(std::move(trie), std::move(manager));
 }
 
 } // namespace json2

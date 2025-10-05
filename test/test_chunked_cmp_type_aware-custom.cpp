@@ -435,20 +435,18 @@ void testChunkedTypeAwareCompression() {
             std::cout << "File compression ratio: " << std::fixed << std::setprecision(2) << file_ratio << ":1" << std::endl;
             std::cout << "Data compression ratio: " << std::fixed << std::setprecision(2) << data_ratio << ":1" << std::endl;
         }
-        
-        if (!stats.block_compression_ratios.empty()) {
-            std::cout << "\nPer-block compression ratios:" << std::endl;
-            double avg_ratio = 0.0;
-            for (size_t i = 0; i < std::min(size_t(10), stats.block_compression_ratios.size()); i++) {
-                std::cout << "  Block " << i << ": " << std::fixed << std::setprecision(3) 
-                          << stats.block_compression_ratios[i] << " (size: " << stats.block_sizes[i] << " bytes)" << std::endl;
-                avg_ratio += stats.block_compression_ratios[i];
+        // 输出每块的压缩后大小
+        if (!stats.block_sizes.empty()) {
+            std::cout << "\nPer-block compressed sizes:" << std::endl;
+            size_t total = 0;
+            for (size_t i = 0; i < std::min(size_t(10), stats.block_sizes.size()); i++) {
+                std::cout << "  Block " << i << ": " << stats.block_sizes[i] << " bytes" << std::endl;
+                total += stats.block_sizes[i];
             }
-            if (stats.block_compression_ratios.size() > 10) {
+            if (stats.block_sizes.size() > 10) {
                 std::cout << "  ... (showing first 10 blocks only)" << std::endl;
             }
-            avg_ratio /= stats.block_compression_ratios.size();
-            std::cout << "Average block compression ratio: " << std::fixed << std::setprecision(3) << avg_ratio << std::endl;
+            std::cout << "Sum of shown block sizes: " << total << " bytes" << std::endl;
         }
         
         // Test deserialization

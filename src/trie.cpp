@@ -87,16 +87,16 @@ void Trie::insert(const std::string& record_string, FieldDictionaryManager& mana
             for (const auto& fk : ordered_fields_) {
                 if (fk.name == field_name && fk.type == inferred_type) { has_same_name_type = true; break; }
             }
-            if (!has_same_name_type) {
-                FieldKey new_fk{field_name, inferred_type};
-                ordered_fields_.push_back(new_fk);
-                
-                // 使用统一的字段值提取
-                Value value = FieldParser::extractValue(field.value);
-                manager.addFieldValue(new_fk, inferred_type, value);
-            }
-            // 对于对象类型，展开其嵌套字段
-            if (field.value.type() == simdjson::dom::element_type::OBJECT) {
+            // 只为非OBJECT类型字段扩展ordered_fields_
+            if (field.value.type() != simdjson::dom::element_type::OBJECT) {
+                if (!has_same_name_type) {
+                    FieldKey new_fk{field_name, inferred_type};
+                    ordered_fields_.push_back(new_fk);
+                    // 使用统一的字段值提取
+                    Value value = FieldParser::extractValue(field.value);
+                    manager.addFieldValue(new_fk, inferred_type, value);
+                }
+            } else { // 对于对象类型，递归展开嵌套字段
                 add_nested_fields(field_name, field.value);
             }
         }

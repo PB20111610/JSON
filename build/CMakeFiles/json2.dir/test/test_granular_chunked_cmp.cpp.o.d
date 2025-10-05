@@ -1,6 +1,7 @@
-CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: \
- /workspaces/JSON/src/chunked_compressor.cpp /usr/include/stdc-predef.h \
- /workspaces/JSON/src/../include/chunked_compressor.h \
+CMakeFiles/json2.dir/test/test_granular_chunked_cmp.cpp.o: \
+ /workspaces/JSON/test/test_granular_chunked_cmp.cpp \
+ /usr/include/stdc-predef.h \
+ /workspaces/JSON/test/../include/chunked_compressor.h \
  /usr/include/c++/13/string /usr/include/c++/13/bits/requires_hosted.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/os_defines.h \
@@ -156,7 +157,8 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: \
  /usr/include/c++/13/backward/auto_ptr.h \
  /usr/include/c++/13/pstl/glue_memory_defs.h \
  /usr/include/c++/13/pstl/execution_defs.h /usr/include/c++/13/cstdint \
- /workspaces/JSON/src/../include/trie.h /usr/include/c++/13/unordered_map \
+ /workspaces/JSON/test/../include/trie.h \
+ /usr/include/c++/13/unordered_map \
  /usr/include/c++/13/bits/unordered_map.h \
  /usr/include/c++/13/bits/hashtable.h \
  /usr/include/c++/13/bits/hashtable_policy.h \
@@ -164,9 +166,9 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: \
  /usr/include/c++/13/bits/node_handle.h \
  /usr/include/c++/13/bits/erase_if.h /usr/include/c++/13/variant \
  /usr/include/c++/13/bits/parse_numbers.h \
- /workspaces/JSON/src/../include/field_key.h /usr/include/c++/13/iostream \
- /usr/include/c++/13/ostream /usr/include/c++/13/ios \
- /usr/include/c++/13/bits/ios_base.h \
+ /workspaces/JSON/test/../include/field_key.h \
+ /usr/include/c++/13/iostream /usr/include/c++/13/ostream \
+ /usr/include/c++/13/ios /usr/include/c++/13/bits/ios_base.h \
  /usr/include/c++/13/bits/locale_classes.h \
  /usr/include/c++/13/bits/locale_classes.tcc \
  /usr/include/c++/13/system_error \
@@ -183,14 +185,14 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: \
  /usr/include/c++/13/bits/basic_ios.tcc \
  /usr/include/c++/13/bits/ostream.tcc /usr/include/c++/13/istream \
  /usr/include/c++/13/bits/istream.tcc \
- /workspaces/JSON/src/../include/variable_dictionary.h \
+ /workspaces/JSON/test/../include/variable_dictionary.h \
  /usr/include/c++/13/optional \
- /workspaces/JSON/src/../include/timestamp_dictionary.h \
+ /workspaces/JSON/test/../include/timestamp_dictionary.h \
  /usr/include/c++/13/unordered_set \
  /usr/include/c++/13/bits/unordered_set.h /usr/include/c++/13/limits \
  /usr/include/c++/13/utility /usr/include/c++/13/bits/stl_relops.h \
- /workspaces/JSON/src/../include/field_dictionary_manager.h \
- /workspaces/JSON/src/../include/logtype_dictionary.h \
+ /workspaces/JSON/test/../include/field_dictionary_manager.h \
+ /workspaces/JSON/test/../include/logtype_dictionary.h \
  /usr/include/c++/13/set /usr/include/c++/13/bits/stl_tree.h \
  /usr/include/c++/13/bits/stl_set.h \
  /usr/include/c++/13/bits/stl_multiset.h /usr/include/c++/13/functional \
@@ -199,8 +201,8 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: \
  /usr/include/c++/13/bits/algorithmfwd.h \
  /usr/include/c++/13/bits/stl_heap.h \
  /usr/include/c++/13/bits/uniform_int_dist.h \
- /workspaces/JSON/src/../include/compress.h \
- /workspaces/JSON/src/../include/louds.h \
+ /workspaces/JSON/test/../include/compress.h \
+ /workspaces/JSON/test/../include/louds.h \
  /usr/include/sdsl/bit_vectors.hpp /usr/include/sdsl/int_vector.hpp \
  /usr/include/sdsl/bits.hpp /usr/include/c++/13/cassert \
  /usr/include/assert.h /usr/include/sdsl/structure_tree.hpp \
@@ -296,7 +298,8 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: \
  /usr/include/sdsl/rank_support_scan.hpp \
  /usr/include/sdsl/select_support_scan.hpp \
  /usr/include/sdsl/hyb_vector.hpp \
- /workspaces/JSON/src/../include/loudsTotrie.h \
+ /workspaces/JSON/test/../include/loudsTotrie.h \
+ /workspaces/JSON/test/../include/reconstruct.h \
  /workspaces/JSON/vendor/simdjson/simdjson.h /usr/include/c++/13/version \
  /usr/include/c++/13/cfloat \
  /usr/lib/gcc/x86_64-linux-gnu/13/include/float.h \
@@ -309,7 +312,6 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: \
  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
  /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
  /usr/include/x86_64-linux-gnu/bits/uio_lim.h \
- /workspaces/JSON/src/../include/field_analyzer.h \
  /usr/include/x86_64-linux-gnu/sys/stat.h \
  /usr/include/x86_64-linux-gnu/bits/statx.h /usr/include/linux/stat.h \
  /usr/include/linux/types.h /usr/include/x86_64-linux-gnu/asm/types.h \

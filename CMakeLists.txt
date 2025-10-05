@@ -16,7 +16,9 @@ add_definitions(-DUSE_ZSTD)
 
 # Add our executable and the library sources
 add_executable(json2
-    test/test_chunked_cmp_type_aware.cpp
+    # test/test_granular_type_aware_chunked_cmp.cpp
+    test/test_granular_chunked_cmp.cpp
+    # test/test_chunked_cmp_type_aware.cpp
     # test/test_compress_type_aware.cpp
     # test/test_chunked_compressor.cpp
     # test/main_compress.cpp

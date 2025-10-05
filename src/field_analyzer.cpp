@@ -62,9 +62,12 @@ void collectBlockFieldStats(simdjson::dom::element node,
                            FieldDictionaryManager& manager) {
     switch (node.type()) {
         case simdjson::dom::element_type::OBJECT:
+            // 对于对象类型，只递归处理嵌套字段，不创建扁平字段
             for (simdjson::dom::key_value_pair field : node.get_object().value()) {
                 std::string full_name = prefix.empty() ? std::string(field.key) : prefix + "." + std::string(field.key);
-                collectBlockFieldStats(field.value, full_name, depth+1, block_stats, manager);
+                // 只有嵌套字段（depth > 0 或 prefix 不为空）才添加 ~ 前缀
+                std::string nested_name = (depth > 0 || !prefix.empty()) ? ("~" + full_name) : full_name;
+                collectBlockFieldStats(field.value, nested_name, depth+1, block_stats, manager);
             }
             break;
         case simdjson::dom::element_type::ARRAY: {

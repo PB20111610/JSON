@@ -73,6 +73,12 @@ std::string reconstructJsonFromTrie(const Trie& trie, const FieldDictionaryManag
     const auto& ordered_fields = trie.getOrderedFields();
     size_t field_count = ordered_fields.size();
     
+    // 调试输出：重建时的字段序列
+    // std::cerr << "[DEBUG] 重建时字段序列:" << std::endl;
+    // for (size_t i = 0; i < ordered_fields.size(); ++i) {
+    //     std::cerr << "  [" << i << "] " << ordered_fields[i].name << " (type=" << static_cast<int>(ordered_fields[i].type) << ")" << std::endl;
+    // }
+    
     // 递归遍历Trie，按顺序重建每条记录
     std::function<void(const TrieNode*, std::vector<std::pair<FieldKey, std::string>>&, size_t)> traverse;
     traverse = [&](const TrieNode* node, std::vector<std::pair<FieldKey, std::string>>& currentRecord, size_t depth) {

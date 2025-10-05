@@ -207,8 +207,6 @@ CompressedData TypeAwareCompressor::compress(const Trie& trie, const FieldDictio
         
         // Use dynamically expanded field order from LOUDS
         auto expanded_field_order = louds.getFieldOrder();
-        std::cout << "[DEBUG] TypeAwareCompressor::compress - field order sizes: initial="
-                  << trie.getOrderedFields().size() << ", expanded=" << expanded_field_order.size() << std::endl;
         
         return compressLouds(louds, manager, expanded_field_order, config);
         
@@ -510,6 +508,396 @@ double TypeAwareCompressor::getCompressionRatio(const CompressedData& compressed
     } catch (const std::exception& e) {
         std::cerr << "Error calculating compression ratio: " << e.what() << std::endl;
         return 1.0; // Conservative fallback
+    }
+}
+
+// ========== 细粒度类型敏感压缩实现 ==========
+
+GranularCompressedData TypeAwareCompressor::compressGranular(const Trie& trie, const FieldDictionaryManager& manager, 
+                                                           const compression::TypeAwareCompressionConfig& config, 
+                                                           bool use_layer_separation) {
+    try {
+        validateTypeAwareConfig(config);
+        
+        // Build LOUDS trie and delegate to configuration-driven LOUDS compression
+        LOUDSTrie louds(trie.getOrderedFields());
+        louds.buildFromTrie(trie);
+        
+        // Use dynamically expanded field order from LOUDS
+        auto expanded_field_order = louds.getFieldOrder();
+        
+        return compressGranularLouds(louds, manager, expanded_field_order, config, use_layer_separation);
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("TypeAware granular trie compression failed: " + std::string(e.what()));
+    }
+}
+
+GranularCompressedData TypeAwareCompressor::compressGranularLouds(const LOUDSTrie& louds, 
+                                                                 const FieldDictionaryManager& manager,
+                                                                 const std::vector<FieldKey>& field_order,
+                                                                 const compression::TypeAwareCompressionConfig& config,
+                                                                 bool use_layer_separation) {
+    try {
+        validateTypeAwareConfig(config);
+        
+        GranularCompressedData result;
+        result.use_layer_separation = use_layer_separation;
+        
+        // 1. 分别序列化各类字典（使用类型敏感压缩）
+        std::vector<uint8_t> string_dict_raw = Compressor::serializeStringDictionary(manager);
+        std::vector<uint8_t> timestamp_dict_raw = Compressor::serializeTimestampDictionary(manager);
+        std::vector<uint8_t> logtype_dict_raw = Compressor::serializeLogTypeDictionary(manager);
+        
+        // 2. 序列化LOUDS Trie位图（使用BOOL类型压缩）
+        std::ostringstream bv_stream(std::ios::binary);
+        louds.serializeBitmap(bv_stream);
+        std::string bv_str = bv_stream.str();
+        std::vector<uint8_t> trie_raw(bv_str.begin(), bv_str.end());
+        
+        if (trie_raw.empty()) {
+            throw std::runtime_error("TypeAware Granular: Empty LOUDS bitmap serialization");
+        }
+        
+        // 3. 序列化分层内容（使用类型敏感压缩）
+        std::vector<uint8_t> layer_raw;
+        if (use_layer_separation) {
+            // 按层分别序列化和压缩（使用字段类型特定的压缩算法）
+            size_t layer_count = louds.getLayeredStorage().getLayerCount();
+            result.layer_data_by_level.reserve(layer_count);
+            
+            for (size_t i = 0; i < layer_count; ++i) {
+                std::ostringstream layer_stream(std::ios::binary);
+                louds.getLayeredStorage().serializeLayer(i, layer_stream);
+                std::string layer_str = layer_stream.str();
+                std::vector<uint8_t> layer_data(layer_str.begin(), layer_str.end());
+                
+                // 根据字段类型选择压缩算法
+                compression::FieldType field_type = compression::FieldType::STRING; // Default
+                if (i < field_order.size()) {
+                    field_type = mapFieldType(field_order[i].type);
+                }
+                
+                std::vector<uint8_t> compressed_layer = compressWithConfig(layer_data, field_type, config);
+                result.layer_data_by_level.push_back(std::move(compressed_layer));
+                
+                // 累计原始大小
+                layer_raw.insert(layer_raw.end(), layer_data.begin(), layer_data.end());
+            }
+        } else {
+            // 整体序列化和压缩（使用STRING类型压缩）
+            // 使用与传统版本相同的序列化方式
+            std::ostringstream all_layers_stream(std::ios::binary);
+            louds.getLayeredStorage().serialize(all_layers_stream);
+            std::string all_layers_str = all_layers_stream.str();
+            layer_raw.assign(all_layers_str.begin(), all_layers_str.end());
+            result.layer_data_combined = compressWithConfig(layer_raw, compression::FieldType::STRING, config);
+        }
+        
+        // 4. 序列化元数据（使用STRING类型压缩）
+        std::vector<uint8_t> metadata_raw = Compressor::serializeMetadata(field_order, manager);
+        
+        // 5. 分别压缩各组件（使用类型敏感压缩）
+        result.trie_bitmap = compressWithConfig(trie_raw, compression::FieldType::BOOL, config);
+        result.string_dict = compressWithConfig(string_dict_raw, compression::FieldType::STRING, config);
+        result.timestamp_dict = compressWithConfig(timestamp_dict_raw, compression::FieldType::TIMESTAMP, config);
+        result.logtype_dict = compressWithConfig(logtype_dict_raw, compression::FieldType::LOGTYPE, config);
+        result.metadata = compressWithConfig(metadata_raw, compression::FieldType::STRING, config);
+        
+        // 6. 记录原始大小
+        result.trie_original_size = trie_raw.size();
+        result.string_dict_original_size = string_dict_raw.size();
+        result.timestamp_dict_original_size = timestamp_dict_raw.size();
+        result.logtype_dict_original_size = logtype_dict_raw.size();
+        result.layer_original_size = layer_raw.size();
+        result.metadata_original_size = metadata_raw.size();
+        
+        result.original_size = result.trie_original_size + result.string_dict_original_size + 
+                              result.timestamp_dict_original_size + result.logtype_dict_original_size + 
+                              result.layer_original_size + result.metadata_original_size;
+        
+        // 7. 计算压缩后总大小
+        result.compressed_size = result.trie_bitmap.size() + result.string_dict.size() + 
+                                result.timestamp_dict.size() + result.logtype_dict.size() + 
+                                result.metadata.size();
+        
+        if (use_layer_separation) {
+            for (const auto& layer : result.layer_data_by_level) {
+                result.compressed_size += layer.size();
+            }
+        } else {
+            result.compressed_size += result.layer_data_combined.size();
+        }
+        
+        if (result.original_size == 0) {
+            throw std::runtime_error("TypeAware Granular: Invalid original size calculation");
+        }
+        
+        return result;
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("TypeAware granular LOUDS compression failed: " + std::string(e.what()));
+    }
+}
+
+double TypeAwareCompressor::getGranularCompressionRatio(const GranularCompressedData& compressed_data) {
+    try {
+        if (compressed_data.compressed_size == 0) return 0.0;
+        
+        double ratio = static_cast<double>(compressed_data.compressed_size) / compressed_data.original_size;
+        
+        if (ratio > 2.0) {
+            // Suspicious compression ratio - might indicate an error
+            std::cerr << "Warning: Suspicious granular compression ratio detected: " << ratio << std::endl;
+        }
+        
+        return static_cast<double>(compressed_data.original_size) / compressed_data.compressed_size;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error calculating granular compression ratio: " << e.what() << std::endl;
+        return 1.0; // Conservative fallback
+    }
+}
+
+// ========== 细粒度类型敏感解压缩实现 ==========
+
+std::pair<std::unique_ptr<Trie>, std::unique_ptr<FieldDictionaryManager>> 
+TypeAwareCompressor::decompressGranular(const GranularCompressedData& compressed_data, 
+                                       const compression::TypeAwareCompressionConfig& config) {
+    try {
+        validateTypeAwareConfig(config);
+        
+        // Delegate to configuration-driven LOUDS decompression and convert to Trie
+        auto [louds, manager] = decompressGranularLouds(compressed_data, config);
+        auto trie = std::make_unique<Trie>(louds->getFieldOrder());
+        loudsToTrie(*louds, *trie);
+        return {std::move(trie), std::move(manager)};
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("TypeAware granular trie decompression failed: " + std::string(e.what()));
+    }
+}
+
+std::pair<std::unique_ptr<LOUDSTrie>, std::unique_ptr<FieldDictionaryManager>> 
+TypeAwareCompressor::decompressGranularLouds(const GranularCompressedData& compressed_data, 
+                                            const compression::TypeAwareCompressionConfig& config) {
+    try {
+        validateTypeAwareConfig(config);
+        
+        // 1. 解压缩元数据（使用STRING类型解压缩）
+        if (compressed_data.metadata.empty()) {
+            throw std::runtime_error("TypeAware Granular: Empty metadata for decompression");
+        }
+        
+        std::vector<uint8_t> metadata_raw = decompressWithConfig(compressed_data.metadata, 
+                                                               compression::FieldType::STRING, config);
+        if (metadata_raw.empty()) {
+            throw std::runtime_error("TypeAware Granular: Decompressed metadata is empty");
+        }
+        
+        std::vector<FieldKey> field_order = Compressor::deserializeMetadata(metadata_raw);
+        if (field_order.empty()) {
+            throw std::runtime_error("TypeAware Granular: No field keys recovered from metadata");
+        }
+        
+        // 2. 重建字典管理器（使用类型敏感解压缩）
+        auto manager = std::make_unique<FieldDictionaryManager>();
+        
+        // 分别解压缩和反序列化各类字典
+        if (!compressed_data.string_dict.empty()) {
+            std::vector<uint8_t> string_dict_raw = decompressWithConfig(compressed_data.string_dict, 
+                                                                       compression::FieldType::STRING, config);
+            if (!string_dict_raw.empty()) {
+                Compressor::deserializeStringDictionary(string_dict_raw, *manager);
+            }
+        }
+        
+        if (!compressed_data.timestamp_dict.empty()) {
+            std::vector<uint8_t> timestamp_dict_raw = decompressWithConfig(compressed_data.timestamp_dict, 
+                                                                          compression::FieldType::TIMESTAMP, config);
+            if (!timestamp_dict_raw.empty()) {
+                Compressor::deserializeTimestampDictionary(timestamp_dict_raw, *manager);
+            }
+        }
+        
+        if (!compressed_data.logtype_dict.empty()) {
+            std::vector<uint8_t> logtype_dict_raw = decompressWithConfig(compressed_data.logtype_dict, 
+                                                                        compression::FieldType::LOGTYPE, config);
+            if (!logtype_dict_raw.empty()) {
+                Compressor::deserializeLogTypeDictionary(logtype_dict_raw, *manager);
+            }
+        }
+        
+        // 3. 重建LOUDS Trie结构（使用BOOL类型解压缩）
+        if (compressed_data.trie_bitmap.empty()) {
+            throw std::runtime_error("TypeAware Granular: Empty LOUDS trie data for decompression");
+        }
+        
+        std::vector<uint8_t> trie_raw = decompressWithConfig(compressed_data.trie_bitmap, 
+                                                           compression::FieldType::BOOL, config);
+        if (trie_raw.empty()) {
+            throw std::runtime_error("TypeAware Granular: Decompressed LOUDS trie data is empty");
+        }
+        
+        auto louds = Compressor::deserializeLoudsTrie(trie_raw, *manager, field_order);
+        
+        // 4. 重建分层内容（使用类型敏感解压缩）
+        if (compressed_data.use_layer_separation) {
+            // 按层分别解压缩（使用字段类型特定的解压缩算法）
+            for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
+                // 根据字段类型选择解压缩算法
+                compression::FieldType field_type = compression::FieldType::STRING; // Default
+                if (i < field_order.size()) {
+                    field_type = mapFieldType(field_order[i].type);
+                }
+                
+                std::vector<uint8_t> layer_data = decompressWithConfig(compressed_data.layer_data_by_level[i], 
+                                                                      field_type, config);
+                if (!layer_data.empty()) {
+                    std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
+                    louds->getLayeredStorage().deserializeLayer(i, layer_stream);
+                }
+            }
+        } else {
+            // 整体解压缩（使用STRING类型解压缩）
+            if (!compressed_data.layer_data_combined.empty()) {
+                std::vector<uint8_t> layer_raw = decompressWithConfig(compressed_data.layer_data_combined, 
+                                                                     compression::FieldType::STRING, config);
+                if (!layer_raw.empty()) {
+                    // 使用与传统版本相同的反序列化方式
+                    std::istringstream all_layers_stream(std::string(layer_raw.begin(), layer_raw.end()), std::ios::binary);
+                    louds->getLayeredStorage().deserialize(all_layers_stream);
+                }
+            }
+        }
+        
+        louds->setFieldOrder(field_order);
+        
+        return {std::move(louds), std::move(manager)};
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("TypeAware granular LOUDS decompression failed: " + std::string(e.what()));
+    }
+}
+
+// ========== 部分解压缩实现（类型敏感版本） ==========
+
+std::pair<std::unique_ptr<Trie>, std::unique_ptr<FieldDictionaryManager>> 
+TypeAwareCompressor::decompressGranularPartial(const GranularCompressedData& compressed_data, 
+                                              const Compressor::PartialDecompressionOptions& options,
+                                              const compression::TypeAwareCompressionConfig& config) {
+    try {
+        validateTypeAwareConfig(config);
+        
+        std::unique_ptr<Trie> trie = nullptr;
+        auto manager = std::make_unique<FieldDictionaryManager>();
+        
+        // 1. 解压缩元数据（通常需要）
+        std::vector<FieldKey> field_order;
+        if (options.load_metadata && !compressed_data.metadata.empty()) {
+            std::vector<uint8_t> metadata_raw = decompressWithConfig(compressed_data.metadata, 
+                                                                   compression::FieldType::STRING, config);
+            if (!metadata_raw.empty()) {
+                field_order = Compressor::deserializeMetadata(metadata_raw);
+            }
+        }
+        
+        // 2. 按需解压缩字典（使用类型敏感解压缩）
+        if (options.load_string_dict && !compressed_data.string_dict.empty()) {
+            std::vector<uint8_t> string_dict_raw = decompressWithConfig(compressed_data.string_dict, 
+                                                                       compression::FieldType::STRING, config);
+            if (!string_dict_raw.empty()) {
+                Compressor::deserializeStringDictionary(string_dict_raw, *manager);
+            }
+        }
+        
+        if (options.load_timestamp_dict && !compressed_data.timestamp_dict.empty()) {
+            std::vector<uint8_t> timestamp_dict_raw = decompressWithConfig(compressed_data.timestamp_dict, 
+                                                                          compression::FieldType::TIMESTAMP, config);
+            if (!timestamp_dict_raw.empty()) {
+                Compressor::deserializeTimestampDictionary(timestamp_dict_raw, *manager);
+            }
+        }
+        
+        if (options.load_logtype_dict && !compressed_data.logtype_dict.empty()) {
+            std::vector<uint8_t> logtype_dict_raw = decompressWithConfig(compressed_data.logtype_dict, 
+                                                                        compression::FieldType::LOGTYPE, config);
+            if (!logtype_dict_raw.empty()) {
+                Compressor::deserializeLogTypeDictionary(logtype_dict_raw, *manager);
+            }
+        }
+        
+        // 3. 按需重建LOUDS Trie结构，然后转换为Trie
+        std::unique_ptr<LOUDSTrie> louds = nullptr;
+        if (options.load_trie && !field_order.empty() && !compressed_data.trie_bitmap.empty()) {
+            std::vector<uint8_t> trie_raw = decompressWithConfig(compressed_data.trie_bitmap, 
+                                                               compression::FieldType::BOOL, config);
+            if (!trie_raw.empty()) {
+                louds = Compressor::deserializeLoudsTrie(trie_raw, *manager, field_order);
+            }
+        }
+        
+        // 4. 按需重建分层内容（使用类型敏感解压缩）
+        if (options.load_layers && louds) {
+            if (compressed_data.use_layer_separation) {
+                // 按指定层解压缩（使用字段类型特定的解压缩算法）
+                if (!options.specific_layers.empty()) {
+                    for (size_t layer_idx : options.specific_layers) {
+                        if (layer_idx < compressed_data.layer_data_by_level.size()) {
+                            // 根据字段类型选择解压缩算法
+                            compression::FieldType field_type = compression::FieldType::STRING; // Default
+                            if (layer_idx < field_order.size()) {
+                                field_type = mapFieldType(field_order[layer_idx].type);
+                            }
+                            
+                            std::vector<uint8_t> layer_data = decompressWithConfig(compressed_data.layer_data_by_level[layer_idx], 
+                                                                                  field_type, config);
+                            if (!layer_data.empty()) {
+                                std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
+                                louds->getLayeredStorage().deserializeLayer(layer_idx, layer_stream);
+                            }
+                        }
+                    }
+                } else {
+                    // 解压缩所有层
+                    for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
+                        compression::FieldType field_type = compression::FieldType::STRING; // Default
+                        if (i < field_order.size()) {
+                            field_type = mapFieldType(field_order[i].type);
+                        }
+                        
+                        std::vector<uint8_t> layer_data = decompressWithConfig(compressed_data.layer_data_by_level[i], 
+                                                                              field_type, config);
+                        if (!layer_data.empty()) {
+                            std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
+                            louds->getLayeredStorage().deserializeLayer(i, layer_stream);
+                        }
+                    }
+                }
+            } else {
+                // 整体解压缩（使用STRING类型解压缩）
+                if (!compressed_data.layer_data_combined.empty()) {
+                    std::vector<uint8_t> layer_raw = decompressWithConfig(compressed_data.layer_data_combined, 
+                                                                         compression::FieldType::STRING, config);
+                    if (!layer_raw.empty()) {
+                        // 使用与传统版本相同的反序列化方式
+                        std::istringstream all_layers_stream(std::string(layer_raw.begin(), layer_raw.end()), std::ios::binary);
+                        louds->getLayeredStorage().deserialize(all_layers_stream);
+                    }
+                }
+            }
+        }
+        
+        // 5. 如果需要Trie，将LOUDS Trie转换为普通Trie
+        if (louds && options.load_trie) {
+            trie = std::make_unique<Trie>(field_order);
+            loudsToTrie(*louds, *trie);
+        }
+        
+        return std::make_pair(std::move(trie), std::move(manager));
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("TypeAware granular partial decompression failed: " + std::string(e.what()));
     }
 }
 

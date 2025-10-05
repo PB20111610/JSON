@@ -2965,8 +2965,12 @@ CMakeFiles/json2.dir/include/compression/type_aware/type_aware_compressor.cpp.o:
 
 CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: /workspaces/JSON/src/chunked_compressor.cpp \
   /usr/include/alloca.h \
+  /usr/include/asm-generic/bitsperlong.h \
   /usr/include/asm-generic/errno-base.h \
   /usr/include/asm-generic/errno.h \
+  /usr/include/asm-generic/int-ll64.h \
+  /usr/include/asm-generic/posix_types.h \
+  /usr/include/asm-generic/types.h \
   /usr/include/assert.h \
   /usr/include/c++/13/algorithm \
   /usr/include/c++/13/array \
@@ -3176,6 +3180,10 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: /workspaces/JSON/src/chunked_
   /usr/include/linux/errno.h \
   /usr/include/linux/falloc.h \
   /usr/include/linux/limits.h \
+  /usr/include/linux/posix_types.h \
+  /usr/include/linux/stat.h \
+  /usr/include/linux/stddef.h \
+  /usr/include/linux/types.h \
   /usr/include/locale.h \
   /usr/include/math.h \
   /usr/include/pthread.h \
@@ -3220,7 +3228,11 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: /workspaces/JSON/src/chunked_
   /usr/include/unistd.h \
   /usr/include/wchar.h \
   /usr/include/wctype.h \
+  /usr/include/x86_64-linux-gnu/asm/bitsperlong.h \
   /usr/include/x86_64-linux-gnu/asm/errno.h \
+  /usr/include/x86_64-linux-gnu/asm/posix_types.h \
+  /usr/include/x86_64-linux-gnu/asm/posix_types_64.h \
+  /usr/include/x86_64-linux-gnu/asm/types.h \
   /usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h \
   /usr/include/x86_64-linux-gnu/bits/byteswap.h \
   /usr/include/x86_64-linux-gnu/bits/confname.h \
@@ -3264,6 +3276,8 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: /workspaces/JSON/src/chunked_
   /usr/include/x86_64-linux-gnu/bits/select.h \
   /usr/include/x86_64-linux-gnu/bits/setjmp.h \
   /usr/include/x86_64-linux-gnu/bits/stat.h \
+  /usr/include/x86_64-linux-gnu/bits/statx-generic.h \
+  /usr/include/x86_64-linux-gnu/bits/statx.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
@@ -3298,6 +3312,8 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: /workspaces/JSON/src/chunked_
   /usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_rusage.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h \
+  /usr/include/x86_64-linux-gnu/bits/types/struct_statx.h \
+  /usr/include/x86_64-linux-gnu/bits/types/struct_statx_timestamp.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_timeval.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h \
@@ -3337,6 +3353,7 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: /workspaces/JSON/src/chunked_
   /usr/include/x86_64-linux-gnu/sys/resource.h \
   /usr/include/x86_64-linux-gnu/sys/select.h \
   /usr/include/x86_64-linux-gnu/sys/single_threaded.h \
+  /usr/include/x86_64-linux-gnu/sys/stat.h \
   /usr/include/x86_64-linux-gnu/sys/time.h \
   /usr/include/x86_64-linux-gnu/sys/types.h \
   /usr/lib/gcc/x86_64-linux-gnu/13/include/float.h \
@@ -3360,8 +3377,12 @@ CMakeFiles/json2.dir/src/chunked_compressor.cpp.o: /workspaces/JSON/src/chunked_
 
 CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: /workspaces/JSON/src/chunked_type_aware_compress.cpp \
   /usr/include/alloca.h \
+  /usr/include/asm-generic/bitsperlong.h \
   /usr/include/asm-generic/errno-base.h \
   /usr/include/asm-generic/errno.h \
+  /usr/include/asm-generic/int-ll64.h \
+  /usr/include/asm-generic/posix_types.h \
+  /usr/include/asm-generic/types.h \
   /usr/include/assert.h \
   /usr/include/c++/13/algorithm \
   /usr/include/c++/13/array \
@@ -3571,6 +3592,10 @@ CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: /workspaces/JSON/src
   /usr/include/linux/errno.h \
   /usr/include/linux/falloc.h \
   /usr/include/linux/limits.h \
+  /usr/include/linux/posix_types.h \
+  /usr/include/linux/stat.h \
+  /usr/include/linux/stddef.h \
+  /usr/include/linux/types.h \
   /usr/include/locale.h \
   /usr/include/math.h \
   /usr/include/pthread.h \
@@ -3615,7 +3640,11 @@ CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: /workspaces/JSON/src
   /usr/include/unistd.h \
   /usr/include/wchar.h \
   /usr/include/wctype.h \
+  /usr/include/x86_64-linux-gnu/asm/bitsperlong.h \
   /usr/include/x86_64-linux-gnu/asm/errno.h \
+  /usr/include/x86_64-linux-gnu/asm/posix_types.h \
+  /usr/include/x86_64-linux-gnu/asm/posix_types_64.h \
+  /usr/include/x86_64-linux-gnu/asm/types.h \
   /usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h \
   /usr/include/x86_64-linux-gnu/bits/byteswap.h \
   /usr/include/x86_64-linux-gnu/bits/confname.h \
@@ -3659,6 +3688,8 @@ CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: /workspaces/JSON/src
   /usr/include/x86_64-linux-gnu/bits/select.h \
   /usr/include/x86_64-linux-gnu/bits/setjmp.h \
   /usr/include/x86_64-linux-gnu/bits/stat.h \
+  /usr/include/x86_64-linux-gnu/bits/statx-generic.h \
+  /usr/include/x86_64-linux-gnu/bits/statx.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
@@ -3693,6 +3724,8 @@ CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: /workspaces/JSON/src
   /usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_rusage.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h \
+  /usr/include/x86_64-linux-gnu/bits/types/struct_statx.h \
+  /usr/include/x86_64-linux-gnu/bits/types/struct_statx_timestamp.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_timeval.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h \
@@ -3732,6 +3765,7 @@ CMakeFiles/json2.dir/src/chunked_type_aware_compress.cpp.o: /workspaces/JSON/src
   /usr/include/x86_64-linux-gnu/sys/resource.h \
   /usr/include/x86_64-linux-gnu/sys/select.h \
   /usr/include/x86_64-linux-gnu/sys/single_threaded.h \
+  /usr/include/x86_64-linux-gnu/sys/stat.h \
   /usr/include/x86_64-linux-gnu/sys/time.h \
   /usr/include/x86_64-linux-gnu/sys/types.h \
   /usr/lib/gcc/x86_64-linux-gnu/13/include/float.h \
@@ -7571,7 +7605,7 @@ CMakeFiles/json2.dir/src/variable_dictionary.cpp.o: /workspaces/JSON/src/variabl
   /workspaces/JSON/include/field_key.h \
   /workspaces/JSON/include/variable_dictionary.h
 
-CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/test/test_chunked_cmp_type_aware.cpp \
+CMakeFiles/json2.dir/test/test_granular_chunked_cmp.cpp.o: /workspaces/JSON/test/test_granular_chunked_cmp.cpp \
   /usr/include/alloca.h \
   /usr/include/asm-generic/bitsperlong.h \
   /usr/include/asm-generic/errno-base.h \
@@ -7581,7 +7615,6 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/te
   /usr/include/asm-generic/types.h \
   /usr/include/assert.h \
   /usr/include/c++/13/algorithm \
-  /usr/include/c++/13/any \
   /usr/include/c++/13/array \
   /usr/include/c++/13/atomic \
   /usr/include/c++/13/backward/auto_ptr.h \
@@ -7612,21 +7645,12 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/te
   /usr/include/c++/13/bits/exception.h \
   /usr/include/c++/13/bits/exception_defines.h \
   /usr/include/c++/13/bits/exception_ptr.h \
-  /usr/include/c++/13/bits/forward_list.h \
-  /usr/include/c++/13/bits/forward_list.tcc \
-  /usr/include/c++/13/bits/fs_dir.h \
-  /usr/include/c++/13/bits/fs_fwd.h \
-  /usr/include/c++/13/bits/fs_ops.h \
-  /usr/include/c++/13/bits/fs_path.h \
   /usr/include/c++/13/bits/fstream.tcc \
   /usr/include/c++/13/bits/functexcept.h \
   /usr/include/c++/13/bits/functional_hash.h \
-  /usr/include/c++/13/bits/gslice.h \
-  /usr/include/c++/13/bits/gslice_array.h \
   /usr/include/c++/13/bits/hash_bytes.h \
   /usr/include/c++/13/bits/hashtable.h \
   /usr/include/c++/13/bits/hashtable_policy.h \
-  /usr/include/c++/13/bits/indirect_array.h \
   /usr/include/c++/13/bits/invoke.h \
   /usr/include/c++/13/bits/ios_base.h \
   /usr/include/c++/13/bits/istream.tcc \
@@ -7638,7 +7662,6 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/te
   /usr/include/c++/13/bits/locale_facets_nonio.h \
   /usr/include/c++/13/bits/locale_facets_nonio.tcc \
   /usr/include/c++/13/bits/localefwd.h \
-  /usr/include/c++/13/bits/mask_array.h \
   /usr/include/c++/13/bits/memory_resource.h \
   /usr/include/c++/13/bits/memoryfwd.h \
   /usr/include/c++/13/bits/move.h \
@@ -7660,7 +7683,6 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/te
   /usr/include/c++/13/bits/shared_ptr.h \
   /usr/include/c++/13/bits/shared_ptr_atomic.h \
   /usr/include/c++/13/bits/shared_ptr_base.h \
-  /usr/include/c++/13/bits/slice_array.h \
   /usr/include/c++/13/bits/specfun.h \
   /usr/include/c++/13/bits/sstream.tcc \
   /usr/include/c++/13/bits/std_abs.h \
@@ -7703,10 +7725,6 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/te
   /usr/include/c++/13/bits/uses_allocator.h \
   /usr/include/c++/13/bits/uses_allocator_args.h \
   /usr/include/c++/13/bits/utility.h \
-  /usr/include/c++/13/bits/valarray_after.h \
-  /usr/include/c++/13/bits/valarray_array.h \
-  /usr/include/c++/13/bits/valarray_array.tcc \
-  /usr/include/c++/13/bits/valarray_before.h \
   /usr/include/c++/13/bits/vector.tcc \
   /usr/include/c++/13/cassert \
   /usr/include/c++/13/cctype \
@@ -7716,7 +7734,6 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/te
   /usr/include/c++/13/climits \
   /usr/include/c++/13/clocale \
   /usr/include/c++/13/cmath \
-  /usr/include/c++/13/codecvt \
   /usr/include/c++/13/compare \
   /usr/include/c++/13/cstddef \
   /usr/include/c++/13/cstdint \
@@ -7737,8 +7754,6 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/te
   /usr/include/c++/13/ext/numeric_traits.h \
   /usr/include/c++/13/ext/string_conversions.h \
   /usr/include/c++/13/ext/type_traits.h \
-  /usr/include/c++/13/filesystem \
-  /usr/include/c++/13/forward_list \
   /usr/include/c++/13/fstream \
   /usr/include/c++/13/functional \
   /usr/include/c++/13/initializer_list \
@@ -7791,7 +7806,6 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/te
   /usr/include/c++/13/unordered_map \
   /usr/include/c++/13/unordered_set \
   /usr/include/c++/13/utility \
-  /usr/include/c++/13/valarray \
   /usr/include/c++/13/variant \
   /usr/include/c++/13/vector \
   /usr/include/c++/13/version \
@@ -7990,15 +8004,8 @@ CMakeFiles/json2.dir/test/test_chunked_cmp_type_aware.cpp.o: /workspaces/JSON/te
   /usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h \
   /usr/lib/gcc/x86_64-linux-gnu/13/include/stdint.h \
   /usr/lib/gcc/x86_64-linux-gnu/13/include/syslimits.h \
-  /workspaces/JSON/include/nlohmann/json.hpp \
-  /workspaces/JSON/include/chunked_type_aware_compress.h \
+  /workspaces/JSON/include/chunked_compressor.h \
   /workspaces/JSON/include/compress.h \
-  /workspaces/JSON/include/compress_type_aware.h \
-  /workspaces/JSON/include/compression/core/compression_backend.h \
-  /workspaces/JSON/include/compression/core/compression_interface.h \
-  /workspaces/JSON/include/compression/factory/compression_factory.h \
-  /workspaces/JSON/include/compression/type_aware/type_aware_compressor.h \
-  /workspaces/JSON/include/field_analyzer.h \
   /workspaces/JSON/include/field_dictionary_manager.h \
   /workspaces/JSON/include/field_key.h \
   /workspaces/JSON/include/logtype_dictionary.h \
@@ -8596,8 +8603,6 @@ CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: /workspaces/JSON/vendor/sim
 
 /usr/include/c++/13/unordered_set:
 
-/workspaces/JSON/test/test_chunked_cmp_type_aware.cpp:
-
 /workspaces/JSON/include/compression/algorithms/rle_compression.cpp:
 
 /usr/include/c++/13/bits/new_allocator.h:
@@ -8886,6 +8891,8 @@ CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: /workspaces/JSON/vendor/sim
 
 /usr/include/c++/13/bits/exception.h:
 
+/workspaces/JSON/test/test_granular_chunked_cmp.cpp:
+
 /usr/include/c++/13/bits/invoke.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/13/include/tbmintrin.h:
@@ -8924,13 +8931,13 @@ CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: /workspaces/JSON/vendor/sim
 
 /usr/include/x86_64-linux-gnu/bits/types/sigset_t.h:
 
-/workspaces/JSON/src/louds.cpp:
-
 /usr/include/asm-generic/bitsperlong.h:
 
 /usr/include/c++/13/tr1/legendre_function.tcc:
 
 /usr/include/asm-generic/types.h:
+
+/workspaces/JSON/src/louds.cpp:
 
 /usr/lib/gcc/x86_64-linux-gnu/13/include/avx512fp16intrin.h:
 
@@ -9408,6 +9415,32 @@ CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: /workspaces/JSON/vendor/sim
 
 /workspaces/JSON/src/chunked_compressor.cpp:
 
+/usr/include/asm-generic/int-ll64.h:
+
+/usr/include/asm-generic/posix_types.h:
+
+/usr/include/linux/stddef.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/13/include/avx512vlintrin.h:
+
+/usr/include/linux/types.h:
+
+/usr/include/x86_64-linux-gnu/asm/types.h:
+
+/usr/include/wchar.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
+
+/usr/include/x86_64-linux-gnu/bits/statx-generic.h:
+
+/usr/include/c++/13/bits/stl_multimap.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_statx.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_statx_timestamp.h:
+
+/usr/include/x86_64-linux-gnu/sys/stat.h:
+
 /workspaces/JSON/vendor/simdjson/simdjson.h:
 
 /usr/include/c++/13/string_view:
@@ -9479,32 +9512,6 @@ CMakeFiles/json2.dir/vendor/simdjson/simdjson.cpp.o: /workspaces/JSON/vendor/sim
 /workspaces/JSON/include/nlohmann/json.hpp:
 
 /workspaces/JSON/src/variable_dictionary.cpp:
-
-/usr/include/asm-generic/int-ll64.h:
-
-/usr/include/asm-generic/posix_types.h:
-
-/usr/include/linux/stddef.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/13/include/avx512vlintrin.h:
-
-/usr/include/linux/types.h:
-
-/usr/include/x86_64-linux-gnu/asm/types.h:
-
-/usr/include/wchar.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
-
-/usr/include/x86_64-linux-gnu/bits/statx-generic.h:
-
-/usr/include/c++/13/bits/stl_multimap.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_statx.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_statx_timestamp.h:
-
-/usr/include/x86_64-linux-gnu/sys/stat.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/13/include/xsavecintrin.h:
 

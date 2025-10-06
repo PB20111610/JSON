@@ -14,6 +14,7 @@ using namespace json2;
 int main() {
     const std::string input_file = "test_data.json"; // "../data/postgresql.log"; // 
     const size_t BLOCK_SIZE = 20000;
+    const size_t CHUNK_SIZE = 1000;
     std::ifstream fin(input_file);
     if (!fin.is_open()) {
         std::cerr << "Cannot open input file: " << input_file << std::endl;
@@ -30,14 +31,17 @@ int main() {
     // 分块压缩（细粒度）
     CompressorConfig config;
     config.block_size = BLOCK_SIZE;
+    config.chunk_size = CHUNK_SIZE;
     config.structurize_arrays = false;
     config.enable_granular_compression = true;
+    config.enable_layer_separation = true;
     ChunkedTrieCompressor compressor(config);
 
     // 设置时间戳字段
     std::vector<std::string> timestamp_fields = {"@timestamp","request_received","response_delivered", "timestamp", "session_start"};
     compressor.setTimestampFields(timestamp_fields);
     compressor.enableGranularCompression(config.enable_granular_compression);
+    compressor.enableLayerSeparation(config.enable_layer_separation);
     compressor.setStructurizeArrays(config.structurize_arrays);
 
     std::cout << "[CONFIG] Compression configuration:" << std::endl;

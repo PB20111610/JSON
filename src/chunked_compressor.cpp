@@ -149,7 +149,7 @@ const std::vector<FieldKey>& ChunkedTrieCompressor::getCustomFieldOrder() const 
 
 void ChunkedTrieCompressor::enableGranularCompression(bool enable) {
     config_.enable_granular_compression = enable;
-    std::cerr << "[DEBUG] Granular compression " << (enable ? "enabled" : "disabled") << std::endl;
+    // std::cerr << "[DEBUG] Granular compression " << (enable ? "enabled" : "disabled") << std::endl;
 }
 
 bool ChunkedTrieCompressor::isGranularCompressionEnabled() const {
@@ -158,7 +158,7 @@ bool ChunkedTrieCompressor::isGranularCompressionEnabled() const {
 
 void ChunkedTrieCompressor::enableLayerSeparation(bool enable) {
     config_.enable_layer_separation = enable;
-    std::cerr << "[DEBUG] Layer separation " << (enable ? "enabled" : "disabled") << std::endl;
+    // std::cerr << "[DEBUG] Layer separation " << (enable ? "enabled" : "disabled") << std::endl;
 }
 
 bool ChunkedTrieCompressor::isLayerSeparationEnabled() const {
@@ -793,12 +793,12 @@ std::vector<ChunkedTrieCompressor::ChunkedBlock> ChunkedTrieCompressor::loadFrom
             std::string variables_file = dict_dir + "/variables.json2";
             std::ifstream test_granular(variables_file, std::ios::binary);
             bool is_granular = test_granular.is_open();
-            std::cerr << "[DEBUG] Checking granular detection: file=" << variables_file << ", exists=" << is_granular << std::endl;
+            // std::cerr << "[DEBUG] Checking granular detection: file=" << variables_file << ", exists=" << is_granular << std::endl;
             test_granular.close();
             
             if (is_granular) {
                 // 细粒度压缩块的加载
-                std::cerr << "[DEBUG] Loading granular block " << i << std::endl;
+                // std::cerr << "[DEBUG] Loading granular block " << i << std::endl;
                 
                 try {
                     // 1. 读取块元数据
@@ -904,16 +904,16 @@ std::vector<ChunkedTrieCompressor::ChunkedBlock> ChunkedTrieCompressor::loadFrom
                     }
                     
                     // 3. 使用Compressor::decompressGranular解压
-                    std::cerr << "[DEBUG] Decompressing granular block " << i << std::endl;
-                    std::cerr << "[DEBUG] Granular data sizes: trie=" << gdata.trie_bitmap.size() 
-                              << ", string=" << gdata.string_dict.size() 
-                              << ", timestamp=" << gdata.timestamp_dict.size() 
-                              << ", logtype=" << gdata.logtype_dict.size() 
-                              << ", metadata=" << gdata.metadata.size() << std::endl;
+                    // std::cerr << "[DEBUG] Decompressing granular block " << i << std::endl;
+                    // std::cerr << "[DEBUG] Granular data sizes: trie=" << gdata.trie_bitmap.size() 
+                    //           << ", string=" << gdata.string_dict.size() 
+                    //           << ", timestamp=" << gdata.timestamp_dict.size() 
+                    //           << ", logtype=" << gdata.logtype_dict.size() 
+                    //           << ", metadata=" << gdata.metadata.size() << std::endl;
                     auto [trie, dict_ptr] = Compressor::decompressGranular(gdata);
                     
                     blocks.push_back(ChunkedBlock{trie->getOrderedFields(), std::move(dict_ptr), std::move(trie)});
-                    std::cerr << "[DEBUG] Successfully loaded granular block " << i << std::endl;
+                    // std::cerr << "[DEBUG] Successfully loaded granular block " << i << std::endl;
                     
                 } catch (const std::exception& e) {
                     std::cerr << "[ERROR] Failed to load granular block " << i << ": " << e.what() << std::endl;

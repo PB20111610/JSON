@@ -406,6 +406,18 @@ std::vector<uint8_t> ZstdBackend::trainDictionary(const std::vector<std::vector<
 #endif
 }
 
+std::string ZstdBackend::getVersionInfo() {
+#ifdef USE_ZSTD
+    unsigned version = ZSTD_versionNumber();
+    unsigned major = version / 10000;
+    unsigned minor = (version % 10000) / 100;
+    unsigned release = version % 100;
+    return std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(release);
+#else
+    return "Not available";
+#endif
+}
+
 } // namespace backends
 } // namespace compression
 } // namespace json2

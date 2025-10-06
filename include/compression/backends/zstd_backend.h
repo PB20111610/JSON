@@ -25,6 +25,7 @@ public:
     
     // ZSTD特定功能
     static bool isAvailable();
+    static std::string getVersionInfo();
     static std::vector<uint8_t> compressWithLevel(const std::vector<uint8_t>& data, int level);
     static std::vector<uint8_t> decompressZstd(const std::vector<uint8_t>& compressed_data);
     

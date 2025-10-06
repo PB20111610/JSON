@@ -783,7 +783,6 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
             
             if (is_granular) {
                 // 细粒度类型敏感压缩块的加载
-                
                 try {
                     // 1. 读取块元数据
                     std::ifstream block_metadata(block_dir + "/block_metadata.json2", std::ios::binary);
@@ -791,7 +790,6 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                         std::cerr << "[ERROR] Cannot open block metadata for block " << i << std::endl;
                         continue;
                     }
-                    
                     size_t original_size;
                     double placeholder_ratio;
                     uint32_t config_compression_level;
@@ -801,11 +799,9 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                     block_metadata.read(reinterpret_cast<char*>(&config_compression_level), sizeof(config_compression_level));
                     block_metadata.read(reinterpret_cast<char*>(&flags), sizeof(flags));
                     block_metadata.close();
-                    
                     // 2. 重建GranularCompressedData结构
                     GranularCompressedData gdata;
                     gdata.use_layer_separation = (flags & 2) != 0;
-                    
                     // 读取Trie位图
                     std::ifstream trie_file(block_dir + "/louds.json2", std::ios::binary);
                     if (trie_file.is_open()) {
@@ -815,10 +811,8 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                         trie_file.read(reinterpret_cast<char*>(gdata.trie_bitmap.data()), trie_size);
                         trie_file.close();
                     }
-                    
                     // 读取字典数据
                     std::string dict_dir = block_dir + "/dictionaries";
-                    
                     // 字符串字典
                     std::ifstream string_file(dict_dir + "/variables.json2", std::ios::binary);
                     if (string_file.is_open()) {
@@ -828,7 +822,6 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                         string_file.read(reinterpret_cast<char*>(gdata.string_dict.data()), string_size);
                         string_file.close();
                     }
-                    
                     // 时间戳字典
                     std::ifstream ts_file(dict_dir + "/timestamps.json2", std::ios::binary);
                     if (ts_file.is_open()) {
@@ -838,7 +831,6 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                         ts_file.read(reinterpret_cast<char*>(gdata.timestamp_dict.data()), ts_size);
                         ts_file.close();
                     }
-                    
                     // LogType字典
                     std::ifstream log_file(dict_dir + "/logtypes.json2", std::ios::binary);
                     if (log_file.is_open()) {
@@ -848,7 +840,6 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                         log_file.read(reinterpret_cast<char*>(gdata.logtype_dict.data()), log_size);
                         log_file.close();
                     }
-                    
                     // 细粒度压缩的元数据文件
                     std::ifstream granular_metadata_file(block_dir + "/metadata.json2", std::ios::binary);
                     if (granular_metadata_file.is_open()) {
@@ -858,7 +849,6 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                         granular_metadata_file.read(reinterpret_cast<char*>(gdata.metadata.data()), metadata_size);
                         granular_metadata_file.close();
                     }
-                    
                     // 读取层数据
                     if (gdata.use_layer_separation) {
                         // 按层分别读取
@@ -867,15 +857,32 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                             char layer_file_buf[256];
                             snprintf(layer_file_buf, sizeof(layer_file_buf), "%s/layer_%zu.json2", block_dir.c_str(), layer_idx);
                             std::ifstream layer_stream(layer_file_buf, std::ios::binary);
-                            if (!layer_stream.is_open()) break;
-                            
+                            if (!layer_stream.is_open()) {
+                                if (layer_idx == 0) {
+                                    std::cerr << "[DEBUG] No layer files found for block " << i << ", expected at least one layer file (layer_0.json2)" << std::endl;
+                                } else {
+                                    // std::cerr << "[DEBUG] Finished loading " << layer_idx << " layers for block " << i << std::endl;
+                                }
+                                break;
+                            }
                             uint32_t layer_size;
-                            layer_stream.read(reinterpret_cast<char*>(&layer_size), sizeof(layer_size));
+                            if (!layer_stream.read(reinterpret_cast<char*>(&layer_size), sizeof(layer_size))) {
+                                std::cerr << "[ERROR] Failed to read layer size for layer " << layer_idx << " in block " << i << std::endl;
+                                break;
+                            }
                             std::vector<uint8_t> layer_data(layer_size);
-                            layer_stream.read(reinterpret_cast<char*>(layer_data.data()), layer_size);
+                            if (!layer_stream.read(reinterpret_cast<char*>(layer_data.data()), layer_size)) {
+                                std::cerr << "[ERROR] Failed to read layer data for layer " << layer_idx << " in block " << i << std::endl;
+                                break;
+                            }
                             gdata.layer_data_by_level.push_back(std::move(layer_data));
                             layer_stream.close();
+                            // std::cerr << "[DEBUG] Loaded layer " << layer_idx << " (" << layer_size << " bytes) for block " << i << std::endl;
                             layer_idx++;
+                        }
+                        // std::cerr << "[DEBUG] Total layers loaded for block " << i << ": " << gdata.layer_data_by_level.size() << std::endl;
+                        if (gdata.layer_data_by_level.empty()) {
+                            std::cerr << "[ERROR] No layer data loaded for block " << i << " (layer_data_by_level is empty)" << std::endl;
                         }
                     } else {
                         // 整体读取
@@ -886,27 +893,34 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                             gdata.layer_data_combined.resize(layers_size);
                             layers_file.read(reinterpret_cast<char*>(gdata.layer_data_combined.data()), layers_size);
                             layers_file.close();
+                            std::cerr << "[DEBUG] Loaded combined layers (" << layers_size << " bytes) for block " << i << std::endl;
+                        } else {
+                            std::cerr << "[ERROR] Cannot open combined layers file for block " << i << std::endl;
                         }
                     }
-                    
+                    // 调用解压前输出gdata状态
+                    // std::cerr << "[DEBUG] Before decompressGranularPartial: block " << i
+                    //           << ", use_layer_separation=" << gdata.use_layer_separation
+                    //           << ", layer_data_by_level.size()=" << gdata.layer_data_by_level.size()
+                    //           << ", layer_data_combined.size()=" << gdata.layer_data_combined.size() << std::endl;
                     // 3. 使用TypeAwareCompressor::decompressGranularPartial解压（类型敏感版本）
-                    
                     // 设置解压选项
                     Compressor::PartialDecompressionOptions decompress_options;
                     decompress_options.load_trie = true;
                     decompress_options.load_layers = true;
-                    
                     // 使用传入的配置参数
-                    auto [trie, dict_ptr] = TypeAwareCompressor::decompressGranularPartial(gdata, decompress_options, config);
-                    
-                    ChunkedTypeAwareBlock block;
-                    block.field_order = trie->getOrderedFields();
-                    block.dict = std::move(dict_ptr);
-                    block.trie = std::move(trie);
-                    block.config = config;
-                    
-                    blocks.push_back(std::move(block));
-                    
+                    try {
+                        auto [trie, dict_ptr] = TypeAwareCompressor::decompressGranularPartial(gdata, decompress_options, config);
+                        // std::cerr << "[DEBUG] decompressGranularPartial succeeded for block " << i << std::endl;
+                        ChunkedTypeAwareBlock block;
+                        block.field_order = trie->getOrderedFields();
+                        block.dict = std::move(dict_ptr);
+                        block.trie = std::move(trie);
+                        block.config = config;
+                        blocks.push_back(std::move(block));
+                    } catch (const std::exception& e) {
+                        std::cerr << "[ERROR] decompressGranularPartial threw exception for block " << i << ": " << e.what() << std::endl;
+                    }
                 } catch (const std::exception& e) {
                     std::cerr << "[ERROR] Failed to load granular type-aware block " << i << ": " << e.what() << std::endl;
                 }

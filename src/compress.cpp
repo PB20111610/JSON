@@ -1070,11 +1070,18 @@ Compressor::decompressGranular(const GranularCompressedData& compressed_data) {
     
     // 4. 重建分层内容
     if (compressed_data.use_layer_separation) {
+        // 确保layers_向量有足够的空间来容纳所有层
+        auto& layered_storage = louds->getLayeredStorage();
+        size_t required_layers = compressed_data.layer_data_by_level.size();
+        while (layered_storage.getLayerCount() < required_layers) {
+            layered_storage.addLayer(FieldKey{}, 0);
+        }
+        
         // 按层分别解压缩
         for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
             std::vector<uint8_t> layer_data = decompressWithZstd(compressed_data.layer_data_by_level[i]);
             std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
-            louds->getLayeredStorage().deserializeLayer(i, layer_stream);
+            layered_storage.deserializeLayer(i, layer_stream);
         }
     } else {
         // 整体解压缩
@@ -1121,11 +1128,18 @@ Compressor::decompressGranularLouds(const GranularCompressedData& compressed_dat
     
     // 4. 重建分层内容
     if (compressed_data.use_layer_separation) {
+        // 确保layers_向量有足够的空间来容纳所有层
+        auto& layered_storage = louds->getLayeredStorage();
+        size_t required_layers = compressed_data.layer_data_by_level.size();
+        while (layered_storage.getLayerCount() < required_layers) {
+            layered_storage.addLayer(FieldKey{}, 0);
+        }
+        
         // 按层分别解压缩
         for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
             std::vector<uint8_t> layer_data = decompressWithZstd(compressed_data.layer_data_by_level[i]);
             std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
-            louds->getLayeredStorage().deserializeLayer(i, layer_stream);
+            layered_storage.deserializeLayer(i, layer_stream);
         }
     } else {
         // 整体解压缩
@@ -1178,13 +1192,20 @@ Compressor::decompressGranularPartial(const GranularCompressedData& compressed_d
     // 4. 按需重建分层内容
     if (options.load_layers && louds) {
         if (compressed_data.use_layer_separation) {
+            // 确保layers_向量有足够的空间来容纳所有层
+            auto& layered_storage = louds->getLayeredStorage();
+            size_t required_layers = compressed_data.layer_data_by_level.size();
+            while (layered_storage.getLayerCount() < required_layers) {
+                layered_storage.addLayer(FieldKey{}, 0);
+            }
+            
             // 按指定层解压缩
             if (!options.specific_layers.empty()) {
                 for (size_t layer_idx : options.specific_layers) {
                     if (layer_idx < compressed_data.layer_data_by_level.size()) {
                         std::vector<uint8_t> layer_data = decompressWithZstd(compressed_data.layer_data_by_level[layer_idx]);
                         std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
-                        louds->getLayeredStorage().deserializeLayer(layer_idx, layer_stream);
+                        layered_storage.deserializeLayer(layer_idx, layer_stream);
                     }
                 }
             } else {
@@ -1192,7 +1213,7 @@ Compressor::decompressGranularPartial(const GranularCompressedData& compressed_d
                 for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
                     std::vector<uint8_t> layer_data = decompressWithZstd(compressed_data.layer_data_by_level[i]);
                     std::istringstream layer_stream(std::string(layer_data.begin(), layer_data.end()), std::ios::binary);
-                    louds->getLayeredStorage().deserializeLayer(i, layer_stream);
+                    layered_storage.deserializeLayer(i, layer_stream);
                 }
             }
         } else {

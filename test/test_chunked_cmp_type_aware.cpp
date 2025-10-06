@@ -7,6 +7,7 @@
 #include "../include/reconstruct.h"
 #include "../include/compress_type_aware.h"
 #include "../include/compress.h"
+#include "../include/compression/backends/zstd_backend.h" 
 #include <simdjson.h>
 #include <iostream>
 #include <fstream>
@@ -455,7 +456,34 @@ void testChunkedTypeAwareCompression() {
     }
 }
 
+// Add this helper function to display environment info
+void displayEnvironmentInfo() {
+    std::cout << "\n=== Environment Information ===" << std::endl;
+    
+    // Get ZSTD version
+    json2::compression::backends::ZstdBackend zstdBackend;
+    std::cout << "ZSTD Version: " << zstdBackend.getVersionInfo() << std::endl;
+    
+    // Display system info
+#ifdef __x86_64__
+    std::cout << "Architecture: x86_64" << std::endl;
+#elif __aarch64__
+    std::cout << "Architecture: ARM64" << std::endl;
+#endif
+
+#ifdef __linux__
+    std::cout << "OS: Linux" << std::endl;
+#endif
+
+    std::cout << "===============================" << std::endl;
+}
+
 int main() {
+    std::cout << "Chunked Type-Aware Compression Test" << std::endl;
+    
+    // Display environment information
+    displayEnvironmentInfo();  // Add this line
+    
     try {
         testChunkedTypeAwareCompression();
         std::cout << "\nAll tests completed successfully!" << std::endl;

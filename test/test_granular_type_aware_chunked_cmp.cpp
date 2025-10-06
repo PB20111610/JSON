@@ -20,7 +20,7 @@
 using namespace json2;
 
 int main() {
-    const std::string input_file = "test_data.json"; // "../data/postgresql.log"; //
+    const std::string input_file =  "test_data.json"; // "../data/postgresql.log"; // 
     const size_t BLOCK_SIZE = 20000;
     const size_t CHUNK_SIZE = 1000;
     std::ifstream fin(input_file);
@@ -41,6 +41,7 @@ int main() {
     config.block_size = BLOCK_SIZE;
     config.chunk_size = CHUNK_SIZE;
     config.enable_granular_compression = true;
+    config.enable_layer_separation = true;
     config.structurize_arrays = false;
     
     // 配置类型敏感压缩后端（参考test_chunked_cmp_type_aware.cpp）
@@ -65,7 +66,7 @@ int main() {
     compressor.setTimestampFields(timestamp_fields);
     compressor.setStructurizeArrays(config.structurize_arrays);
     compressor.enableGranularCompression(config.enable_granular_compression);
-    compressor.enableLayerSeparation(false);
+    compressor.enableLayerSeparation(config.enable_layer_separation);
     
     std::cout << "[CONFIG] Type-aware compression configuration:" << std::endl;
     std::cout << "  LOUDS backend: BIT_PACKING" << std::endl;

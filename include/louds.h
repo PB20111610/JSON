@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
+#include <unordered_map>
+#include <string>
 #include "trie.h"
 
 namespace json2 {
@@ -35,8 +38,10 @@ public:
     
     // 根据BFS索引找到对应的层和层内索引
     std::pair<size_t, size_t> bfsToLayerIndex(size_t bfs_idx) const;
+    // 根据层索引和层内节点索引计算BFS索引
+    size_t layerIndexToBFS(size_t layer_idx, size_t node_idx_in_layer) const;
 
-    // 新增：单层序列化/反序列化
+    // 单层序列化/反序列化
     void serializeLayer(size_t layer_idx, std::ostream& out) const;
     void deserializeLayer(size_t layer_idx, std::istream& in);
 
@@ -73,13 +78,38 @@ public:
     const LayeredNodeStorage& getLayeredStorage() const { return layered_storage_; }
     LayeredNodeStorage& getLayeredStorage();
     const sdsl::select_support_mcl<0>& getLoudsSelect0() const { return louds_select0_; }
-    const sdsl::rank_support_v<>& getLoudsRank() const { return louds_rank_; }
-    const sdsl::select_support_mcl<>& getLoudsSelect() const { return louds_select_; }
+    const sdsl::rank_support_v<>& getLoudsRank1() const { return louds_rank1_; }
+    const sdsl::select_support_mcl<>& getLoudsSelect1() const { return louds_select1_; }
+    const sdsl::rank_support_v<0>& getLoudsRank0() const { return louds_rank0_; }
     
     // 获取字段顺序（用于重建）
     const std::vector<FieldKey>& getFieldOrder() const { return field_order_; }
 
     void loadFromSerialized(const std::vector<bool>& bv, const std::vector<std::vector<NodeValue>>& all_layers, const std::vector<FieldKey>& field_order);
+
+    // ========== 按需路径重建接口 ==========
+    // 根据BFS索引重建到根节点的完整路径（返回BFS索引）
+    std::vector<size_t> reconstructPathToRoot(size_t bfs_idx) const;
+    
+    // 根据BFS索引重建到指定深度的路径
+    std::vector<NodeValue> reconstructPathToDepth(size_t bfs_idx, size_t target_depth) const;
+    
+    // 批量重建多个路径
+    std::vector<std::vector<NodeValue>> reconstructMultiplePaths(
+        const std::vector<size_t>& bfs_indices) const;
+    
+    // 获取指定字段在路径中的值
+    std::optional<NodeValue> getFieldValueInPath(size_t bfs_idx, const std::string& field_name) const;
+    
+    // 检查路径是否包含指定字段
+    bool pathContainsField(size_t bfs_idx, const std::string& field_name) const;
+    
+    // 获取路径中所有字段的值
+    std::unordered_map<std::string, NodeValue> getPathFieldValues(size_t bfs_idx) const;
+    
+    // ========== 中间节点路径集合重建接口 ==========
+    // 从中间节点重建所有经过该节点的完整路径（返回BFS索引路径）
+    std::vector<std::vector<size_t>> reconstructPathsFromIntermediateNode(size_t bfs_idx) const;
 
     // LOUDS位图序列化/反序列化
     void serializeBitmap(std::ostream& out) const;
@@ -91,8 +121,8 @@ public:
 private:
     // LOUDS结构部分
     sdsl::bit_vector louds_bv_;                    // LOUDS位图
-    sdsl::rank_support_v<> louds_rank_;            // Rank支持
-    sdsl::select_support_mcl<> louds_select_;
+    sdsl::rank_support_v<> louds_rank1_;            // Rank支持
+    sdsl::select_support_mcl<> louds_select1_;
     sdsl::select_support_mcl<0> louds_select0_;
     sdsl::rank_support_v<0> louds_rank0_;
     
@@ -112,6 +142,21 @@ private:
     void buildLayeredContentByField(const Trie& trie);
     void buildLayeredContentByFieldRecursive(const TrieNode* node, size_t depth, size_t bfs_idx);
     void buildLayeredContentByField_BFS(const Trie& trie);  // 新增BFS方式构建分层内容的函数声明
+    
+    // ========== 路径重建辅助方法 ==========
+    // 根据字段名找到对应的层深度
+    size_t findFieldDepth(const std::string& field_name) const;
+    
+    // 向上重建路径到指定深度
+    std::vector<NodeValue> reconstructPathUpward(size_t bfs_idx, size_t max_depth) const;
+    
+    // 检查BFS索引是否有效
+    bool isValidBFSIndex(size_t bfs_idx) const;
+    
+    // 从指定节点递归收集所有路径
+    void collectPathsFromNode(size_t node_idx, 
+                             std::vector<size_t>& current_path, 
+                             std::vector<std::vector<size_t>>& all_paths) const;
 };
 
 } // namespace json2

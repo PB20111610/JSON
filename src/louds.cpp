@@ -56,6 +56,27 @@ std::pair<size_t, size_t> LayeredNodeStorage::bfsToLayerIndex(size_t bfs_idx) co
     return {layer_idx, node_idx};
 }
 
+size_t LayeredNodeStorage::layerIndexToBFS(size_t layer_idx, size_t node_idx_in_layer) const {
+    // 验证输入参数
+    if (layer_idx >= layers_.size()) {
+        return 0; // 或者抛出异常
+    }
+    
+    const auto& layer = layers_[layer_idx];
+    if (node_idx_in_layer >= layer.size()) {
+        return 0; // 或者抛出异常
+    }
+    
+    // 计算BFS索引：前面所有层的节点数之和 + 当前层内的索引
+    size_t bfs_idx = 0;
+    for (size_t i = 0; i < layer_idx; ++i) {
+        bfs_idx += layers_[i].size();
+    }
+    bfs_idx += node_idx_in_layer;
+    
+    return bfs_idx;
+}
+
 void LayeredNodeStorage::serialize(std::ostream& out) const {
     size_t layer_count = layers_.size();
     out.write(reinterpret_cast<const char*>(&layer_count), sizeof(layer_count));
@@ -229,8 +250,8 @@ void LOUDSTrie::buildLoudsStructure(const Trie& trie) {
         louds_bv_[i] = louds_bits[i];
     }
     // 构建Rank/Select支持
-    louds_rank_ = sdsl::rank_support_v<>(&louds_bv_);
-    louds_select_ = sdsl::select_support_mcl<>(&louds_bv_);
+    louds_rank1_ = sdsl::rank_support_v<>(&louds_bv_);
+    louds_select1_ = sdsl::select_support_mcl<>(&louds_bv_);
     louds_select0_ = sdsl::select_support_mcl<0>(&louds_bv_);
     louds_rank0_ = sdsl::rank_support_v<0>(&louds_bv_);
 
@@ -423,7 +444,7 @@ void LOUDSTrie::buildLayeredContentByFieldRecursive(const TrieNode* node, size_t
 // 查询接口实现
 size_t LOUDSTrie::nodeCount() const {
     // LOUDS节点数 = LOUDS位图中1的数量
-    return louds_rank_(louds_bv_.size());
+    return louds_rank1_(louds_bv_.size());
 }
 
 const NodeValue& LOUDSTrie::getNodeValue(size_t bfs_idx) const {
@@ -439,41 +460,69 @@ bool LOUDSTrie::hasChild(size_t node_idx) const {
     if (node_idx >= nodeCount()) {
         return false;
     }
-    size_t pos = louds_select_(node_idx + 1);
+    size_t pos = louds_select0_(node_idx + 1);
     return (pos + 1 < louds_bv_.size() && louds_bv_[pos + 1]);
-}
-
-size_t LOUDSTrie::firstChild(size_t node_idx) const {
-    if (!hasChild(node_idx)) {
-        return nodeCount();
-    }
-    size_t pos = louds_select_(node_idx + 1);
-    return louds_rank_(pos + 1);
-}
-
-size_t LOUDSTrie::nextSibling(size_t node_idx) const {
-    if (node_idx + 1 >= nodeCount()) {
-        return nodeCount();
-    }
-    size_t pos = louds_select_(node_idx + 1);
-    if (pos + 1 >= louds_bv_.size() || !louds_bv_[pos + 1]) {
-        return nodeCount();
-    }
-    return node_idx + 1;
 }
 
 size_t LOUDSTrie::parent(size_t node_idx) const {
     if (node_idx == 0 || node_idx >= nodeCount()) {
         return nodeCount();
     }
-    size_t pos = louds_select_(node_idx + 1);
-    size_t q = louds_rank0_(pos);
-    if (q == 0) {
+    
+    // In LOUDS, to find the parent of node_idx:
+    // 1. Find the position of node_idx's 1 bit in the bit vector
+    size_t node_pos = louds_select1_(node_idx + 1);
+    
+    // 2. Find the nearest 0 before this position (marks end of parent's children)
+    //    We can do this by finding the rank of 0s up to this position
+    size_t zero_rank = louds_rank0_(node_pos);
+    
+    // 3. The parent's index is zero_rank - 1
+    if (zero_rank > 0) {
+        return zero_rank - 1;
+    }
+    
+    return nodeCount(); // Should not happen in a valid LOUDS structure
+}
+
+size_t LOUDSTrie::firstChild(size_t node_idx) const {
+    if (!hasChild(node_idx)) {
         return nodeCount();
     }
-    size_t parent_pos = louds_select0_(q);
-    size_t parent_idx = louds_rank_(parent_pos);
-    return parent_idx;
+    
+    // In LOUDS, to find the first child of node_idx:
+    // 1. Find the position of the 0 that marks the end of this node's children
+    size_t pos = louds_select0_(node_idx + 1);
+    
+    // 2. The first child is the node represented by the first 1 after this position
+    // 3. Its index is the rank of 1s up to (but not including) this position+1
+    return louds_rank1_(pos + 1);
+}
+
+size_t LOUDSTrie::nextSibling(size_t node_idx) const {
+    if (node_idx >= nodeCount()) {
+        return nodeCount();
+    }
+    
+    // In LOUDS, to find the next sibling of node_idx:
+    // 1. Find the position of the 0 that marks the end of this node's children
+    size_t pos = louds_select0_(node_idx + 1);
+    
+    // 2. Check if there's a next sibling (if the next bit is 1)
+    if (pos + 1 >= louds_bv_.size() || louds_bv_[pos + 1] == 0) {
+        return nodeCount(); // No next sibling
+    }
+    
+    // 3. In LOUDS, siblings are consecutive in the BFS node ordering
+    //    So the next sibling of node_idx is simply node_idx + 1
+    //    But we need to verify they have the same parent
+    if (node_idx + 1 < nodeCount()) {
+        if (parent(node_idx + 1) == parent(node_idx)) {
+            return node_idx + 1;
+        }
+    }
+    
+    return nodeCount();
 }
 
 const std::vector<NodeValue>& LOUDSTrie::getLayer(size_t layer_idx) const {
@@ -493,8 +542,8 @@ void LOUDSTrie::loadFromSerialized(const std::vector<bool>& bv, const std::vecto
         louds_bv_[i] = bv[i];
     }
     // 3. 构建 Rank/Select 支持
-    louds_rank_ = sdsl::rank_support_v<>(&louds_bv_);
-    louds_select_ = sdsl::select_support_mcl<>(&louds_bv_);
+    louds_rank1_ = sdsl::rank_support_v<>(&louds_bv_);
+    louds_select1_ = sdsl::select_support_mcl<>(&louds_bv_);
     louds_select0_ = sdsl::select_support_mcl<0>(&louds_bv_);
     louds_rank0_ = sdsl::rank_support_v<0>(&louds_bv_);
     // 4. 重建分层内容
@@ -523,8 +572,8 @@ void LOUDSTrie::deserializeBitmap(std::istream& in) {
     louds_bv_.load(in);
     
     // 重建辅助索引结构
-    louds_rank_ = sdsl::rank_support_v<>(&louds_bv_);
-    louds_select_ = sdsl::select_support_mcl<>(&louds_bv_);
+    louds_rank1_ = sdsl::rank_support_v<>(&louds_bv_);
+    louds_select1_ = sdsl::select_support_mcl<>(&louds_bv_);
     louds_select0_ = sdsl::select_support_mcl<0>(&louds_bv_);
     louds_rank0_ = sdsl::rank_support_v<0>(&louds_bv_);
 }
@@ -537,5 +586,213 @@ void LOUDSTrie::setFieldOrder(const std::vector<FieldKey>& field_order) {
 LOUDSTrie::LOUDSTrie() = default;
 LOUDSTrie::LOUDSTrie(const std::vector<FieldKey>& field_order)
     : field_order_(field_order) {}
+
+// ========== 路径重建算法实现 ==========
+
+std::vector<size_t> LOUDSTrie::reconstructPathToRoot(size_t bfs_idx) const {
+    if (!isValidBFSIndex(bfs_idx)) {
+        return {};
+    }
+    
+    std::vector<size_t> path;
+    size_t current_idx = bfs_idx;
+    
+    // 向上遍历到根节点
+    while (current_idx < nodeCount()) {
+        // 添加当前节点的BFS索引
+        path.push_back(current_idx);
+        
+        // 移动到父节点
+        current_idx = parent(current_idx);
+    }
+    
+    // 反转路径（从根到目标节点）
+    std::reverse(path.begin(), path.end());
+    return path;
+}
+
+std::vector<NodeValue> LOUDSTrie::reconstructPathToDepth(size_t bfs_idx, size_t target_depth) const {
+    if (!isValidBFSIndex(bfs_idx)) {
+        return {};
+    }
+    
+    return reconstructPathUpward(bfs_idx, target_depth);
+}
+
+std::vector<std::vector<NodeValue>> LOUDSTrie::reconstructMultiplePaths(
+    const std::vector<size_t>& bfs_indices) const {
+    
+    std::vector<std::vector<NodeValue>> paths;
+    paths.reserve(bfs_indices.size());
+    
+    for (size_t bfs_idx : bfs_indices) {
+        // 获取BFS索引路径，然后转换为NodeValue路径
+        std::vector<size_t> bfs_path = reconstructPathToRoot(bfs_idx);
+        std::vector<NodeValue> node_value_path;
+        node_value_path.reserve(bfs_path.size());
+        
+        for (size_t idx : bfs_path) {
+            node_value_path.push_back(getNodeValue(idx));
+        }
+        
+        paths.push_back(std::move(node_value_path));
+    }
+    
+    return paths;
+}
+
+// ========== 中间节点路径集合重建算法 ==========
+
+std::vector<std::vector<size_t>> LOUDSTrie::reconstructPathsFromIntermediateNode(size_t bfs_idx) const {
+    if (!isValidBFSIndex(bfs_idx)) {
+        return {};
+    }
+    
+    std::vector<std::vector<size_t>> all_paths;
+    
+    // 优化：预先分配空间以减少重新分配
+    all_paths.reserve(100); // 根据实际情况调整预估容量
+    
+    // 1. 重建从根到当前节点的完整路径（包含当前节点）
+    std::vector<size_t> path_prefix = reconstructPathToRoot(bfs_idx);
+    
+    // 2. 从当前节点开始，递归收集所有到叶子的路径
+    // 创建一个新的路径，从当前节点开始
+    std::vector<size_t> current_path = std::move(path_prefix);
+    current_path.reserve(field_order_.size()); // 预分配路径空间
+    
+    collectPathsFromNode(bfs_idx, current_path, all_paths);
+    
+    return all_paths;
+}
+
+void LOUDSTrie::collectPathsFromNode(size_t node_idx, 
+                                   std::vector<size_t>& current_path, 
+                                   std::vector<std::vector<size_t>>& all_paths) const {
+    if (!isValidBFSIndex(node_idx)) {
+        return;
+    }
+    
+    // 防止无限递归：检查路径长度是否超过合理范围
+    if (current_path.size() > field_order_.size() * 2) {
+        return; // 防止异常情况下的无限递归
+    }
+    
+    // 如果当前节点是叶子节点，保存完整路径
+    if (!hasChild(node_idx)) {
+        all_paths.push_back(current_path);
+        return;
+    }
+    
+    // 遍历所有子节点 - 算法优化版本
+    size_t child_idx = firstChild(node_idx);
+    
+    // 在LOUDS结构中，兄弟节点是连续的，且具有相同的父节点
+    while (child_idx < nodeCount()) {
+        // 添加子节点BFS索引到当前路径
+        current_path.push_back(child_idx);
+        
+        // 递归处理子节点
+        collectPathsFromNode(child_idx, current_path, all_paths);
+        
+        // 回溯：移除刚添加的子节点索引
+        current_path.pop_back();
+        
+        // 移动到下一个兄弟节点
+        size_t next_child = nextSibling(child_idx);
+        // 在LOUDS中，如果next_child <= child_idx，说明没有更多兄弟节点
+        if (next_child <= child_idx || next_child >= nodeCount()) {
+            break; // 没有更多兄弟节点
+        }
+        child_idx = next_child;
+    }
+}
+
+std::optional<NodeValue> LOUDSTrie::getFieldValueInPath(size_t bfs_idx, const std::string& field_name) const {
+    if (!isValidBFSIndex(bfs_idx)) {
+        return std::nullopt;
+    }
+    
+    // 找到字段对应的层深度
+    size_t field_depth = findFieldDepth(field_name);
+    if (field_depth >= field_order_.size()) {
+        return std::nullopt;
+    }
+    
+    // 重建到该深度的路径
+    std::vector<NodeValue> path = reconstructPathToDepth(bfs_idx, field_depth);
+    
+    // 如果路径长度足够，返回对应深度的值
+    if (path.size() > field_depth) {
+        return path[field_depth];
+    }
+    
+    return std::nullopt;
+}
+
+bool LOUDSTrie::pathContainsField(size_t bfs_idx, const std::string& field_name) const {
+    return getFieldValueInPath(bfs_idx, field_name).has_value();
+}
+
+std::unordered_map<std::string, NodeValue> LOUDSTrie::getPathFieldValues(size_t bfs_idx) const {
+    std::unordered_map<std::string, NodeValue> field_values;
+    
+    if (!isValidBFSIndex(bfs_idx)) {
+        return field_values;
+    }
+    
+    // 重建完整路径（BFS索引）
+    std::vector<size_t> bfs_path = reconstructPathToRoot(bfs_idx);
+    
+    // 将路径值与字段名映射
+    for (size_t i = 0; i < std::min(bfs_path.size(), field_order_.size()); ++i) {
+        const std::string& field_name = field_order_[i].name;
+        field_values[field_name] = getNodeValue(bfs_path[i]);
+    }
+    
+    return field_values;
+}
+
+// ========== 私有辅助方法实现 ==========
+
+size_t LOUDSTrie::findFieldDepth(const std::string& field_name) const {
+    for (size_t i = 0; i < field_order_.size(); ++i) {
+        if (field_order_[i].name == field_name) {
+            return i;
+        }
+    }
+    return field_order_.size(); // 返回无效深度
+}
+
+std::vector<NodeValue> LOUDSTrie::reconstructPathUpward(size_t bfs_idx, size_t max_depth) const {
+    std::vector<NodeValue> path;
+    size_t current_idx = bfs_idx;
+    size_t current_depth = 0;
+    
+    // 向上遍历到指定深度或根节点
+    while (current_idx < nodeCount() && current_depth <= max_depth) {
+        // 获取当前节点的层和层内索引
+        auto [layer, layer_idx] = layered_storage_.bfsToLayerIndex(current_idx);
+        
+        // 获取节点值并添加到路径
+        const NodeValue& node_value = getLayerNodeValue(layer, layer_idx);
+        path.push_back(node_value);
+        
+        // 移动到父节点
+        current_idx = parent(current_idx);
+        current_depth++;
+        
+        // 如果到达根节点，停止
+        if (current_idx >= nodeCount()) break;
+    }
+    
+    // 反转路径（从根到目标节点）
+    std::reverse(path.begin(), path.end());
+    return path;
+}
+
+bool LOUDSTrie::isValidBFSIndex(size_t bfs_idx) const {
+    return bfs_idx < nodeCount();
+}
 
 } // namespace json2

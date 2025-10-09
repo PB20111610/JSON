@@ -1,4 +1,5 @@
 #pragma once
+#include "trie.h"
 #include <sdsl/bit_vectors.hpp>
 #include <vector>
 #include <cstdint>
@@ -7,7 +8,6 @@
 #include <optional>
 #include <unordered_map>
 #include <string>
-#include "trie.h"
 
 namespace json2 {
 

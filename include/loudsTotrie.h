@@ -1,9 +1,9 @@
 #ifndef LOUDS_TOTRIE_H
 #define LOUDS_TOTRIE_H
 
-#include "../include/louds.h"
-#include "../include/trie.h"
 #include "../include/field_dictionary_manager.h"
+#include "../include/trie.h"
+#include "../include/louds.h"
 #include <vector>
 #include <string>
 

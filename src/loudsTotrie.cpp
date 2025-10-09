@@ -25,7 +25,6 @@ static void collectLoudsTriePaths(const LOUDSTrie& louds, size_t idx, size_t dep
     
     // 如果是叶子节点或者达到最大深度，保存路径
     if (!louds.hasChild(idx) || depth + 1 >= max_depth) {
-        // 算法优化：使用emplace_back避免不必要的拷贝
         all_paths.emplace_back(path);
     } else {
         // 遍历子节点 - 算法优化：直接遍历兄弟节点
@@ -35,7 +34,7 @@ static void collectLoudsTriePaths(const LOUDSTrie& louds, size_t idx, size_t dep
             
             // 移动到下一个兄弟节点
             size_t next = louds.nextSibling(child);
-            // 算法优化：在LOUDS中，如果next <= child，说明没有更多兄弟节点
+            // 在LOUDS中，如果next <= child，说明没有更多兄弟节点
             if (next <= child || next >= louds.nodeCount()) {
                 break;
             }

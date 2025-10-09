@@ -1222,19 +1222,19 @@ int main() {
         std::cout << "LOUDS Trie构建完成，根节点子节点数: " << root_children << std::endl;
 
         // LOUDS结构验证测试
-        // testLoudsStructureValidation(louds_trie);
+        testLoudsStructureValidation(louds_trie);
         
         // LOUDS导航函数测试
-        // testLoudsNavigation(louds_trie);
+        testLoudsNavigation(louds_trie);
         
         // 测试从中间节点重建路径
         testReconstructPathsFromIntermediateNode(louds_trie, manager);
          
         // 将重建的路径写入JSON文件
-        // writeReconstructedPathsToJson(louds_trie, manager, "trie_reconstruct.json");
+        writeReconstructedPathsToJson(louds_trie, manager, "trie_reconstruct.json");
         
         // 测试BFS索引和层索引转换
-        // testBFSAndLayerIndexConversion(louds_trie);
+        testBFSAndLayerIndexConversion(louds_trie);
     
         // 打印带BFS索引的LOUDS Trie结构
         printLoudsTrieWithBFSIndex(louds_trie, fieldOrder);

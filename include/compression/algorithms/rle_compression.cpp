@@ -107,6 +107,72 @@ std::vector<uint8_t> RLECompression::rleDecompress(const std::vector<uint8_t>& c
     return decompressed;
 }
 
+// 部分解压指定索引的值
+uint8_t RLECompression::rleDecompressAt(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.size() % 2 != 0) {
+        throw std::runtime_error("RLE: Invalid compressed data length");
+    }
+    
+    size_t current_index = 0;
+    size_t pos = 0;
+    
+    while (pos < compressed.size()) {
+        auto [value, count] = readRun(compressed, pos);
+        
+        if (count == 0) {
+            throw std::runtime_error("RLE: Invalid run length");
+        }
+        
+        // 检查索引是否在当前游程范围内
+        if (index >= current_index && index < current_index + count) {
+            return value;
+        }
+        
+        current_index += count;
+        
+        // 如果已经超过了目标索引，说明索引超出范围
+        if (current_index > index) {
+            throw std::out_of_range("RLE: Index out of range");
+        }
+    }
+    
+    // 索引超出范围
+    throw std::out_of_range("RLE: Index out of range");
+}
+
+// 辅助函数：查找指定索引所在的游程
+std::pair<uint8_t, size_t> RLECompression::findRunAtIndex(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.size() % 2 != 0) {
+        throw std::runtime_error("RLE: Invalid compressed data length");
+    }
+    
+    size_t current_index = 0;
+    size_t pos = 0;
+    
+    while (pos < compressed.size()) {
+        auto [value, count] = readRun(compressed, pos);
+        
+        if (count == 0) {
+            throw std::runtime_error("RLE: Invalid run length");
+        }
+        
+        // 检查索引是否在当前游程范围内
+        if (index >= current_index && index < current_index + count) {
+            return {value, index - current_index}; // 返回值和在游程中的偏移
+        }
+        
+        current_index += count;
+        
+        // 如果已经超过了目标索引，说明索引超出范围
+        if (current_index > index) {
+            throw std::out_of_range("RLE: Index out of range");
+        }
+    }
+    
+    // 索引超出范围
+    throw std::out_of_range("RLE: Index out of range");
+}
+
 bool RLECompression::isHighlyRepetitive(const std::vector<uint8_t>& data, double threshold) {
     return utils::DataAnalysisUtils::isHighlyRepetitive(data, threshold);
 }

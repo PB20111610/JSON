@@ -16,7 +16,7 @@ static void writeBitPackHeader(std::vector<uint8_t>& output, uint32_t count, uin
 }
 
 // Helper function to read bit-packed header information
-static std::pair<uint32_t, uint8_t> readBitPackHeader(const std::vector<uint8_t>& data, size_t& pos) {
+std::pair<uint32_t, uint8_t> BitPackingCompression::readBitPackHeader(const std::vector<uint8_t>& data, size_t& pos) {
     if (pos + sizeof(uint32_t) + sizeof(uint8_t) > data.size()) {
         throw std::runtime_error("BitPacking: Invalid header - insufficient data");
     }
@@ -118,6 +118,35 @@ std::vector<bool> BitPackingCompression::decompressBool(const std::vector<uint8_
     }
 }
 
+// 部分解压指定索引的值
+bool BitPackingCompression::decompressBoolAt(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.empty()) {
+        throw std::runtime_error("BitPacking: Empty compressed data");
+    }
+    
+    try {
+        size_t pos = 0;
+        auto [actual_count, flags] = readBitPackHeader(compressed, pos);
+        
+        // Validate index
+        if (index >= actual_count) {
+            throw std::out_of_range("BitPacking: Index out of range");
+        }
+        
+        // Extract data portion
+        std::vector<uint8_t> data(compressed.begin() + pos, compressed.end());
+        
+        if (flags & 0x01) { // Sparse encoding used
+            return decompressSparseBitmapAt(data, index);
+        } else { // Regular bit packing
+            return bitPackingDecompressAt(data, index, actual_count);
+        }
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("BitPacking partial decompression failed: " + std::string(e.what()));
+    }
+}
+
 // ========== Core Bit Packing Implementation with Enhanced Error Handling ==========
 
 std::vector<uint8_t> BitPackingCompression::bitPackingCompress(const std::vector<bool>& values) {
@@ -171,6 +200,26 @@ std::vector<bool> BitPackingCompression::bitPackingDecompress(const std::vector<
     }
     
     return values;
+}
+
+// 部分解压指定索引的值
+bool BitPackingCompression::bitPackingDecompressAt(const std::vector<uint8_t>& compressed, size_t index, size_t count) {
+    if (compressed.empty() && count > 0) {
+        throw std::runtime_error("BitPacking: Empty compressed data but non-zero count expected");
+    }
+    
+    // 计算目标字节和位的位置
+    size_t byte_index = index / 8;
+    size_t bit_index = index % 8;
+    
+    // 检查字节索引是否在范围内
+    if (byte_index >= compressed.size()) {
+        throw std::out_of_range("BitPacking: Index out of range");
+    }
+    
+    // 提取目标位的值
+    uint8_t byte = compressed[byte_index];
+    return (byte & (1 << bit_index)) != 0;
 }
 
 // ========== Enhanced State Compression with Validation ==========
@@ -300,6 +349,41 @@ std::vector<bool> BitPackingCompression::decompressSparseBitmap(const std::vecto
     }
     
     return values;
+}
+
+// 部分解压稀疏位图指定索引的值
+bool BitPackingCompression::decompressSparseBitmapAt(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.size() < 8) {
+        throw std::runtime_error("BitPacking: Invalid sparse bitmap data - insufficient header");
+    }
+    
+    size_t pos = 0;
+    uint32_t total_size = utils::SerializationUtils::readValue<uint32_t>(compressed, pos);
+    uint32_t true_count = utils::SerializationUtils::readValue<uint32_t>(compressed, pos);
+    
+    // Validate index
+    if (index >= total_size) {
+        throw std::out_of_range("BitPacking: Index out of range");
+    }
+    
+    // Validate data size
+    size_t expected_data_size = 8 + true_count * sizeof(uint32_t);
+    if (compressed.size() < expected_data_size) {
+        throw std::runtime_error("BitPacking: Insufficient data for sparse bitmap indices");
+    }
+    
+    // 查找索引是否在true_indices中
+    for (uint32_t i = 0; i < true_count && pos + sizeof(uint32_t) <= compressed.size(); ++i) {
+        uint32_t stored_index = utils::SerializationUtils::readValue<uint32_t>(compressed, pos);
+        if (stored_index == index) {
+            return true; // 找到匹配的索引，返回true
+        }
+        if (stored_index > index) {
+            break; // 由于索引是有序的，如果存储的索引大于目标索引，则后面不可能有匹配项
+        }
+    }
+    
+    return false; // 未找到匹配的索引，返回false
 }
 
 // ========== Enhanced Analysis and Validation Functions ==========

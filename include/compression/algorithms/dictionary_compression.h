@@ -27,9 +27,15 @@ public:
     std::string getName() const override;
     bool supportsLevel(int level) const override;
     
+    // 支持部分解压
+    bool supportsPartialDecompression() const override { return true; }
+    
     // IStringCompression 接口实现
     std::vector<uint8_t> compressStrings(const std::vector<std::string>& strings) override;
     std::vector<std::string> decompressStrings(const std::vector<uint8_t>& compressed) override;
+    
+    // 部分解压指定索引的值
+    std::string decompressStringAt(const std::vector<uint8_t>& compressed, size_t index) override;
     
     // 压缩类型常量
     enum CompressionType : uint8_t {
@@ -51,6 +57,10 @@ public:
                                                   Backend backend = Backend::NONE);
     static std::vector<std::string> dictionaryDecompress(const std::vector<uint8_t>& compressed, 
                                                         Backend backend = Backend::NONE);
+    
+    // 部分解压指定索引的值
+    static std::string dictionaryDecompressAt(const std::vector<uint8_t>& compressed, size_t index,
+                                            Backend backend = Backend::NONE);
     
     // 增量字典构建 (适用于大数据集)
     class IncrementalDictionary {
@@ -114,6 +124,11 @@ private:
     static std::vector<uint8_t> compressIndices(const std::vector<uint32_t>& indices, Backend backend);
     static std::vector<uint32_t> decompressIndices(const std::vector<uint8_t>& compressed, 
                                                    size_t expected_count, Backend backend);
+    
+    // 部分解压辅助函数
+    static std::string partialDecompressHelper(const std::vector<uint8_t>& compressed, size_t index, 
+                                              size_t& pos, const std::vector<std::string>& dictionary,
+                                              Backend backend);
 };
 
 } // namespace algorithms

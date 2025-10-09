@@ -7,7 +7,7 @@ namespace json2 {
 namespace compression {
 namespace algorithms {
 
-// ========== Helper Functions (模仿compress.cpp的风格) ==========
+// ========== Helper Functions ==========
 static void writeVarintHeader(std::vector<uint8_t>& output, size_t count, uint8_t type) {
     // 写入元素数量
     uint32_t count32 = static_cast<uint32_t>(count);
@@ -84,12 +84,22 @@ std::vector<int64_t> VarintCompression::decompressInt64(const std::vector<uint8_
     return decompressInt64Array(compressed);
 }
 
+// 部分解压指定索引的值
+int64_t VarintCompression::decompressInt64At(const std::vector<uint8_t>& compressed, size_t index) {
+    return decompressInt64ArrayAt(compressed, index);
+}
+
 std::vector<uint8_t> VarintCompression::compressUint32(const std::vector<uint32_t>& values) {
     return compressUint32Array(values);
 }
 
 std::vector<uint32_t> VarintCompression::decompressUint32(const std::vector<uint8_t>& compressed) {
     return decompressUint32Array(compressed);
+}
+
+// 部分解压指定索引的值
+uint32_t VarintCompression::decompressUint32At(const std::vector<uint8_t>& compressed, size_t index) {
+    return decompressUint32ArrayAt(compressed, index);
 }
 
 std::vector<uint8_t> VarintCompression::compressDouble(const std::vector<double>& values) {
@@ -118,6 +128,13 @@ std::vector<double> VarintCompression::decompressDouble(const std::vector<uint8_
     return values;
 }
 
+// 部分解压指定索引的值
+double VarintCompression::decompressDoubleAt(const std::vector<uint8_t>& compressed, size_t index) {
+    int64_t int_val = decompressInt64ArrayAt(compressed, index);
+    double* double_ptr = reinterpret_cast<double*>(&int_val);
+    return *double_ptr;
+}
+
 // 静态方法实现
 
 std::vector<uint8_t> VarintCompression::compressInt64Array(const std::vector<int64_t>& values) {
@@ -142,6 +159,25 @@ std::vector<int64_t> VarintCompression::decompressInt64Array(const std::vector<u
     return values;
 }
 
+// 部分解压指定索引的值
+int64_t VarintCompression::decompressInt64ArrayAt(const std::vector<uint8_t>& compressed, size_t index) {
+    size_t pos = 0;
+    size_t current_index = 0;
+    
+    while (pos < compressed.size() && current_index <= index) {
+        int64_t value = decodeVarint(compressed, pos);
+        
+        if (current_index == index) {
+            return value;
+        }
+        
+        current_index++;
+    }
+    
+    // If we get here, the index is out of range
+    throw std::out_of_range("Varint: Index out of range");
+}
+
 std::vector<uint8_t> VarintCompression::compressUint32Array(const std::vector<uint32_t>& values) {
     std::vector<int64_t> int64_values;
     int64_values.reserve(values.size());
@@ -159,6 +195,12 @@ std::vector<uint32_t> VarintCompression::decompressUint32Array(const std::vector
         values.push_back(static_cast<uint32_t>(val));
     }
     return values;
+}
+
+// 部分解压指定索引的值
+uint32_t VarintCompression::decompressUint32ArrayAt(const std::vector<uint8_t>& compressed, size_t index) {
+    int64_t value = decompressInt64ArrayAt(compressed, index);
+    return static_cast<uint32_t>(value);
 }
 
 void VarintCompression::encodeVarint(int64_t value, std::vector<uint8_t>& output) {
@@ -186,6 +228,11 @@ int64_t VarintCompression::decodeVarint(const std::vector<uint8_t>& data, size_t
     }
     
     return zigzagDecode(result);
+}
+
+// 部分解压指定索引的值
+int64_t VarintCompression::decodeVarintAt(const std::vector<uint8_t>& data, size_t index) {
+    return decompressInt64ArrayAt(data, index);
 }
 
 uint64_t VarintCompression::zigzagEncode(int64_t value) {

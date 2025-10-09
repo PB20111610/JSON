@@ -24,26 +24,47 @@ public:
     std::string getName() const override;
     bool supportsLevel(int level) const override;
     
+    // 支持部分解压
+    bool supportsPartialDecompression() const override { return true; }
+    
     // INumericCompression 接口实现
     std::vector<uint8_t> compressInt64(const std::vector<int64_t>& values) override;
     std::vector<int64_t> decompressInt64(const std::vector<uint8_t>& compressed) override;
     
+    // 部分解压指定索引的值
+    int64_t decompressInt64At(const std::vector<uint8_t>& compressed, size_t index) override;
+    
     std::vector<uint8_t> compressUint32(const std::vector<uint32_t>& values) override;
     std::vector<uint32_t> decompressUint32(const std::vector<uint8_t>& compressed) override;
     
+    // 部分解压指定索引的值
+    uint32_t decompressUint32At(const std::vector<uint8_t>& compressed, size_t index) override;
+    
     std::vector<uint8_t> compressDouble(const std::vector<double>& values) override;
     std::vector<double> decompressDouble(const std::vector<uint8_t>& compressed) override;
+    
+    // 部分解压指定索引的值
+    double decompressDoubleAt(const std::vector<uint8_t>& compressed, size_t index) override;
     
     // Varint编码接口
     static std::vector<uint8_t> compressInt64Array(const std::vector<int64_t>& values);
     static std::vector<int64_t> decompressInt64Array(const std::vector<uint8_t>& compressed);
     
+    // 部分解压指定索引的值
+    static int64_t decompressInt64ArrayAt(const std::vector<uint8_t>& compressed, size_t index);
+    
     static std::vector<uint8_t> compressUint32Array(const std::vector<uint32_t>& values);
     static std::vector<uint32_t> decompressUint32Array(const std::vector<uint8_t>& compressed);
+    
+    // 部分解压指定索引的值
+    static uint32_t decompressUint32ArrayAt(const std::vector<uint8_t>& compressed, size_t index);
     
     // 单个值编码
     static void encodeVarint(int64_t value, std::vector<uint8_t>& output);
     static int64_t decodeVarint(const std::vector<uint8_t>& data, size_t& pos);
+    
+    // 部分解压指定索引的值
+    static int64_t decodeVarintAt(const std::vector<uint8_t>& data, size_t index);
     
     // ZigZag编码 (有符号整数转无符号)
     static uint64_t zigzagEncode(int64_t value);

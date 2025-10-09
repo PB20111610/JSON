@@ -23,13 +23,22 @@ public:
     std::string getName() const override;
     bool supportsLevel(int level) const override;
     
+    // 支持部分解压
+    bool supportsPartialDecompression() const override { return true; }
+    
     // IBooleanCompression 接口实现
     std::vector<uint8_t> compressBool(const std::vector<bool>& values) override;
     std::vector<bool> decompressBool(const std::vector<uint8_t>& compressed, size_t count) override;
     
+    // 部分解压指定索引的值
+    bool decompressBoolAt(const std::vector<uint8_t>& compressed, size_t index) override;
+    
     // BitPacking专用接口
     static std::vector<uint8_t> bitPackingCompress(const std::vector<bool>& values);
     static std::vector<bool> bitPackingDecompress(const std::vector<uint8_t>& compressed, size_t count);
+    
+    // 部分解压指定索引的值
+    static bool bitPackingDecompressAt(const std::vector<uint8_t>& compressed, size_t index, size_t count);
     
     // 支持三态压缩 (false/true/null)
     static std::vector<uint8_t> compressBoolStates(const std::vector<uint8_t>& states);
@@ -38,6 +47,9 @@ public:
     // 稀疏位图压缩 (优化稀疏数据)
     static std::vector<uint8_t> compressSparseBitmap(const std::vector<bool>& values);
     static std::vector<bool> decompressSparseBitmap(const std::vector<uint8_t>& compressed, size_t count);
+    
+    // 部分解压稀疏位图指定索引的值
+    static bool decompressSparseBitmapAt(const std::vector<uint8_t>& compressed, size_t index);
     
     // 数据分析
     static double estimateCompressionRatio(const std::vector<bool>& values);
@@ -59,6 +71,9 @@ private:
     // 内部辅助函数
     static size_t calculateCompressedSize(size_t bool_count);
     static bool shouldUseSparseEncoding(const std::vector<bool>& values, double threshold = 0.1);
+    
+    // Helper function to read bit-packed header information
+    static std::pair<uint32_t, uint8_t> readBitPackHeader(const std::vector<uint8_t>& data, size_t& pos);
 };
 
 } // namespace algorithms

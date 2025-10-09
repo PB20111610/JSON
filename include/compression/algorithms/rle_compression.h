@@ -24,9 +24,15 @@ public:
     std::string getName() const override { return "RLE"; }
     bool supportsLevel(int level) const override { return level == 6; } // RLE不支持压缩级别
     
+    // 支持部分解压
+    bool supportsPartialDecompression() const override { return true; }
+    
     // RLE专用接口
     static std::vector<uint8_t> rleCompress(const std::vector<uint8_t>& data);
     static std::vector<uint8_t> rleDecompress(const std::vector<uint8_t>& compressed);
+    
+    // 部分解压指定索引的值
+    static uint8_t rleDecompressAt(const std::vector<uint8_t>& compressed, size_t index);
     
     // 数据分析：判断是否适合RLE压缩
     static bool isHighlyRepetitive(const std::vector<uint8_t>& data, double threshold = 0.5);
@@ -41,6 +47,10 @@ public:
     };
     
     static RLEStats analyzeData(const std::vector<uint8_t>& data);
+
+private:
+    // 辅助函数：查找指定索引所在的游程
+    static std::pair<uint8_t, size_t> findRunAtIndex(const std::vector<uint8_t>& compressed, size_t index);
 };
 
 } // namespace algorithms

@@ -24,23 +24,41 @@ public:
     std::string getName() const override;
     bool supportsLevel(int level) const override;
     
+    // 支持部分解压
+    bool supportsPartialDecompression() const override { return true; }
+    
     // INumericCompression 接口实现
     std::vector<uint8_t> compressInt64(const std::vector<int64_t>& values) override;
     std::vector<int64_t> decompressInt64(const std::vector<uint8_t>& compressed) override;
     
+    // 部分解压指定索引的值
+    int64_t decompressInt64At(const std::vector<uint8_t>& compressed, size_t index) override;
+    
     std::vector<uint8_t> compressUint32(const std::vector<uint32_t>& values) override;
     std::vector<uint32_t> decompressUint32(const std::vector<uint8_t>& compressed) override;
     
+    // 部分解压指定索引的值
+    uint32_t decompressUint32At(const std::vector<uint8_t>& compressed, size_t index) override;
+    
     std::vector<uint8_t> compressDouble(const std::vector<double>& values) override;
     std::vector<double> decompressDouble(const std::vector<uint8_t>& compressed) override;
+    
+    // 部分解压指定索引的值
+    double decompressDoubleAt(const std::vector<uint8_t>& compressed, size_t index) override;
     
     // Delta专用接口
     static std::vector<uint8_t> deltaCompress(const std::vector<int64_t>& values);
     static std::vector<int64_t> deltaDecompress(const std::vector<uint8_t>& compressed);
     
+    // 部分解压指定索引的值
+    static int64_t deltaDecompressAt(const std::vector<uint8_t>& compressed, size_t index);
+    
     // Delta + Varint组合压缩
     static std::vector<uint8_t> deltaVarintCompress(const std::vector<int64_t>& values);
     static std::vector<int64_t> deltaVarintDecompress(const std::vector<uint8_t>& compressed);
+    
+    // 部分解压指定索引的值
+    static int64_t deltaVarintDecompressAt(const std::vector<uint8_t>& compressed, size_t index);
     
     // 数据分析：判断是否适合Delta压缩
     static bool isSorted(const std::vector<int64_t>& values);
@@ -66,6 +84,9 @@ private:
     static std::vector<uint32_t> int64sToUint32s(const std::vector<int64_t>& values);
     static std::vector<int64_t> doublesToInt64s(const std::vector<double>& values);
     static std::vector<double> int64sToDoubles(const std::vector<int64_t>& values);
+    
+    // Helper function to read delta compression header
+    static std::tuple<uint32_t, uint8_t, int64_t> readDeltaHeader(const std::vector<uint8_t>& data, size_t& pos);
 };
 
 /**
@@ -81,9 +102,15 @@ public:
     static std::vector<uint8_t> deltaDeltaCompress(const std::vector<int64_t>& timestamps);
     static std::vector<int64_t> deltaDeltaDecompress(const std::vector<uint8_t>& compressed);
     
+    // 部分解压指定索引的值
+    static int64_t deltaDeltaDecompressAt(const std::vector<uint8_t>& compressed, size_t index);
+    
     // 时间戳专用接口
     static std::vector<uint8_t> compressTimestamps(const std::vector<int64_t>& timestamps);
     static std::vector<int64_t> decompressTimestamps(const std::vector<uint8_t>& compressed);
+    
+    // 部分解压指定索引的值
+    static int64_t decompressTimestampAt(const std::vector<uint8_t>& compressed, size_t index);
     
     // 数据分析：判断是否适合Delta-of-Delta压缩
     static bool hasRegularIntervals(const std::vector<int64_t>& timestamps, double tolerance = 0.1);

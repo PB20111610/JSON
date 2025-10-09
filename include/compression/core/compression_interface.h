@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdint>
 #include <string>
+#include <stdexcept>
 
 namespace json2 {
 namespace compression {
@@ -38,6 +39,11 @@ public:
      * 是否支持指定的压缩级别
      */
     virtual bool supportsLevel(int level) const = 0;
+    
+    /**
+     * 是否支持部分解压
+     */
+    virtual bool supportsPartialDecompression() const { return false; }
 };
 
 /**
@@ -50,11 +56,53 @@ public:
     virtual std::vector<uint8_t> compressInt64(const std::vector<int64_t>& values) = 0;
     virtual std::vector<int64_t> decompressInt64(const std::vector<uint8_t>& compressed) = 0;
     
+    /**
+     * 部分解压指定索引的值
+     * @param compressed 压缩的数据
+     * @param index 要解压的值的索引
+     * @return 指定索引处的值
+     */
+    virtual int64_t decompressInt64At(const std::vector<uint8_t>& compressed, size_t index) { 
+        auto values = decompressInt64(compressed);
+        if (index >= values.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return values[index]; 
+    }
+    
     virtual std::vector<uint8_t> compressUint32(const std::vector<uint32_t>& values) = 0;
     virtual std::vector<uint32_t> decompressUint32(const std::vector<uint8_t>& compressed) = 0;
     
+    /**
+     * 部分解压指定索引的值
+     * @param compressed 压缩的数据
+     * @param index 要解压的值的索引
+     * @return 指定索引处的值
+     */
+    virtual uint32_t decompressUint32At(const std::vector<uint8_t>& compressed, size_t index) { 
+        auto values = decompressUint32(compressed);
+        if (index >= values.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return values[index]; 
+    }
+    
     virtual std::vector<uint8_t> compressDouble(const std::vector<double>& values) = 0;
     virtual std::vector<double> decompressDouble(const std::vector<uint8_t>& compressed) = 0;
+    
+    /**
+     * 部分解压指定索引的值
+     * @param compressed 压缩的数据
+     * @param index 要解压的值的索引
+     * @return 指定索引处的值
+     */
+    virtual double decompressDoubleAt(const std::vector<uint8_t>& compressed, size_t index) { 
+        auto values = decompressDouble(compressed);
+        if (index >= values.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return values[index]; 
+    }
 };
 
 /**
@@ -66,6 +114,21 @@ public:
     
     virtual std::vector<uint8_t> compressBool(const std::vector<bool>& values) = 0;
     virtual std::vector<bool> decompressBool(const std::vector<uint8_t>& compressed, size_t count) = 0;
+    
+    /**
+     * 部分解压指定索引的值
+     * @param compressed 压缩的数据
+     * @param index 要解压的值的索引
+     * @return 指定索引处的值
+     */
+    virtual bool decompressBoolAt(const std::vector<uint8_t>& compressed, size_t index) { 
+        // 默认实现：解压所有然后返回指定索引的值
+        auto values = decompressBool(compressed, 0);
+        if (index >= values.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return values[index]; 
+    }
 };
 
 /**
@@ -77,6 +140,20 @@ public:
     
     virtual std::vector<uint8_t> compressStrings(const std::vector<std::string>& strings) = 0;
     virtual std::vector<std::string> decompressStrings(const std::vector<uint8_t>& compressed) = 0;
+    
+    /**
+     * 部分解压指定索引的值
+     * @param compressed 压缩的数据
+     * @param index 要解压的值的索引
+     * @return 指定索引处的值
+     */
+    virtual std::string decompressStringAt(const std::vector<uint8_t>& compressed, size_t index) { 
+        auto values = decompressStrings(compressed);
+        if (index >= values.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return values[index]; 
+    }
 };
 
 } // namespace compression

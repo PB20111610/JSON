@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <cstring>
+#include <stdexcept>
 
 namespace json2 {
 namespace compression {
@@ -23,6 +24,10 @@ public:
 
     template<typename T>
     static T readValue(const std::vector<uint8_t>& data, size_t& pos) {
+        // Bounds checking to prevent segmentation faults
+        if (pos + sizeof(T) > data.size()) {
+            throw std::runtime_error("SerializationUtils::readValue: Attempt to read beyond data bounds");
+        }
         T value;
         std::memcpy(&value, &data[pos], sizeof(T));
         pos += sizeof(T);

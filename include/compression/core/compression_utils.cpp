@@ -16,7 +16,19 @@ void SerializationUtils::writeString(std::vector<uint8_t>& data, const std::stri
 }
 
 std::string SerializationUtils::readString(const std::vector<uint8_t>& data, size_t& pos) {
+    // First check if we can read the length
+    if (pos + sizeof(uint32_t) > data.size()) {
+        throw std::runtime_error("SerializationUtils::readString: Insufficient data for string length");
+    }
+    
     uint32_t length = readValue<uint32_t>(data, pos);
+    
+    // Check if we have enough data for the string content
+    if (pos + length > data.size()) {
+        throw std::runtime_error("SerializationUtils::readString: Insufficient data for string content, requested: " + 
+                                std::to_string(length) + ", available: " + std::to_string(data.size() - pos));
+    }
+    
     std::string str(reinterpret_cast<const char*>(&data[pos]), length);
     pos += length;
     return str;

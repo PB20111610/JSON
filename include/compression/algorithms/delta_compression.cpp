@@ -21,7 +21,7 @@ static void writeDeltaHeader(std::vector<uint8_t>& output, uint32_t count, uint8
 }
 
 // Helper function to read delta compression header
-static std::tuple<uint32_t, uint8_t, int64_t> readDeltaHeader(const std::vector<uint8_t>& data, size_t& pos) {
+std::tuple<uint32_t, uint8_t, int64_t> DeltaCompression::readDeltaHeader(const std::vector<uint8_t>& data, size_t& pos) {
     if (pos + sizeof(uint32_t) + sizeof(uint8_t) > data.size()) {
         throw std::runtime_error("Delta: Invalid header - insufficient data");
     }
@@ -129,6 +129,39 @@ std::vector<int64_t> DeltaCompression::decompressInt64(const std::vector<uint8_t
     }
 }
 
+// 部分解压指定索引的值
+int64_t DeltaCompression::decompressInt64At(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.empty()) {
+        throw std::runtime_error("Delta: Empty compressed data");
+    }
+    
+    try {
+        size_t pos = 0;
+        auto [count, compression_type, base_value] = readDeltaHeader(compressed, pos);
+        
+        // Validate index
+        if (index >= count) {
+            throw std::out_of_range("Delta: Index out of range");
+        }
+        
+        // Extract compressed data portion
+        std::vector<uint8_t> data(compressed.begin() + pos, compressed.end());
+        
+        if (compression_type & 0x04) { // Delta-varint encoding used
+            return deltaVarintDecompressAt(data, index);
+        } else { // Simple serialization fallback
+            auto values = utils::SerializationUtils::bytesToInt64s(data);
+            if (index >= values.size()) {
+                throw std::out_of_range("Delta: Index out of range");
+            }
+            return values[index];
+        }
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Delta partial decompression failed: " + std::string(e.what()));
+    }
+}
+
 std::vector<uint8_t> DeltaCompression::compressUint32(const std::vector<uint32_t>& values) {
     if (values.empty()) return {};
     
@@ -151,6 +184,15 @@ std::vector<uint32_t> DeltaCompression::decompressUint32(const std::vector<uint8
     }
 }
 
+// 部分解压指定索引的值
+uint32_t DeltaCompression::decompressUint32At(const std::vector<uint8_t>& compressed, size_t index) {
+    int64_t value = decompressInt64At(compressed, index);
+    if (value < 0 || value > UINT32_MAX) {
+        throw std::runtime_error("Delta: Value out of uint32 range: " + std::to_string(value));
+    }
+    return static_cast<uint32_t>(value);
+}
+
 std::vector<uint8_t> DeltaCompression::compressDouble(const std::vector<double>& values) {
     if (values.empty()) return {};
     
@@ -171,6 +213,14 @@ std::vector<double> DeltaCompression::decompressDouble(const std::vector<uint8_t
     } catch (const std::exception& e) {
         throw std::runtime_error("Delta double decompression failed: " + std::string(e.what()));
     }
+}
+
+// 部分解压指定索引的值
+double DeltaCompression::decompressDoubleAt(const std::vector<uint8_t>& compressed, size_t index) {
+    int64_t int_value = decompressInt64At(compressed, index);
+    double double_value;
+    std::memcpy(&double_value, &int_value, sizeof(double));
+    return double_value;
 }
 
 // ========== Enhanced Delta Compression Core Implementation ==========
@@ -217,6 +267,38 @@ std::vector<int64_t> DeltaCompression::deltaDecompress(const std::vector<uint8_t
         
     } catch (const std::exception& e) {
         throw std::runtime_error("Delta decompression reconstruction failed: " + std::string(e.what()));
+    }
+}
+
+// 部分解压指定索引的值
+int64_t DeltaCompression::deltaDecompressAt(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.empty()) {
+        throw std::runtime_error("Delta: Empty compressed data");
+    }
+    
+    try {
+        auto deltas = utils::SerializationUtils::bytesToInt64s(compressed);
+        if (deltas.empty()) {
+            throw std::runtime_error("Delta: Empty deltas data");
+        }
+        
+        // Validate index
+        if (index >= deltas.size()) {
+            throw std::out_of_range("Delta: Index out of range");
+        }
+        
+        // Reconstruct value at index by accumulating deltas
+        int64_t value = deltas[0]; // First value
+        
+        // Accumulate deltas up to the target index
+        for (size_t i = 1; i <= index; ++i) {
+            value += deltas[i];
+        }
+        
+        return value;
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Delta partial decompression failed: " + std::string(e.what()));
     }
 }
 
@@ -274,6 +356,51 @@ std::vector<int64_t> DeltaCompression::deltaVarintDecompress(const std::vector<u
         
     } catch (const std::exception& e) {
         throw std::runtime_error("Delta-varint decompression failed: " + std::string(e.what()));
+    }
+}
+
+// 部分解压指定索引的值
+int64_t DeltaCompression::deltaVarintDecompressAt(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.empty()) {
+        throw std::runtime_error("Delta-varint: Empty compressed data");
+    }
+    
+    try {
+        size_t pos = 0;
+        
+        // Read the first value
+        if (pos >= compressed.size()) {
+            throw std::runtime_error("Delta-varint: Insufficient data for first value");
+        }
+        
+        int64_t first = VarintCompression::decodeVarint(compressed, pos);
+        
+        // If index is 0, return the first value directly
+        if (index == 0) {
+            return first;
+        }
+        
+        // Decode subsequent delta values until we reach the target index
+        int64_t prev = first;
+        size_t current_index = 1;
+        
+        while (pos < compressed.size() && current_index <= index) {
+            int64_t delta = VarintCompression::decodeVarint(compressed, pos);
+            int64_t value = prev + delta;
+            
+            if (current_index == index) {
+                return value;
+            }
+            
+            prev = value;
+            current_index++;
+        }
+        
+        // If we get here, the index is out of range
+        throw std::out_of_range("Delta-varint: Index out of range");
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Delta-varint partial decompression failed: " + std::string(e.what()));
     }
 }
 
@@ -496,6 +623,67 @@ std::vector<int64_t> DeltaDeltaCompression::deltaDeltaDecompress(const std::vect
     }
 }
 
+// 部分解压指定索引的值
+int64_t DeltaDeltaCompression::deltaDeltaDecompressAt(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.empty()) {
+        throw std::runtime_error("Delta-delta: Empty compressed data");
+    }
+    
+    try {
+        std::vector<int64_t> timestamps;
+        size_t pos = 0;
+        
+        // Read the first two values with validation
+        if (pos >= compressed.size()) {
+            throw std::runtime_error("Delta-delta: Insufficient data for first timestamp");
+        }
+        
+        int64_t first = VarintCompression::decodeVarint(compressed, pos);
+        timestamps.push_back(first);
+        
+        // If index is 0, return the first value directly
+        if (index == 0) {
+            return first;
+        }
+        
+        if (pos >= compressed.size()) {
+            throw std::out_of_range("Delta-delta: Index out of range");
+        }
+        
+        int64_t second = VarintCompression::decodeVarint(compressed, pos);
+        timestamps.push_back(second);
+        
+        // If index is 1, return the second value directly
+        if (index == 1) {
+            return second;
+        }
+        
+        // Decode delta-of-delta with bounds checking until we reach the target index
+        int64_t prev_delta = second - first;
+        size_t current_index = 2;
+        
+        while (pos < compressed.size() && current_index <= index) {
+            int64_t delta_of_delta = VarintCompression::decodeVarint(compressed, pos);
+            int64_t curr_delta = prev_delta + delta_of_delta;
+            int64_t value = timestamps.back() + curr_delta;
+            timestamps.push_back(value);
+            prev_delta = curr_delta;
+            current_index++;
+            
+            // If we've reached the target index, return the value
+            if (current_index - 1 == index) {
+                return value;
+            }
+        }
+        
+        // If we get here, the index is out of range
+        throw std::out_of_range("Delta-delta: Index out of range");
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Delta-delta partial decompression failed: " + std::string(e.what()));
+    }
+}
+
 std::vector<uint8_t> DeltaDeltaCompression::compressTimestamps(const std::vector<int64_t>& timestamps) {
     if (timestamps.empty()) return {};
     
@@ -514,6 +702,11 @@ std::vector<int64_t> DeltaDeltaCompression::decompressTimestamps(const std::vect
     } catch (const std::exception& e) {
         throw std::runtime_error("Timestamp decompression failed: " + std::string(e.what()));
     }
+}
+
+// 部分解压指定索引的值
+int64_t DeltaDeltaCompression::decompressTimestampAt(const std::vector<uint8_t>& compressed, size_t index) {
+    return deltaDeltaDecompressAt(compressed, index);
 }
 
 bool DeltaDeltaCompression::hasRegularIntervals(const std::vector<int64_t>& timestamps, double tolerance) {

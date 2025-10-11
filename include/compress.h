@@ -72,6 +72,9 @@ public:
     // 从文件加载压缩数据
     static CompressedData loadFromFile(const std::string& filename);
 
+    static bool saveToFile(const GranularCompressedData& data, const std::string& filename);
+    static GranularCompressedData loadFromFileGranular(const std::string& filename);
+
     // ========== 新的细粒度压缩接口 ==========
     // 细粒度压缩Trie树和相关数据
     static GranularCompressedData compressGranular(const Trie& trie, const FieldDictionaryManager& manager, bool use_layer_separation = false);
@@ -85,13 +88,13 @@ public:
     
     // 部分解压缩（按需加载特定组件）
     struct PartialDecompressionOptions {
-        bool load_trie = true;
-        bool load_string_dict = true;
-        bool load_timestamp_dict = true;
-        bool load_logtype_dict = true;
-        bool load_layers = true;
-        bool load_metadata = true;
-        std::vector<size_t> specific_layers; // 如果使用分层压缩，指定加载哪些层
+        bool load_metadata = true;          // 是否加载元数据
+        bool load_string_dict = false;      // 是否加载String字典
+        bool load_timestamp_dict = false;   // 是否加载Timestamp字典
+        bool load_logtype_dict = false;     // 是否加载LogType字典
+        bool load_trie = false;             // 是否加载Trie结构
+        bool load_layers = false;           // 是否加载分层内容
+        std::vector<size_t> specific_layers; // 指定要加载的层索引（空表示加载所有层）
     };
     
     static std::pair<std::unique_ptr<Trie>, std::unique_ptr<FieldDictionaryManager>> 
@@ -144,6 +147,16 @@ public:
     // 内存序列化/反序列化接口
     static std::vector<uint8_t> saveToMemory(const CompressedData& compressed_data);
     static CompressedData loadFromMemory(const std::vector<uint8_t>& buffer);
+    static std::vector<uint8_t> saveToMemory(const GranularCompressedData& data);
+    static GranularCompressedData loadFromMemoryGranular(const std::vector<uint8_t>& data);
+
+    // 部分解压字典中的特定值
+    static std::string getStringValueAt(const std::vector<uint8_t>& data, const FieldKey& target_fk, uint32_t code);
+    static std::string getTimestampTemplateAt(const std::vector<uint8_t>& data, uint32_t template_id);
+    static std::string getTimestampVariableAt(const std::vector<uint8_t>& data, uint32_t var_code);
+    static std::string getLogTypeTemplateAt(const std::vector<uint8_t>& data, uint32_t template_id);
+    static std::string getLogTypeVariableAt(const std::vector<uint8_t>& data, uint32_t var_code);
+    
 };
 
 } // namespace json2 

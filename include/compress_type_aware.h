@@ -58,6 +58,33 @@ public:
                              const Compressor::PartialDecompressionOptions& options,
                              const compression::TypeAwareCompressionConfig& config = {});
 
+    // ========== 类型敏感的部分解压缩接口 ==========
+    // 部分解压String字典中的特定值（使用配置的字典后端）
+    static std::string getStringValueAt(const std::vector<uint8_t>& data, 
+                                       const FieldKey& target_fk, 
+                                       uint32_t code,
+                                       const compression::TypeAwareCompressionConfig& config = {});
+    
+    // 部分解压Timestamp字典中的模板（使用配置的字典后端）
+    static std::string getTimestampTemplateAt(const std::vector<uint8_t>& data, 
+                                             uint32_t template_id,
+                                             const compression::TypeAwareCompressionConfig& config = {});
+    
+    // 部分解压Timestamp字典中的变量（使用配置的字典后端）
+    static std::string getTimestampVariableAt(const std::vector<uint8_t>& data, 
+                                             uint32_t var_code,
+                                             const compression::TypeAwareCompressionConfig& config = {});
+    
+    // 部分解压LogType字典中的模板（使用配置的字典后端）
+    static std::string getLogTypeTemplateAt(const std::vector<uint8_t>& data, 
+                                           uint32_t template_id,
+                                           const compression::TypeAwareCompressionConfig& config = {});
+    
+    // 部分解压LogType字典中的变量（使用配置的字典后端）
+    static std::string getLogTypeVariableAt(const std::vector<uint8_t>& data, 
+                                           uint32_t var_code,
+                                           const compression::TypeAwareCompressionConfig& config = {});
+
     // Statistics for type-aware compression
     static void printCompressionStats(const compression::TypeAwareCompressionConfig& config = {});
     static void clearCompressionStats(const compression::TypeAwareCompressionConfig& config = {});

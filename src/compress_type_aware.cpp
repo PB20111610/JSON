@@ -16,6 +16,35 @@
 
 namespace json2 {
 
+// ========== Helper functions for reading/writing data (in anonymous namespace to avoid linkage issues) ==========
+
+namespace {
+    template<typename T>
+    T readValue(const std::vector<uint8_t>& data, size_t& pos) {
+        T value;
+        std::memcpy(&value, &data[pos], sizeof(T));
+        pos += sizeof(T);
+        return value;
+    }
+
+    std::string readString(const std::vector<uint8_t>& data, size_t& pos) {
+        uint32_t length = readValue<uint32_t>(data, pos);
+        std::string str(reinterpret_cast<const char*>(&data[pos]), length);
+        pos += length;
+        return str;
+    }
+
+    std::vector<std::string> readVector(const std::vector<uint8_t>& data, size_t& pos) {
+        uint32_t size = readValue<uint32_t>(data, pos);
+        std::vector<std::string> vec;
+        vec.reserve(size);
+        for (uint32_t i = 0; i < size; ++i) {
+            vec.push_back(readString(data, pos));
+        }
+        return vec;
+    }
+}
+
 // ========== Systematic Helper Functions Following compress.cpp Patterns ==========
 
 // Helper function to validate configuration parameters
@@ -913,6 +942,292 @@ TypeAwareCompressor::decompressGranularPartial(const GranularCompressedData& com
     } catch (const std::exception& e) {
         throw std::runtime_error("TypeAware granular partial decompression failed: " + std::string(e.what()));
     }
+}
+
+
+// ========== 类型敏感的部分解压缩实现 ==========
+
+// Forward declaration of the decompressWithConfig function
+std::vector<uint8_t> decompressWithConfig(const std::vector<uint8_t>& compressed_data,
+                                         compression::FieldType field_type,
+                                         const compression::TypeAwareCompressionConfig& config);
+
+// 部分解压String字典中的特定值（使用配置的字典后端）
+std::string TypeAwareCompressor::getStringValueAt(const std::vector<uint8_t>& data, 
+                                                 const FieldKey& target_fk, 
+                                                 uint32_t code,
+                                                 const compression::TypeAwareCompressionConfig& config) {
+    // Decompress the data using the configured backend via decompressWithConfig
+    std::vector<uint8_t> decompressed_data;
+    try {
+        decompressed_data = decompressWithConfig(data, compression::FieldType::STRING, config);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to decompress data with configured backend: " + std::string(e.what()));
+    }
+    
+    // Reuse the parsing logic from Compressor::getStringValueAt but with our pre-decompressed data
+    if (decompressed_data.empty()) {
+        throw std::runtime_error("Empty data buffer");
+    }
+    
+    // If decompressed data is too small, it might be empty
+    if (decompressed_data.size() < sizeof(uint32_t)) {
+        throw std::runtime_error("Decompressed data too small - possibly empty dictionary");
+    }
+    
+    size_t pos = 0;
+    
+    // 读取字典数量
+    if (pos + sizeof(uint32_t) > decompressed_data.size()) {
+        throw std::runtime_error("Buffer too small for dictionary count");
+    }
+    
+    uint32_t string_dict_count = readValue<uint32_t>(decompressed_data, pos);
+    
+    // Safety check to prevent infinite loops or buffer overflows
+    if (string_dict_count > 10000) {
+        throw std::runtime_error("Invalid dictionary count - possible data corruption");
+    }
+    
+    // Handle empty dictionary case
+    if (string_dict_count == 0) {
+        throw std::runtime_error("String dictionary is empty");
+    }
+    
+    // For String fields, all fields share a global dictionary
+    // So we just need to find the first String field and get its values
+    if (target_fk.type == FieldType::String) {
+        // Look for any String field to get the global dictionary
+        for (uint32_t i = 0; i < string_dict_count; ++i) {
+            std::string name = readString(decompressed_data, pos);
+            FieldType type = static_cast<FieldType>(readValue<uint32_t>(decompressed_data, pos));
+            
+            // Read the values of this field
+            std::vector<std::string> values = readVector(decompressed_data, pos);
+            
+            // If this is a String field, use its values as the global dictionary
+            if (type == FieldType::String) {
+                // Check if code is valid
+                if (code > 0 && code <= values.size()) {
+                    std::string value = values[code - 1];
+                    return value;
+                } else {
+                    throw std::out_of_range("Invalid code for field - code out of range");
+                }
+            }
+        }
+        
+        // If we get here, we didn't find any String fields
+        throw std::runtime_error("No String fields found in dictionary");
+    }
+    
+    // For non-String fields or if we need field-specific matching
+    // Reset position and try exact field matching
+    pos = sizeof(uint32_t); // Reset to after dictionary count
+    
+    // 遍历字典查找目标FieldKey
+    for (uint32_t i = 0; i < string_dict_count; ++i) {
+        // Check if we have enough data to read the field name length
+        if (pos + sizeof(uint32_t) > decompressed_data.size()) {
+            throw std::runtime_error("Buffer too small for field name length");
+        }
+        
+        // 读取字段名
+        std::string name = readString(decompressed_data, pos);
+        FieldType type = static_cast<FieldType>(readValue<uint32_t>(decompressed_data, pos));
+        FieldKey fk{name, type};
+        
+        // 检查是否为目标FieldKey
+        if (fk.name == target_fk.name && fk.type == target_fk.type) {
+            // 读取该字段的所有值 (使用readVector)
+            std::vector<std::string> values = readVector(decompressed_data, pos);
+            uint32_t values_count = static_cast<uint32_t>(values.size());
+            
+            // 检查code是否有效
+            if (code > values_count || code == 0) {
+                throw std::out_of_range("Invalid code for field");
+            }
+            
+            // 返回目标值 (code是1-based)
+            std::string value = values[code - 1];
+            return value;
+        } else {
+            // 跳过这个字段的所有值 (使用readVector来跳 over the data)
+            std::vector<std::string> values = readVector(decompressed_data, pos);
+        }
+    }
+    
+    throw std::runtime_error("FieldKey not found in dictionary");
+}
+
+// 部分解压Timestamp字典中的模板（使用配置的字典后端）
+std::string TypeAwareCompressor::getTimestampTemplateAt(const std::vector<uint8_t>& data, 
+                                                       uint32_t template_id,
+                                                       const compression::TypeAwareCompressionConfig& config) {
+    if (template_id == 0) {
+        throw std::out_of_range("Invalid template ID");
+    }
+    
+    // Decompress the data using the configured backend via decompressWithConfig
+    std::vector<uint8_t> decompressed_data;
+    try {
+        decompressed_data = decompressWithConfig(data, compression::FieldType::TIMESTAMP, config);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to decompress data with configured backend: " + std::string(e.what()));
+    }
+    
+    // Reuse the parsing logic from Compressor::getTimestampTemplateAt but with our pre-decompressed data
+    size_t pos = 0;
+    
+    // 读取模板数量
+    uint32_t templates_count = readValue<uint32_t>(decompressed_data, pos);
+    
+    // 检查template_id是否有效
+    if (template_id > templates_count) {
+        throw std::out_of_range("Template ID out of range");
+    }
+    
+    // 跳转到指定template_id的模板
+    for (uint32_t i = 1; i < template_id; ++i) {
+        uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+        pos += str_length; // 跳过字符串内容
+    }
+    
+    // 读取目标模板
+    uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+    std::string template_str(reinterpret_cast<const char*>(&decompressed_data[pos]), str_length);
+    return template_str;
+}
+
+// 部分解压Timestamp字典中的变量（使用配置的字典后端）
+std::string TypeAwareCompressor::getTimestampVariableAt(const std::vector<uint8_t>& data, 
+                                                       uint32_t var_code,
+                                                       const compression::TypeAwareCompressionConfig& config) {
+    if (var_code == 0) {
+        throw std::out_of_range("Invalid variable code");
+    }
+    
+    // Decompress the data using the configured backend via decompressWithConfig
+    std::vector<uint8_t> decompressed_data;
+    try {
+        decompressed_data = decompressWithConfig(data, compression::FieldType::TIMESTAMP, config);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to decompress data with configured backend: " + std::string(e.what()));
+    }
+    
+    // Reuse the parsing logic from Compressor::getTimestampVariableAt but with our pre-decompressed data
+    size_t pos = 0;
+    
+    // 先跳过模板部分
+    uint32_t templates_count = readValue<uint32_t>(decompressed_data, pos);
+    for (uint32_t i = 0; i < templates_count; ++i) {
+        uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+        pos += str_length; // 跳过字符串内容
+    }
+    
+    // 读取变量数量
+    uint32_t variables_count = readValue<uint32_t>(decompressed_data, pos);
+    
+    // 检查var_code是否有效
+    if (var_code > variables_count) {
+        throw std::out_of_range("Variable code out of range");
+    }
+    
+    // 跳转到指定var_code的变量
+    for (uint32_t i = 1; i < var_code; ++i) {
+        uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+        pos += str_length; // 跳过字符串内容
+    }
+    
+    // 读取目标变量
+    uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+    std::string variable_str(reinterpret_cast<const char*>(&decompressed_data[pos]), str_length);
+    return variable_str;
+}
+
+// 部分解压LogType字典中的模板（使用配置的字典后端）
+std::string TypeAwareCompressor::getLogTypeTemplateAt(const std::vector<uint8_t>& data, 
+                                                     uint32_t template_id,
+                                                     const compression::TypeAwareCompressionConfig& config) {
+    if (template_id == 0) {
+        throw std::out_of_range("Invalid template ID");
+    }
+    
+    // Decompress the data using the configured backend via decompressWithConfig
+    std::vector<uint8_t> decompressed_data;
+    try {
+        decompressed_data = decompressWithConfig(data, compression::FieldType::LOGTYPE, config);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to decompress data with configured backend: " + std::string(e.what()));
+    }
+    
+    // Reuse the parsing logic from Compressor::getLogTypeTemplateAt but with our pre-decompressed data
+    size_t pos = 0;
+    
+    // 读取模板数量
+    uint32_t templates_count = readValue<uint32_t>(decompressed_data, pos);
+    
+    // 检查template_id是否有效
+    if (template_id > templates_count) {
+        throw std::out_of_range("Template ID out of range");
+    }
+    
+    // 跳转到指定template_id的模板
+    for (uint32_t i = 1; i < template_id; ++i) {
+        uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+        pos += str_length; // 跳过字符串内容
+    }
+    
+    // 读取目标模板
+    uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+    std::string template_str(reinterpret_cast<const char*>(&decompressed_data[pos]), str_length);
+    return template_str;
+}
+
+// 部分解压LogType字典中的变量（使用配置的字典后端）
+std::string TypeAwareCompressor::getLogTypeVariableAt(const std::vector<uint8_t>& data, 
+                                                     uint32_t var_code,
+                                                     const compression::TypeAwareCompressionConfig& config) {
+    if (var_code == 0) {
+        throw std::out_of_range("Invalid variable code");
+    }
+    
+    // Decompress the data using the configured backend via decompressWithConfig
+    std::vector<uint8_t> decompressed_data;
+    try {
+        decompressed_data = decompressWithConfig(data, compression::FieldType::LOGTYPE, config);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to decompress data with configured backend: " + std::string(e.what()));
+    }
+    
+    // Reuse the parsing logic from Compressor::getLogTypeVariableAt but with our pre-decompressed data
+    size_t pos = 0;
+    
+    // 先跳过模板部分
+    uint32_t templates_count = readValue<uint32_t>(decompressed_data, pos);
+    for (uint32_t i = 0; i < templates_count; ++i) {
+        uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+        pos += str_length; // 跳过字符串内容
+    }
+    
+    // 读取变量数量
+    uint32_t variables_count = readValue<uint32_t>(decompressed_data, pos);
+    
+    // 检查var_code是否有效
+    if (var_code > variables_count) {
+        throw std::out_of_range("Variable code out of range");
+    }
+    
+    // 跳转到指定var_code的变量
+    for (uint32_t i = 1; i < var_code; ++i) {
+        uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+        pos += str_length; // 跳过字符串内容
+    }
+    
+    // 读取目标变量
+    uint32_t str_length = readValue<uint32_t>(decompressed_data, pos);
+    std::string variable_str(reinterpret_cast<const char*>(&decompressed_data[pos]), str_length);
+    return variable_str;
 }
 
 } // namespace json2

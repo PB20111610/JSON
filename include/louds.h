@@ -8,6 +8,7 @@
 #include <optional>
 #include <unordered_map>
 #include <string>
+#include <stdexcept>  // Add this include for std::out_of_range
 
 namespace json2 {
 
@@ -27,7 +28,13 @@ public:
     const std::vector<NodeValue>& getLayer(size_t layer_idx) const;
     
     // 获取层数
-    size_t getLayerCount() const { return layers_.size(); }
+    size_t getLayerCount() const { 
+        // If we have layer sizes information, use that as the layer count
+        if (!layer_sizes_.empty()) {
+            return layer_sizes_.size();
+        }
+        return layers_.size(); 
+    }
     
     // 序列化/反序列化
     void serialize(std::ostream& out) const;
@@ -44,9 +51,17 @@ public:
     // 单层序列化/反序列化
     void serializeLayer(size_t layer_idx, std::ostream& out) const;
     void deserializeLayer(size_t layer_idx, std::istream& in);
+    
+    // 设置层大小信息（用于压缩环境下的索引计算）
+    void setLayerSizes(const std::vector<size_t>& layer_sizes);
+    
+    // 获取层大小信息
+    const std::vector<size_t>& getLayerSizes() const;
 
 private:
     std::vector<std::vector<NodeValue>> layers_;
+    // 新增：存储每层的大小信息，用于在压缩环境下正确计算索引
+    std::vector<size_t> layer_sizes_;
 };
 
 class LOUDSTrie {

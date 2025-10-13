@@ -12,23 +12,84 @@ namespace json2 {
 // === LayeredNodeStorage 实现 ===
 
 void LayeredNodeStorage::addLayer(const FieldKey& /*field_key*/, size_t /*start_offset*/) {
+    // Always add to layers_ regardless of layer_sizes_ state
     layers_.emplace_back();
 }
 
 void LayeredNodeStorage::addNodeValue(const NodeValue& value, size_t layer_idx) {
+    // Check if we have layer sizes information (for compressed environment)
+    if (!layer_sizes_.empty()) {
+        // In compressed environment, we might be adding values to layers that don't exist yet
+        // Ensure the layer exists in the layers_ vector
+        if (layer_idx >= layers_.size()) {
+            layers_.resize(layer_idx + 1);
+        }
+        layers_[layer_idx].push_back(value);
+        return;
+    }
+    
+    // In uncompressed environment, use the original logic
     if (layers_.empty() || layer_idx >= layers_.size()) return;
     layers_[layer_idx].push_back(value);
 }
 
 const NodeValue& LayeredNodeStorage::getNodeValue(size_t layer_idx, size_t node_idx) const {
-    assert(layer_idx < layers_.size());
-    assert(node_idx < layers_[layer_idx].size());
-    return layers_[layer_idx][node_idx];
+    // Check if we have layer sizes information (for compressed environment)
+    if (!layer_sizes_.empty()) {
+        // In compressed environment, we need to validate against layer_sizes_ instead of layers_
+        if (layer_idx >= layer_sizes_.size()) {
+            throw std::out_of_range("Layer index out of range");
+        }
+        // For compressed environments, we might not have actual layer data loaded
+        // Return a default null value if the layer doesn't exist in layers_
+        if (layer_idx >= layers_.size() || node_idx >= layers_[layer_idx].size()) {
+            static const NodeValue null_value = std::nullptr_t{};
+            return null_value;
+        }
+    } else {
+        // In uncompressed environment, validate against actual layers_
+        assert(layer_idx < layers_.size());
+        assert(node_idx < layers_[layer_idx].size());
+    }
+    
+    // If we have the layer data, return the actual value
+    if (layer_idx < layers_.size() && node_idx < layers_[layer_idx].size()) {
+        return layers_[layer_idx][node_idx];
+    }
+    
+    // Fallback to null value
+    static const NodeValue null_value = std::nullptr_t{};
+    return null_value;
 }
 
 const std::vector<NodeValue>& LayeredNodeStorage::getLayer(size_t layer_idx) const {
-    assert(layer_idx < layers_.size());
-    return layers_[layer_idx];
+    // Check if we have layer sizes information (for compressed environment)
+    if (!layer_sizes_.empty()) {
+        // In compressed environment, validate against layer_sizes_
+        if (layer_idx >= layer_sizes_.size()) {
+            throw std::out_of_range("Layer index out of range");
+        }
+        // If the layer doesn't exist in layers_ but we know its size from layer_sizes_,
+        // we might need to create a temporary empty layer
+        if (layer_idx >= layers_.size()) {
+            // This is a compressed environment where layers might not be fully loaded
+            // Return a reference to a static empty vector
+            static const std::vector<NodeValue> empty_layer;
+            return empty_layer;
+        }
+    } else {
+        // In uncompressed environment, validate against actual layers_
+        assert(layer_idx < layers_.size());
+    }
+    
+    // If we have the layer data, return it
+    if (layer_idx < layers_.size()) {
+        return layers_[layer_idx];
+    }
+    
+    // Fallback to empty layer
+    static const std::vector<NodeValue> empty_layer;
+    return empty_layer;
 }
 
 const NodeValue& LayeredNodeStorage::getBFSNodeValue(size_t bfs_idx) const {
@@ -37,6 +98,25 @@ const NodeValue& LayeredNodeStorage::getBFSNodeValue(size_t bfs_idx) const {
 }
 
 std::pair<size_t, size_t> LayeredNodeStorage::bfsToLayerIndex(size_t bfs_idx) const {
+    // 如果有层大小信息，使用层大小进行计算（适用于压缩环境）
+    if (!layer_sizes_.empty()) {
+        size_t current_idx = 0;
+        for (size_t i = 0; i < layer_sizes_.size(); ++i) {
+            size_t layer_size = layer_sizes_[i];
+            if (bfs_idx >= current_idx && bfs_idx < current_idx + layer_size) {
+                return {i, bfs_idx - current_idx};
+            }
+            current_idx += layer_size;
+        }
+        // 如果超出范围，返回最后一层的最后一个节点
+        if (!layer_sizes_.empty()) {
+            size_t last_layer = layer_sizes_.size() - 1;
+            size_t last_layer_size = layer_sizes_[last_layer];
+            return {last_layer, last_layer_size > 0 ? last_layer_size - 1 : 0};
+        }
+    }
+    
+    // 否则使用实际节点数进行计算（适用于非压缩环境）
     size_t current_idx = 0;
     size_t layer_idx = 0;
     size_t node_idx = 0;
@@ -51,12 +131,40 @@ std::pair<size_t, size_t> LayeredNodeStorage::bfsToLayerIndex(size_t bfs_idx) co
     }
     if (layer_idx >= layers_.size()) {
         layer_idx = layers_.size() - 1;
-        node_idx = layers_[layer_idx].size() - 1;
+        if (!layers_.empty() && !layers_[layer_idx].empty()) {
+            node_idx = layers_[layer_idx].size() - 1;
+        } else {
+            node_idx = 0;
+        }
     }
     return {layer_idx, node_idx};
 }
 
 size_t LayeredNodeStorage::layerIndexToBFS(size_t layer_idx, size_t node_idx_in_layer) const {
+    // 如果有层大小信息，使用层大小进行计算（适用于压缩环境）
+    if (!layer_sizes_.empty()) {
+        // 验证输入参数
+        if (layer_idx >= layer_sizes_.size()) {
+            return 0; // 或者抛出异常
+        }
+        
+        size_t layer_size = layer_sizes_[layer_idx];
+        if (node_idx_in_layer >= layer_size) {
+            // Return the last valid index in the layer instead of 0
+            node_idx_in_layer = layer_size > 0 ? layer_size - 1 : 0;
+        }
+        
+        // 计算BFS索引：前面所有层的节点数之和 + 当前层内的索引
+        size_t bfs_idx = 0;
+        for (size_t i = 0; i < layer_idx; ++i) {
+            bfs_idx += layer_sizes_[i];
+        }
+        bfs_idx += node_idx_in_layer;
+        
+        return bfs_idx;
+    }
+    
+    // 否则使用实际节点数进行计算（适用于非压缩环境）
     // 验证输入参数
     if (layer_idx >= layers_.size()) {
         return 0; // 或者抛出异常
@@ -64,7 +172,8 @@ size_t LayeredNodeStorage::layerIndexToBFS(size_t layer_idx, size_t node_idx_in_
     
     const auto& layer = layers_[layer_idx];
     if (node_idx_in_layer >= layer.size()) {
-        return 0; // 或者抛出异常
+        // Return the last valid index in the layer instead of 0
+        node_idx_in_layer = layer.size() > 0 ? layer.size() - 1 : 0;
     }
     
     // 计算BFS索引：前面所有层的节点数之和 + 当前层内的索引
@@ -75,6 +184,14 @@ size_t LayeredNodeStorage::layerIndexToBFS(size_t layer_idx, size_t node_idx_in_
     bfs_idx += node_idx_in_layer;
     
     return bfs_idx;
+}
+
+void LayeredNodeStorage::setLayerSizes(const std::vector<size_t>& layer_sizes) {
+    layer_sizes_ = layer_sizes;
+}
+
+const std::vector<size_t>& LayeredNodeStorage::getLayerSizes() const {
+    return layer_sizes_;
 }
 
 void LayeredNodeStorage::serialize(std::ostream& out) const {
@@ -348,7 +465,7 @@ void LOUDSTrie::buildLayeredContentRecursive(const TrieNode* node, size_t depth,
         }
     }
     
-// 新增：BFS方式按字段顺序构建分层内容
+// BFS方式按字段顺序构建分层内容
 void LOUDSTrie::buildLayeredContentByField_BFS(const Trie& trie) {
     const TrieNode* root = trie.getRoot();
     if (!root) return;

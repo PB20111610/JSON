@@ -522,7 +522,119 @@ ChunkedTypeAwareCompressor::deserialize(const std::vector<uint8_t>& data) {
         uint32_t block_count = 0;
         std::memcpy(&block_count, &data[offset], sizeof(block_count));
         offset += sizeof(block_count);
-        for (uint32_t i = 0; i < block_count; ++i) {
+        // 判断是否有granular_enabled字段
+        if (data.size() > offset + 2) {
+            uint8_t granular_enabled = data[offset];
+            uint8_t layer_separation = data[offset + 1];
+            uint32_t compression_level = 0;
+            std::memcpy(&compression_level, &data[offset + 2], sizeof(compression_level));
+            std::cerr << "[DESER] block_count=" << block_count << ", granular_enabled=" << (int)granular_enabled 
+                      << ", layer_separation=" << (int)layer_separation << ", compression_level=" << compression_level 
+                      << ", offset=" << offset << std::endl;
+            // 细粒度格式magic: granular_enabled==1
+            if (granular_enabled == 1) {
+                offset += 2 + sizeof(compression_level);
+                // 读取每个块的元数据
+                struct BlockMeta {
+                    uint32_t trie_size, string_dict_size, timestamp_dict_size, logtype_dict_size, metadata_size;
+                    uint32_t layer_count_or_combined_size;
+                    uint32_t block_compression_level;
+                    std::vector<uint32_t> layer_sizes; // 如果分层
+                };
+                std::vector<BlockMeta> metas(block_count);
+                for (uint32_t i = 0; i < block_count; ++i) {
+                    BlockMeta meta;
+                    uint32_t block_index = 0;
+                    std::memcpy(&block_index, &data[offset], sizeof(block_index));
+                    std::cerr << "[DESER] Block " << i << " index=" << block_index << ", offset=" << offset << std::endl;
+                    offset += sizeof(block_index);
+                    std::memcpy(&meta.trie_size, &data[offset], sizeof(meta.trie_size));
+                    std::cerr << "[DESER] Block " << i << " trie_size=" << meta.trie_size << ", offset=" << offset << std::endl;
+                    offset += sizeof(meta.trie_size);
+                    std::memcpy(&meta.string_dict_size, &data[offset], sizeof(meta.string_dict_size));
+                    offset += sizeof(meta.string_dict_size);
+                    std::memcpy(&meta.timestamp_dict_size, &data[offset], sizeof(meta.timestamp_dict_size));
+                    offset += sizeof(meta.timestamp_dict_size);
+                    std::memcpy(&meta.logtype_dict_size, &data[offset], sizeof(meta.logtype_dict_size));
+                    offset += sizeof(meta.logtype_dict_size);
+                    std::memcpy(&meta.metadata_size, &data[offset], sizeof(meta.metadata_size));
+                    offset += sizeof(meta.metadata_size);
+                    if (layer_separation) {
+                        std::memcpy(&meta.layer_count_or_combined_size, &data[offset], sizeof(meta.layer_count_or_combined_size));
+                        std::cerr << "[DESER] Block " << i << " layer_count=" << meta.layer_count_or_combined_size << ", offset=" << offset << std::endl;
+                        offset += sizeof(meta.layer_count_or_combined_size);
+                        meta.layer_sizes.resize(meta.layer_count_or_combined_size);
+                        for (uint32_t l = 0; l < meta.layer_count_or_combined_size; ++l) {
+                            std::memcpy(&meta.layer_sizes[l], &data[offset], sizeof(uint32_t));
+                            offset += sizeof(uint32_t);
+                        }
+                    } else {
+                        std::memcpy(&meta.layer_count_or_combined_size, &data[offset], sizeof(meta.layer_count_or_combined_size));
+                        std::cerr << "[DESER] Block " << i << " combined_layer_size=" << meta.layer_count_or_combined_size << ", offset=" << offset << std::endl;
+                        offset += sizeof(meta.layer_count_or_combined_size);
+                    }
+                    // 读取块配置信息
+                    std::memcpy(&meta.block_compression_level, &data[offset], sizeof(meta.block_compression_level));
+                    offset += sizeof(meta.block_compression_level);
+                    metas[i] = meta;
+                }
+                // 读取每个块的数据
+                compression::TypeAwareCompressionConfig config;
+                config.compression_level = static_cast<int>(compression_level);
+                for (uint32_t i = 0; i < block_count; ++i) {
+                    const auto& meta = metas[i];
+                    GranularCompressedData gdata;
+                    gdata.use_layer_separation = layer_separation;
+                    // 依次读取各组件
+                    auto read_vec = [&](uint32_t sz, const char* name) {
+                        std::cerr << "[DESER] Block " << i << " reading " << name << " size=" << sz << ", offset=" << offset << std::endl;
+                        if (sz == 0) return std::vector<uint8_t>{};
+                        if (data.size() < offset + sz) throw std::runtime_error("Buffer too small for component");
+                        std::vector<uint8_t> v(data.begin() + offset, data.begin() + offset + sz);
+                        offset += sz;
+                        return v;
+                    };
+                    gdata.trie_bitmap = read_vec(meta.trie_size, "trie_bitmap");
+                    gdata.string_dict = read_vec(meta.string_dict_size, "string_dict");
+                    gdata.timestamp_dict = read_vec(meta.timestamp_dict_size, "timestamp_dict");
+                    gdata.logtype_dict = read_vec(meta.logtype_dict_size, "logtype_dict");
+                    gdata.metadata = read_vec(meta.metadata_size, "metadata");
+                    if (layer_separation) {
+                        gdata.layer_data_by_level.resize(meta.layer_count_or_combined_size);
+                        for (uint32_t l = 0; l < meta.layer_count_or_combined_size; ++l) {
+                            gdata.layer_data_by_level[l] = read_vec(meta.layer_sizes[l], "layer");
+                        }
+                    } else {
+                        gdata.layer_data_combined = read_vec(meta.layer_count_or_combined_size, "layer_combined");
+                    }
+                    // 解压
+                    std::cerr << "[DESER] Block " << i << " decompressGranular..." << std::endl;
+                    // 设置解压选项以确保加载所有组件
+                    Compressor::PartialDecompressionOptions decompress_options;
+                    decompress_options.load_trie = true;
+                    decompress_options.load_layers = true;
+                    decompress_options.load_string_dict = true;
+                    decompress_options.load_timestamp_dict = true;
+                    decompress_options.load_logtype_dict = true;
+                    decompress_options.load_metadata = true;
+                    auto [trie, dict_ptr] = TypeAwareCompressor::decompressGranularPartial(gdata, decompress_options, config);
+                    ChunkedTypeAwareBlock block;
+                    block.field_order = trie->getOrderedFields();
+                    block.dict = std::move(dict_ptr);
+                    block.trie = std::move(trie);
+                    block.config = config;
+                    blocks.push_back(std::move(block));
+                }
+                std::cerr << "[DESER] Finished type-aware granular deserializing " << block_count << " blocks." << std::endl;
+                return blocks;
+            }
+        }
+        // 否则走传统格式
+        offset -= sizeof(block_count); // 回退到block_count位置
+        uint32_t block_count2 = 0;
+        std::memcpy(&block_count2, &data[offset], sizeof(block_count2));
+        offset += sizeof(block_count2);
+        for (uint32_t i = 0; i < block_count2; ++i) {
             uint32_t block_size = 0;
             std::memcpy(&block_size, &data[offset], sizeof(block_size));
             offset += sizeof(block_size);
@@ -538,7 +650,7 @@ ChunkedTypeAwareCompressor::deserialize(const std::vector<uint8_t>& data) {
             loudsToTrie(*louds, *trie);
             blocks.push_back(ChunkedTypeAwareBlock{louds->getFieldOrder(), std::move(dict_ptr), std::move(trie), block_config});
         }
-        std::cerr << "[DESER] Finished type-aware traditional deserializing " << block_count << " blocks." << std::endl;
+        std::cerr << "[DESER] Finished type-aware traditional deserializing " << block_count2 << " blocks." << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "[FATAL] Exception during type-aware deserialization: " << e.what() << " (offset=" << offset << ")" << std::endl;
         throw;
@@ -908,6 +1020,10 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
                     Compressor::PartialDecompressionOptions decompress_options;
                     decompress_options.load_trie = true;
                     decompress_options.load_layers = true;
+                    decompress_options.load_string_dict = true;
+                    decompress_options.load_timestamp_dict = true;
+                    decompress_options.load_logtype_dict = true;
+                    decompress_options.load_metadata = true;
                     // 使用传入的配置参数
                     try {
                         auto [trie, dict_ptr] = TypeAwareCompressor::decompressGranularPartial(gdata, decompress_options, config);

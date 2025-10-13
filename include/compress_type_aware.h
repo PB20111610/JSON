@@ -14,6 +14,10 @@ class LOUDSTrie;
 struct FieldKey;
 struct CompressedData;
 
+std::vector<uint8_t> decompressWithConfig(const std::vector<uint8_t>& compressed_data,
+                                         compression::FieldType field_type,
+                                         const compression::TypeAwareCompressionConfig& config);
+
 class TypeAwareCompressor {
 public:
     // Core compression methods with configurable algorithms - the ONLY unique functionality

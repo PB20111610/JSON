@@ -909,24 +909,33 @@ GranularCompressedData Compressor::compressGranular(const Trie& trie, const Fiel
     std::string bv_str = bv_stream.str();
     std::vector<uint8_t> trie_raw(bv_str.begin(), bv_str.end());
     
-    // 3. 序列化分层内容
+    // 3. 序列化分层内容和层大小信息
     std::vector<uint8_t> layer_raw;
+    std::vector<uint8_t> layer_sizes_raw;
     if (use_layer_separation) {
         // 按层分别序列化和压缩
         size_t layer_count = louds.getLayeredStorage().getLayerCount();
         result.layer_data_by_level.reserve(layer_count);
         
+        // 序列化层大小信息
+        std::vector<uint32_t> layer_sizes;
         for (size_t i = 0; i < layer_count; ++i) {
             std::ostringstream layer_stream(std::ios::binary);
             louds.getLayeredStorage().serializeLayer(i, layer_stream);
             std::string layer_str = layer_stream.str();
             std::vector<uint8_t> layer_data(layer_str.begin(), layer_str.end());
+            layer_sizes.push_back(static_cast<uint32_t>(layer_data.size()));
+            
             std::vector<uint8_t> compressed_layer = compressWithZstd(layer_data);
             result.layer_data_by_level.push_back(std::move(compressed_layer));
             
             // 累计原始大小
             layer_raw.insert(layer_raw.end(), layer_data.begin(), layer_data.end());
         }
+        
+        // 序列化层大小信息
+        layer_sizes_raw.resize(layer_sizes.size() * sizeof(uint32_t));
+        std::memcpy(layer_sizes_raw.data(), layer_sizes.data(), layer_sizes.size() * sizeof(uint32_t));
     } else {
         // 整体序列化和压缩
         // Serialize all layers individually and combine
@@ -947,17 +956,23 @@ GranularCompressedData Compressor::compressGranular(const Trie& trie, const Fiel
     result.logtype_dict = compressWithZstd(logtype_dict_raw);
     result.metadata = compressWithZstd(metadata_raw);
     
+    // 压缩层大小信息（如果使用分层压缩）
+    if (use_layer_separation) {
+        result.layer_sizes = compressWithZstd(layer_sizes_raw);
+    }
+    
     // 6. 记录原始大小
     result.trie_original_size = trie_raw.size();
     result.string_dict_original_size = string_dict_raw.size();
     result.timestamp_dict_original_size = timestamp_dict_raw.size();
     result.logtype_dict_original_size = logtype_dict_raw.size();
     result.layer_original_size = layer_raw.size();
+    result.layer_sizes_original_size = layer_sizes_raw.size();
     result.metadata_original_size = metadata_raw.size();
     
     result.original_size = result.trie_original_size + result.string_dict_original_size + 
                           result.timestamp_dict_original_size + result.logtype_dict_original_size + 
-                          result.layer_original_size + result.metadata_original_size;
+                          result.layer_original_size + result.metadata_original_size + result.layer_sizes_original_size;
     
     // 7. 计算压缩后总大小
     result.compressed_size = result.trie_bitmap.size() + result.string_dict.size() + 
@@ -968,6 +983,7 @@ GranularCompressedData Compressor::compressGranular(const Trie& trie, const Fiel
         for (const auto& layer : result.layer_data_by_level) {
             result.compressed_size += layer.size();
         }
+        result.compressed_size += result.layer_sizes.size(); // 添加层大小信息的压缩大小
     } else {
         result.compressed_size += result.layer_data_combined.size();
     }
@@ -987,24 +1003,33 @@ GranularCompressedData Compressor::compressGranularLouds(const LOUDSTrie& louds,
     // 2. 序列化LOUDS Trie位图
     std::vector<uint8_t> trie_raw = serializeLoudsTrie(louds);
     
-    // 3. 序列化分层内容
+    // 3. 序列化分层内容和层大小信息
     std::vector<uint8_t> layer_raw;
+    std::vector<uint8_t> layer_sizes_raw;
     if (use_layer_separation) {
         // 按层分别序列化和压缩
         size_t layer_count = louds.getLayeredStorage().getLayerCount();
         result.layer_data_by_level.reserve(layer_count);
         
+        // 序列化层大小信息
+        std::vector<uint32_t> layer_sizes;
         for (size_t i = 0; i < layer_count; ++i) {
             std::ostringstream layer_stream(std::ios::binary);
             louds.getLayeredStorage().serializeLayer(i, layer_stream);
             std::string layer_str = layer_stream.str();
             std::vector<uint8_t> layer_data(layer_str.begin(), layer_str.end());
+            layer_sizes.push_back(static_cast<uint32_t>(layer_data.size()));
+            
             std::vector<uint8_t> compressed_layer = compressWithZstd(layer_data);
             result.layer_data_by_level.push_back(std::move(compressed_layer));
             
             // 累计原始大小
             layer_raw.insert(layer_raw.end(), layer_data.begin(), layer_data.end());
         }
+        
+        // 序列化层大小信息
+        layer_sizes_raw.resize(layer_sizes.size() * sizeof(uint32_t));
+        std::memcpy(layer_sizes_raw.data(), layer_sizes.data(), layer_sizes.size() * sizeof(uint32_t));
     } else {
         // 整体序列化和压缩
         // Serialize all layers individually and combine
@@ -1025,17 +1050,23 @@ GranularCompressedData Compressor::compressGranularLouds(const LOUDSTrie& louds,
     result.logtype_dict = compressWithZstd(logtype_dict_raw);
     result.metadata = compressWithZstd(metadata_raw);
     
+    // 压缩层大小信息（如果使用分层压缩）
+    if (use_layer_separation) {
+        result.layer_sizes = compressWithZstd(layer_sizes_raw);
+    }
+    
     // 6. 记录原始大小
     result.trie_original_size = trie_raw.size();
     result.string_dict_original_size = string_dict_raw.size();
     result.timestamp_dict_original_size = timestamp_dict_raw.size();
     result.logtype_dict_original_size = logtype_dict_raw.size();
     result.layer_original_size = layer_raw.size();
+    result.layer_sizes_original_size = layer_sizes_raw.size();
     result.metadata_original_size = metadata_raw.size();
     
     result.original_size = result.trie_original_size + result.string_dict_original_size + 
                           result.timestamp_dict_original_size + result.logtype_dict_original_size + 
-                          result.layer_original_size + result.metadata_original_size;
+                          result.layer_original_size + result.metadata_original_size + result.layer_sizes_original_size;
     
     // 7. 计算压缩后总大小
     result.compressed_size = result.trie_bitmap.size() + result.string_dict.size() + 
@@ -1046,6 +1077,7 @@ GranularCompressedData Compressor::compressGranularLouds(const LOUDSTrie& louds,
         for (const auto& layer : result.layer_data_by_level) {
             result.compressed_size += layer.size();
         }
+        result.compressed_size += result.layer_sizes.size(); // 添加层大小信息的压缩大小
     } else {
         result.compressed_size += result.layer_data_combined.size();
     }
@@ -1096,6 +1128,17 @@ Compressor::decompressGranular(const GranularCompressedData& compressed_data) {
         size_t required_layers = compressed_data.layer_data_by_level.size();
         while (layered_storage.getLayerCount() < required_layers) {
             layered_storage.addLayer(FieldKey{}, 0);
+        }
+        
+        // 解压缩层大小信息（如果存在）
+        std::vector<uint32_t> layer_sizes;
+        if (!compressed_data.layer_sizes.empty()) {
+            std::vector<uint8_t> layer_sizes_raw = decompressWithZstd(compressed_data.layer_sizes);
+            if (layer_sizes_raw.size() >= sizeof(uint32_t)) {
+                size_t layer_count = layer_sizes_raw.size() / sizeof(uint32_t);
+                layer_sizes.resize(layer_count);
+                std::memcpy(layer_sizes.data(), layer_sizes_raw.data(), layer_count * sizeof(uint32_t));
+            }
         }
         
         // 按层分别解压缩
@@ -1154,6 +1197,17 @@ Compressor::decompressGranularLouds(const GranularCompressedData& compressed_dat
         size_t required_layers = compressed_data.layer_data_by_level.size();
         while (layered_storage.getLayerCount() < required_layers) {
             layered_storage.addLayer(FieldKey{}, 0);
+        }
+        
+        // 解压缩层大小信息（如果存在）
+        std::vector<uint32_t> layer_sizes;
+        if (!compressed_data.layer_sizes.empty()) {
+            std::vector<uint8_t> layer_sizes_raw = decompressWithZstd(compressed_data.layer_sizes);
+            if (layer_sizes_raw.size() >= sizeof(uint32_t)) {
+                size_t layer_count = layer_sizes_raw.size() / sizeof(uint32_t);
+                layer_sizes.resize(layer_count);
+                std::memcpy(layer_sizes.data(), layer_sizes_raw.data(), layer_count * sizeof(uint32_t));
+            }
         }
         
         // 按层分别解压缩
@@ -1218,6 +1272,17 @@ Compressor::decompressGranularPartial(const GranularCompressedData& compressed_d
             size_t required_layers = compressed_data.layer_data_by_level.size();
             while (layered_storage.getLayerCount() < required_layers) {
                 layered_storage.addLayer(FieldKey{}, 0);
+            }
+            
+            // 解压缩层大小信息（如果存在）
+            std::vector<uint32_t> layer_sizes;
+            if (!compressed_data.layer_sizes.empty()) {
+                std::vector<uint8_t> layer_sizes_raw = decompressWithZstd(compressed_data.layer_sizes);
+                if (layer_sizes_raw.size() >= sizeof(uint32_t)) {
+                    size_t layer_count = layer_sizes_raw.size() / sizeof(uint32_t);
+                    layer_sizes.resize(layer_count);
+                    std::memcpy(layer_sizes.data(), layer_sizes_raw.data(), layer_count * sizeof(uint32_t));
+                }
             }
             
             // 按指定层解压缩

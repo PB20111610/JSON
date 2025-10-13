@@ -166,6 +166,7 @@ private:
         std::vector<uint8_t> logtype_dict;
         std::vector<std::vector<uint8_t>> layer_data_by_level;
         std::vector<uint8_t> layer_data_combined;
+        std::vector<uint8_t> layer_sizes;        // 层大小信息
         std::vector<uint8_t> metadata;
         
         // 统计信息
@@ -182,6 +183,7 @@ private:
         size_t timestamp_dict_original_size = 0;
         size_t logtype_dict_original_size = 0;
         size_t layer_original_size = 0;
+        size_t layer_sizes_original_size = 0;    // 层大小信息原始大小
         size_t metadata_original_size = 0;
     };
     std::vector<ChunkedTypeAwareBlockMemory> blocks_memory_;

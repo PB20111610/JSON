@@ -588,18 +588,22 @@ GranularCompressedData TypeAwareCompressor::compressGranularLouds(const LOUDSTri
             throw std::runtime_error("TypeAware Granular: Empty LOUDS bitmap serialization");
         }
         
-        // 3. 序列化分层内容（使用类型敏感压缩）
+        // 3. 序列化分层内容和层大小信息（使用类型敏感压缩）
         std::vector<uint8_t> layer_raw;
+        std::vector<uint8_t> layer_sizes_raw;
         if (use_layer_separation) {
             // 按层分别序列化和压缩（使用字段类型特定的压缩算法）
             size_t layer_count = louds.getLayeredStorage().getLayerCount();
             result.layer_data_by_level.reserve(layer_count);
             
+            // 序列化层大小信息
+            std::vector<uint32_t> layer_sizes;
             for (size_t i = 0; i < layer_count; ++i) {
                 std::ostringstream layer_stream(std::ios::binary);
                 louds.getLayeredStorage().serializeLayer(i, layer_stream);
                 std::string layer_str = layer_stream.str();
                 std::vector<uint8_t> layer_data(layer_str.begin(), layer_str.end());
+                layer_sizes.push_back(static_cast<uint32_t>(layer_data.size()));
                 
                 // 根据字段类型选择压缩算法
                 compression::FieldType field_type = compression::FieldType::STRING; // Default
@@ -613,6 +617,10 @@ GranularCompressedData TypeAwareCompressor::compressGranularLouds(const LOUDSTri
                 // 累计原始大小
                 layer_raw.insert(layer_raw.end(), layer_data.begin(), layer_data.end());
             }
+            
+            // 序列化层大小信息
+            layer_sizes_raw.resize(layer_sizes.size() * sizeof(uint32_t));
+            std::memcpy(layer_sizes_raw.data(), layer_sizes.data(), layer_sizes.size() * sizeof(uint32_t));
         } else {
             // 整体序列化和压缩（使用STRING类型压缩）
             // 使用与传统版本相同的序列化方式
@@ -633,17 +641,23 @@ GranularCompressedData TypeAwareCompressor::compressGranularLouds(const LOUDSTri
         result.logtype_dict = compressWithConfig(logtype_dict_raw, compression::FieldType::LOGTYPE, config);
         result.metadata = compressWithConfig(metadata_raw, compression::FieldType::STRING, config);
         
+        // 压缩层大小信息（如果使用分层压缩）
+        if (use_layer_separation) {
+            result.layer_sizes = compressWithConfig(layer_sizes_raw, compression::FieldType::STRING, config);
+        }
+        
         // 6. 记录原始大小
         result.trie_original_size = trie_raw.size();
         result.string_dict_original_size = string_dict_raw.size();
         result.timestamp_dict_original_size = timestamp_dict_raw.size();
         result.logtype_dict_original_size = logtype_dict_raw.size();
         result.layer_original_size = layer_raw.size();
+        result.layer_sizes_original_size = layer_sizes_raw.size();
         result.metadata_original_size = metadata_raw.size();
         
         result.original_size = result.trie_original_size + result.string_dict_original_size + 
                               result.timestamp_dict_original_size + result.logtype_dict_original_size + 
-                              result.layer_original_size + result.metadata_original_size;
+                              result.layer_original_size + result.metadata_original_size + result.layer_sizes_original_size;
         
         // 7. 计算压缩后总大小
         result.compressed_size = result.trie_bitmap.size() + result.string_dict.size() + 
@@ -654,6 +668,7 @@ GranularCompressedData TypeAwareCompressor::compressGranularLouds(const LOUDSTri
             for (const auto& layer : result.layer_data_by_level) {
                 result.compressed_size += layer.size();
             }
+            result.compressed_size += result.layer_sizes.size(); // 添加层大小信息的压缩大小
         } else {
             result.compressed_size += result.layer_data_combined.size();
         }
@@ -779,7 +794,19 @@ TypeAwareCompressor::decompressGranularLouds(const GranularCompressedData& compr
                 layered_storage.addLayer(FieldKey{}, 0);
             }
             
-            // 按层分别解压缩（使用字段类型特定的解压缩算法）
+            // 解压缩层大小信息（如果存在）
+            std::vector<uint32_t> layer_sizes;
+            if (!compressed_data.layer_sizes.empty()) {
+                std::vector<uint8_t> layer_sizes_raw = decompressWithConfig(compressed_data.layer_sizes, 
+                                                                           compression::FieldType::STRING, config);
+                if (layer_sizes_raw.size() >= sizeof(uint32_t)) {
+                    size_t layer_count = layer_sizes_raw.size() / sizeof(uint32_t);
+                    layer_sizes.resize(layer_count);
+                    std::memcpy(layer_sizes.data(), layer_sizes_raw.data(), layer_count * sizeof(uint32_t));
+                }
+            }
+            
+            // 按指定层解压缩（使用字段类型特定的解压缩算法）
             for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
                 // 根据字段类型选择解压缩算法
                 compression::FieldType field_type = compression::FieldType::STRING; // Default
@@ -881,6 +908,18 @@ TypeAwareCompressor::decompressGranularPartial(const GranularCompressedData& com
                 size_t required_layers = compressed_data.layer_data_by_level.size();
                 while (layered_storage.getLayerCount() < required_layers) {
                     layered_storage.addLayer(FieldKey{}, 0);
+                }
+                
+                // 解压缩层大小信息（如果存在）
+                std::vector<uint32_t> layer_sizes;
+                if (!compressed_data.layer_sizes.empty()) {
+                    std::vector<uint8_t> layer_sizes_raw = decompressWithConfig(compressed_data.layer_sizes, 
+                                                                               compression::FieldType::STRING, config);
+                    if (layer_sizes_raw.size() >= sizeof(uint32_t)) {
+                        size_t layer_count = layer_sizes_raw.size() / sizeof(uint32_t);
+                        layer_sizes.resize(layer_count);
+                        std::memcpy(layer_sizes.data(), layer_sizes_raw.data(), layer_count * sizeof(uint32_t));
+                    }
                 }
                 
                 // 按指定层解压缩（使用字段类型特定的解压缩算法）

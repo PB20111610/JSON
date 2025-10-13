@@ -233,6 +233,7 @@ void ChunkedTrieCompressor::finalizeCurrentBlock() {
             block_mem.timestamp_dict = granular_compressed.timestamp_dict;
             block_mem.logtype_dict = granular_compressed.logtype_dict;
             block_mem.metadata = granular_compressed.metadata;
+            block_mem.layer_sizes = granular_compressed.layer_sizes; // 添加层大小信息
             
             if (config_.enable_layer_separation) {
                 block_mem.layer_data_by_level = granular_compressed.layer_data_by_level;
@@ -247,6 +248,7 @@ void ChunkedTrieCompressor::finalizeCurrentBlock() {
             block_mem.timestamp_dict_original_size = granular_compressed.timestamp_dict_original_size;
             block_mem.logtype_dict_original_size = granular_compressed.logtype_dict_original_size;
             block_mem.layer_original_size = granular_compressed.layer_original_size;
+            block_mem.layer_sizes_original_size = granular_compressed.layer_sizes_original_size; // 添加层大小信息原始大小
             block_mem.metadata_original_size = granular_compressed.metadata_original_size;
             
             // 细粒度压缩模式下，compressed_data为空
@@ -348,6 +350,9 @@ std::vector<uint8_t> ChunkedTrieCompressor::serializeGranularToMemory() const {
                 uint32_t layer_size = static_cast<uint32_t>(layer.size());
                 result.insert(result.end(), reinterpret_cast<uint8_t*>(&layer_size), reinterpret_cast<uint8_t*>(&layer_size) + sizeof(layer_size));
             }
+            // 层大小信息大小
+            uint32_t layer_sizes_size = static_cast<uint32_t>(block.layer_sizes.size());
+            result.insert(result.end(), reinterpret_cast<uint8_t*>(&layer_sizes_size), reinterpret_cast<uint8_t*>(&layer_sizes_size) + sizeof(layer_sizes_size));
         } else {
             uint32_t combined_size = static_cast<uint32_t>(block.layer_data_combined.size());
             result.insert(result.end(), reinterpret_cast<uint8_t*>(&combined_size), reinterpret_cast<uint8_t*>(&combined_size) + sizeof(combined_size));
@@ -368,6 +373,8 @@ std::vector<uint8_t> ChunkedTrieCompressor::serializeGranularToMemory() const {
             for (const auto& layer : block.layer_data_by_level) {
                 result.insert(result.end(), layer.begin(), layer.end());
             }
+            // 层大小信息
+            result.insert(result.end(), block.layer_sizes.begin(), block.layer_sizes.end());
         } else {
             result.insert(result.end(), block.layer_data_combined.begin(), block.layer_data_combined.end());
         }
@@ -421,6 +428,7 @@ CompressionStats ChunkedTrieCompressor::getStats() const {
                 for (const auto& layer : block.layer_data_by_level) {
                     block_compressed_size += layer.size();
                 }
+                block_compressed_size += block.layer_sizes.size(); // 添加层大小信息的压缩大小
             } else {
                 block_compressed_size += block.layer_data_combined.size();
             }
@@ -486,6 +494,7 @@ std::vector<ChunkedTrieCompressor::ChunkedBlock> ChunkedTrieCompressor::deserial
                 struct BlockMeta {
                     uint32_t trie_size, string_dict_size, timestamp_dict_size, logtype_dict_size, metadata_size;
                     uint32_t layer_count_or_combined_size;
+                    uint32_t layer_sizes_size; // 层大小信息大小
                     std::vector<uint32_t> layer_sizes; // 如果分层
                 };
                 std::vector<BlockMeta> metas(block_count);
@@ -515,6 +524,10 @@ std::vector<ChunkedTrieCompressor::ChunkedBlock> ChunkedTrieCompressor::deserial
                             std::memcpy(&meta.layer_sizes[l], &data[offset], sizeof(uint32_t));
                             offset += sizeof(uint32_t);
                         }
+                        // 读取层大小信息大小
+                        std::memcpy(&meta.layer_sizes_size, &data[offset], sizeof(meta.layer_sizes_size));
+                        std::cerr << "[DESER] Block " << i << " layer_sizes_size=" << meta.layer_sizes_size << ", offset=" << offset << std::endl;
+                        offset += sizeof(meta.layer_sizes_size);
                     } else {
                         std::memcpy(&meta.layer_count_or_combined_size, &data[offset], sizeof(meta.layer_count_or_combined_size));
                         std::cerr << "[DESER] Block " << i << " combined_layer_size=" << meta.layer_count_or_combined_size << ", offset=" << offset << std::endl;
@@ -546,6 +559,8 @@ std::vector<ChunkedTrieCompressor::ChunkedBlock> ChunkedTrieCompressor::deserial
                         for (uint32_t l = 0; l < meta.layer_count_or_combined_size; ++l) {
                             gdata.layer_data_by_level[l] = read_vec(meta.layer_sizes[l], "layer");
                         }
+                        // 读取层大小信息
+                        gdata.layer_sizes = read_vec(meta.layer_sizes_size, "layer_sizes");
                     } else {
                         gdata.layer_data_combined = read_vec(meta.layer_count_or_combined_size, "layer_combined");
                     }
@@ -692,6 +707,16 @@ bool ChunkedTrieCompressor::saveToDirectory(const std::string& directory_path) {
                         } else {
                             std::cerr << "[ERROR] Cannot create " << layer_file_buf << std::endl;
                         }
+                    }
+                    // 保存层大小信息
+                    std::ofstream layer_sizes_file(block_dir + "/layer_sizes.json2", std::ios::binary);
+                    if (layer_sizes_file.is_open()) {
+                        uint32_t size = static_cast<uint32_t>(block.layer_sizes.size());
+                        layer_sizes_file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+                        layer_sizes_file.write(reinterpret_cast<const char*>(block.layer_sizes.data()), size);
+                        layer_sizes_file.close();
+                    } else {
+                        std::cerr << "[ERROR] Cannot create " << block_dir << "/layer_sizes.json2" << std::endl;
                     }
                 } else {
                     std::ofstream layers_file(block_dir + "/layers.json2", std::ios::binary);
@@ -890,6 +915,15 @@ std::vector<ChunkedTrieCompressor::ChunkedBlock> ChunkedTrieCompressor::loadFrom
                             gdata.layer_data_by_level.push_back(std::move(layer_data));
                             layer_stream.close();
                             layer_idx++;
+                        }
+                        // 读取层大小信息
+                        std::ifstream layer_sizes_file(block_dir + "/layer_sizes.json2", std::ios::binary);
+                        if (layer_sizes_file.is_open()) {
+                            uint32_t layer_sizes_size;
+                            layer_sizes_file.read(reinterpret_cast<char*>(&layer_sizes_size), sizeof(layer_sizes_size));
+                            gdata.layer_sizes.resize(layer_sizes_size);
+                            layer_sizes_file.read(reinterpret_cast<char*>(gdata.layer_sizes.data()), layer_sizes_size);
+                            layer_sizes_file.close();
                         }
                     } else {
                         // 整体读取

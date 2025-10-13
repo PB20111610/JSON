@@ -24,6 +24,7 @@ struct GranularCompressedData {
     // 分层内容压缩（可选择逐层或整体压缩）
     std::vector<std::vector<uint8_t>> layer_data_by_level;  // 按层分别压缩
     std::vector<uint8_t> layer_data_combined;               // 或整体压缩（二选一）
+    std::vector<uint8_t> layer_sizes;                       // 层大小信息（单独压缩）
     bool use_layer_separation;                              // 是否使用分层压缩
     
     // 元数据
@@ -39,6 +40,7 @@ struct GranularCompressedData {
     size_t timestamp_dict_original_size;
     size_t logtype_dict_original_size;
     size_t layer_original_size;
+    size_t layer_sizes_original_size;        // 层大小信息原始大小
     size_t metadata_original_size;
 };
 

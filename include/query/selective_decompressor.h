@@ -4,9 +4,29 @@
 #include "field_dictionary_manager.h"
 #include "trie.h"
 #include "louds.h"
+#include "../compress_type_aware.h" // Add this for decompressWithConfig
 #include <memory>
 #include <unordered_set>
 #include <unordered_map>
+
+// Forward declaration
+namespace json2 {
+    namespace compression {
+        struct TypeAwareCompressionConfig;
+        enum class FieldType : uint8_t;
+        enum class CompressionBackend : uint8_t;
+        
+        namespace algorithms {
+            class DeltaCompression;
+            class BitPackingCompression;
+            class VarintCompression;
+        }
+        
+        namespace factory {
+            class CompressionFactory;
+        }
+    }
+}
 
 namespace json2 {
 namespace query {
@@ -83,6 +103,63 @@ public:
                                           FieldDictionaryManager& manager);
     
     /**
+     * 获取字符串字典中特定编码的值（部分解压）
+     * @param granular_data 细粒度压缩数据
+     * @param field_name 字段名
+     * @param code 编码值
+     * @param config 压缩配置
+     * @return 字符串值
+     */
+    std::string getStringValueAt(const GranularCompressedData& granular_data,
+                                const std::string& field_name,
+                                uint32_t code,
+                                const compression::TypeAwareCompressionConfig& config);
+    
+    /**
+     * 获取时间戳字典中特定模板ID的模板（部分解压）
+     * @param granular_data 细粒度压缩数据
+     * @param template_id 模板ID
+     * @param config 压缩配置
+     * @return 模板字符串
+     */
+    std::string getTimestampTemplateAt(const GranularCompressedData& granular_data,
+                                      uint32_t template_id,
+                                      const compression::TypeAwareCompressionConfig& config);
+    
+    /**
+     * 获取时间戳字典中特定变量编码的变量（部分解压）
+     * @param granular_data 细粒度压缩数据
+     * @param var_code 变量编码
+     * @param config 压缩配置
+     * @return 变量字符串
+     */
+    std::string getTimestampVariableAt(const GranularCompressedData& granular_data,
+                                      uint32_t var_code,
+                                      const compression::TypeAwareCompressionConfig& config);
+    
+    /**
+     * 获取日志类型字典中特定模板ID的模板（部分解压）
+     * @param granular_data 细粒度压缩数据
+     * @param template_id 模板ID
+     * @param config 压缩配置
+     * @return 模板字符串
+     */
+    std::string getLogTypeTemplateAt(const GranularCompressedData& granular_data,
+                                    uint32_t template_id,
+                                    const compression::TypeAwareCompressionConfig& config);
+    
+    /**
+     * 获取日志类型字典中特定变量编码的变量（部分解压）
+     * @param granular_data 细粒度压缩数据
+     * @param var_code 变量编码
+     * @param config 压缩配置
+     * @return 变量字符串
+     */
+    std::string getLogTypeVariableAt(const GranularCompressedData& granular_data,
+                                    uint32_t var_code,
+                                    const compression::TypeAwareCompressionConfig& config);
+    
+    /**
      * 解压特定层的内容（用于查询）
      * @param granular_data 细粒度压缩数据
      * @param layer_index 层索引
@@ -148,6 +225,40 @@ public:
      */
     bool needsTypeDecompression(FieldType field_type, 
                                const DecompressionOptions& options) const;
+                               
+    // ========== 新增：部分解压层值的方法 ==========
+    
+    /**
+     * 获取特定层中特定索引的节点值（使用部分解压）
+     * @param granular_data 细粒度压缩数据
+     * @param layer_index 层索引
+     * @param node_index_in_layer 层内节点索引
+     * @param field_order 字段顺序
+     * @param config 压缩配置
+     * @param layer_sizes 已解压的层大小信息（可选）
+     * @return 节点值
+     */
+    NodeValue getLayerValueAt(const GranularCompressedData& granular_data,
+                             size_t layer_index,
+                             size_t node_index_in_layer,
+                             const std::vector<FieldKey>& field_order,
+                             const compression::TypeAwareCompressionConfig& config,
+                             const std::vector<uint32_t>* layer_sizes = nullptr);
+                             
+    /**
+     * 解压层中特定索引的值（使用部分解压）
+     * @param compressed_layer 压缩的层数据
+     * @param node_index_in_layer 层内节点索引
+     * @param field_type 字段类型
+     * @param config 压缩配置
+     * @param layer_size 层大小（元素数量），用于需要计数的压缩算法
+     * @return 节点值
+     */
+    NodeValue decompressLayerValueAt(const std::vector<uint8_t>& compressed_layer,
+                                    size_t node_index_in_layer,
+                                    compression::FieldType field_type,
+                                    const compression::TypeAwareCompressionConfig& config,
+                                    size_t layer_size = 0);
 
 private:
     // 解压Trie结构
@@ -205,6 +316,35 @@ private:
     // 解压层大小信息
     bool decompressLayerSizes(const std::vector<uint8_t>& layer_sizes_data,
                              std::vector<uint32_t>& layer_sizes);
+                             
+    // 类型映射辅助方法
+    compression::FieldType mapJsonFieldTypeToCompressionType(FieldType json_field_type) const;
+    
+    // ========== 新增：部分解压辅助方法 ==========
+    
+    /**
+     * 使用压缩算法的*At方法提取节点值
+     * @param compressed_data 压缩的数据
+     * @param node_index_in_layer 层内节点索引
+     * @param backend 压缩后端
+     * @param field_type 字段类型
+     * @param layer_size 层大小（元素数量），用于需要计数的压缩算法
+     * @return 节点值
+     */
+    NodeValue extractNodeValueUsingCompressionAt(const std::vector<uint8_t>& compressed_data,
+                                                size_t node_index_in_layer,
+                                                compression::CompressionBackend backend,
+                                                compression::FieldType field_type,
+                                                size_t layer_size = 0);
+                                                
+    /**
+     * 从原始数据中提取节点值
+     * @param raw_data 原始数据
+     * @param node_index_in_layer 层内节点索引
+     * @return 节点值
+     */
+    NodeValue extractNodeValueFromRawData(const std::vector<uint8_t>& raw_data,
+                                         size_t node_index_in_layer);
 };
 
 } // namespace query

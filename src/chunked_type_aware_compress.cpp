@@ -11,6 +11,7 @@
 #include "../include/field_analyzer.h"
 #include "../include/field_parser.h"
 #include <sys/stat.h>
+#include <filesystem>
 
 namespace json2 {
 
@@ -900,6 +901,19 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
         global_metadata.close();
         
         // 加载指定的块
+        // First check which blocks actually exist
+        uint32_t actual_blocks = 0;
+        for (uint32_t i = 0; i < total_blocks; ++i) {
+            char chunk_dir_buf[256];
+            snprintf(chunk_dir_buf, sizeof(chunk_dir_buf), "%s/chunks/chunk_%06u", directory_path.c_str(), i);
+            std::string block_dir = chunk_dir_buf;
+            
+            // Check if the block directory exists
+            if (std::filesystem::exists(block_dir)) {
+                actual_blocks++;
+            }
+        }
+        
         for (uint32_t i = 0; i < total_blocks; ++i) {
             // 检查是否需要加载这个块
             if (!options.specific_chunks.empty() && 
@@ -910,6 +924,11 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
             char chunk_dir_buf[256];
             snprintf(chunk_dir_buf, sizeof(chunk_dir_buf), "%s/chunks/chunk_%06u", directory_path.c_str(), i);
             std::string block_dir = chunk_dir_buf;
+            
+            // Check if the block directory exists before trying to load it
+            if (!std::filesystem::exists(block_dir)) {
+                continue;
+            }
             
             // 尝试检测是否为细粒度压缩
             std::string dict_dir = block_dir + "/dictionaries";
@@ -1124,7 +1143,7 @@ std::vector<ChunkedTypeAwareBlock> ChunkedTypeAwareCompressor::loadFromDirectory
             }
         }
         
-        std::cerr << "[SUCCESS] Loaded " << blocks.size() << " type-aware blocks from " << directory_path << std::endl;
+        std::cerr << "[SUCCESS] Loaded " << blocks.size() << " type-aware blocks from " << directory_path << " (" << actual_blocks << " blocks exist)" << std::endl;
         
     } catch (const std::exception& e) {
         std::cerr << "[ERROR] Failed to load type-aware blocks from directory: " << e.what() << std::endl;

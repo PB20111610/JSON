@@ -42,6 +42,19 @@ std::unique_ptr<QueryNode> QueryNode::range(const std::string& min_val, const st
     return node;
 }
 
+std::unique_ptr<QueryNode> QueryNode::aggregate(AggregateFunction func, const std::string& field_name) {
+    auto node = std::make_unique<QueryNode>(QueryNodeType::AGGREGATE);
+    node->aggregate_function_ = func;
+    node->content_ = field_name;
+    return node;
+}
+
+std::unique_ptr<QueryNode> QueryNode::groupBy(const std::vector<std::string>& group_fields) {
+    auto node = std::make_unique<QueryNode>(QueryNodeType::GROUP_BY);
+    node->group_fields_ = group_fields;
+    return node;
+}
+
 void QueryNode::addChild(std::unique_ptr<QueryNode> child) {
     children_.push_back(std::move(child));
 }
@@ -78,6 +91,19 @@ std::string QueryNode::toString(int indent) const {
             break;
         case QueryNodeType::LOGICAL:
             ss << indent_str << "LOGICAL: " << static_cast<int>(operator_type_);
+            break;
+        case QueryNodeType::AGGREGATE:
+            ss << indent_str << "AGGREGATE: " << static_cast<int>(aggregate_function_);
+            if (!content_.empty()) {
+                ss << " on field: " << content_;
+            }
+            break;
+        case QueryNodeType::GROUP_BY:
+            ss << indent_str << "GROUP BY: ";
+            for (size_t i = 0; i < group_fields_.size(); ++i) {
+                if (i > 0) ss << ", ";
+                ss << group_fields_[i];
+            }
             break;
     }
     
@@ -145,7 +171,7 @@ std::vector<std::string> QueryParser::tokenize(const std::string& query_string) 
                     tokens.push_back(current_token);
                     current_token.clear();
                 }
-            } else if (c == '(' || c == ')' || c == '[' || c == ']' || c == ':' || c == ',') {
+            } else if (c == '(' || c == ')' || c == '[' || c == ']' || c == ':' || c == ',' || c == '*') {
                 if (!current_token.empty()) {
                     tokens.push_back(current_token);
                     current_token.clear();
@@ -184,12 +210,40 @@ std::unique_ptr<QueryNode> QueryParser::parseLogicalExpression(const std::vector
             logical_node->addChild(std::move(right));
             
             left = std::move(logical_node);
+        } else if (tokens[pos] == "GROUP") {
+            // Handle GROUP BY clause
+            pos++; // Skip "GROUP"
+            if (pos >= tokens.size() || tokens[pos] != "BY") {
+                throw std::invalid_argument("Expected 'BY' after 'GROUP'");
+            }
+            pos++; // Skip "BY"
+            
+            // Parse group by fields
+            std::vector<std::string> group_fields;
+            while (pos < tokens.size() && tokens[pos] != "HAVING" && tokens[pos] != ")") {
+                if (tokens[pos] != ",") {
+                    group_fields.push_back(tokens[pos]);
+                }
+                pos++;
+            }
+            
+            auto group_node = QueryNode::groupBy(group_fields);
+            group_node->addChild(std::move(left));
+            left = std::move(group_node);
         } else {
             break;
         }
     }
     
     return left;
+}
+
+// 辅助函数：判断是否为聚合函数
+bool isAggregateFunction(const std::string& token) {
+    static const std::unordered_set<std::string> aggregate_functions = {
+        "COUNT", "SUM", "AVG", "MAX", "MIN"
+    };
+    return aggregate_functions.count(token) > 0;
 }
 
 // 辅助函数：判断是否为已知字段类型
@@ -203,6 +257,36 @@ bool QueryParser::isKnownFieldType(const std::string& token) {
 std::unique_ptr<QueryNode> QueryParser::parseComparisonExpression(const std::vector<std::string>& tokens, size_t& pos) {
     if (pos >= tokens.size()) {
         throw std::invalid_argument("Unexpected end of tokens");
+    }
+    
+    // 处理聚合函数
+    if (isAggregateFunction(tokens[pos])) {
+        std::string func_name = tokens[pos++];
+        AggregateFunction func;
+        if (func_name == "COUNT") func = AggregateFunction::COUNT;
+        else if (func_name == "SUM") func = AggregateFunction::SUM;
+        else if (func_name == "AVG") func = AggregateFunction::AVG;
+        else if (func_name == "MAX") func = AggregateFunction::MAX;
+        else if (func_name == "MIN") func = AggregateFunction::MIN;
+        else throw std::invalid_argument("Unknown aggregate function: " + func_name);
+        
+        if (pos >= tokens.size() || tokens[pos] != "(") {
+            throw std::invalid_argument("Expected '(' after aggregate function");
+        }
+        pos++; // Skip '('
+        
+        std::string field_name;
+        if (pos < tokens.size() && tokens[pos] != ")") {
+            field_name = tokens[pos++];
+        }
+        
+        if (pos >= tokens.size() || tokens[pos] != ")") {
+            throw std::invalid_argument("Expected ')' after aggregate function arguments");
+        }
+        pos++; // Skip ')'
+        
+        auto aggregate_node = QueryNode::aggregate(func, field_name);
+        return aggregate_node;
     }
     
     // 处理括号

@@ -186,11 +186,45 @@ std::vector<uint32_t> DeltaCompression::decompressUint32(const std::vector<uint8
 
 // 部分解压指定索引的值
 uint32_t DeltaCompression::decompressUint32At(const std::vector<uint8_t>& compressed, size_t index) {
-    int64_t value = decompressInt64At(compressed, index);
-    if (value < 0 || value > UINT32_MAX) {
-        throw std::runtime_error("Delta: Value out of uint32 range: " + std::to_string(value));
+    if (compressed.empty()) {
+        throw std::runtime_error("Delta: Empty compressed data");
     }
-    return static_cast<uint32_t>(value);
+    
+    try {
+        size_t pos = 0;
+        auto [count, compression_type, base_value] = readDeltaHeader(compressed, pos);
+        
+        // Validate index
+        if (index >= count) {
+            throw std::out_of_range("Delta: Index out of range");
+        }
+        
+        // Extract compressed data portion
+        std::vector<uint8_t> data(compressed.begin() + pos, compressed.end());
+        
+        if (compression_type & 0x04) { // Delta-varint encoding used
+            // For UINT32 with delta-varint encoding, we need to decompress the specific index
+            // and convert it to uint32
+            int64_t value = deltaVarintDecompressAt(data, index);
+            if (value < 0 || value > UINT32_MAX) {
+                throw std::runtime_error("Delta: Value out of uint32 range: " + std::to_string(value));
+            }
+            return static_cast<uint32_t>(value);
+        } else { // Simple serialization fallback
+            auto values = utils::SerializationUtils::bytesToInt64s(data);
+            if (index >= values.size()) {
+                throw std::out_of_range("Delta: Index out of range");
+            }
+            int64_t value = values[index];
+            if (value < 0 || value > UINT32_MAX) {
+                throw std::runtime_error("Delta: Value out of uint32 range: " + std::to_string(value));
+            }
+            return static_cast<uint32_t>(value);
+        }
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Delta uint32 partial decompression failed: " + std::string(e.what()));
+    }
 }
 
 std::vector<uint8_t> DeltaCompression::compressDouble(const std::vector<double>& values) {
@@ -217,10 +251,43 @@ std::vector<double> DeltaCompression::decompressDouble(const std::vector<uint8_t
 
 // 部分解压指定索引的值
 double DeltaCompression::decompressDoubleAt(const std::vector<uint8_t>& compressed, size_t index) {
-    int64_t int_value = decompressInt64At(compressed, index);
-    double double_value;
-    std::memcpy(&double_value, &int_value, sizeof(double));
-    return double_value;
+    if (compressed.empty()) {
+        throw std::runtime_error("Delta: Empty compressed data");
+    }
+    
+    try {
+        size_t pos = 0;
+        auto [count, compression_type, base_value] = readDeltaHeader(compressed, pos);
+        
+        // Validate index
+        if (index >= count) {
+            throw std::out_of_range("Delta: Index out of range");
+        }
+        
+        // Extract compressed data portion
+        std::vector<uint8_t> data(compressed.begin() + pos, compressed.end());
+        
+        if (compression_type & 0x04) { // Delta-varint encoding used
+            // For DOUBLE with delta-varint encoding, we need to decompress the specific index
+            // and convert it to double
+            int64_t int_value = deltaVarintDecompressAt(data, index);
+            double double_value;
+            std::memcpy(&double_value, &int_value, sizeof(double));
+            return double_value;
+        } else { // Simple serialization fallback
+            auto values = utils::SerializationUtils::bytesToInt64s(data);
+            if (index >= values.size()) {
+                throw std::out_of_range("Delta: Index out of range");
+            }
+            int64_t int_value = values[index];
+            double double_value;
+            std::memcpy(&double_value, &int_value, sizeof(double));
+            return double_value;
+        }
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Delta double partial decompression failed: " + std::string(e.what()));
+    }
 }
 
 // ========== Enhanced Delta Compression Core Implementation ==========

@@ -16,7 +16,9 @@ enum class QueryNodeType {
     FIELD,      // 字段节点
     VALUE,      // 值节点
     OPERATOR,   // 操作符节点
-    LOGICAL     // 逻辑操作符节点
+    LOGICAL,    // 逻辑操作符节点
+    AGGREGATE,  // 聚合函数节点
+    GROUP_BY    // GROUP BY节点
 };
 
 /**
@@ -35,7 +37,21 @@ enum class QueryOperator {
     MATCHES,        // 模式匹配
     AND,            // 逻辑AND
     OR,             // 逻辑OR
-    NOT             // 逻辑NOT
+    NOT,            // 逻辑NOT
+    COUNT,          // 聚合函数COUNT
+    SUM,            // 聚合函数SUM
+    AVG,            // 聚合函数AVG
+    MAX,            // 聚合函数MAX
+    MIN             // 聚合函数MIN
+};
+
+// 聚合函数类型
+enum class AggregateFunction {
+    COUNT,
+    SUM,
+    AVG,
+    MAX,
+    MIN
 };
 
 /**
@@ -52,6 +68,8 @@ public:
     static std::unique_ptr<QueryNode> operator_(QueryOperator op);
     static std::unique_ptr<QueryNode> logical(QueryOperator op);
     static std::unique_ptr<QueryNode> range(const std::string& min_val, const std::string& max_val);
+    static std::unique_ptr<QueryNode> aggregate(AggregateFunction func, const std::string& field_name = "");
+    static std::unique_ptr<QueryNode> groupBy(const std::vector<std::string>& group_fields);
     
     // 访问器
     QueryNodeType getType() const { return type_; }
@@ -59,12 +77,16 @@ public:
     QueryOperator getOperator() const { return operator_type_; }
     FieldType getFieldType() const { return field_type_; }
     const std::vector<std::unique_ptr<QueryNode>>& getChildren() const { return children_; }
+    AggregateFunction getAggregateFunction() const { return aggregate_function_; }
+    const std::vector<std::string>& getGroupFields() const { return group_fields_; }
     
     // 修改器
     void addChild(std::unique_ptr<QueryNode> child);
     void setFieldType(FieldType type) { field_type_ = type; }
     void setOperator(QueryOperator op) { operator_type_ = op; }
     void setContent(const std::string& content) { content_ = content; }
+    void setAggregateFunction(AggregateFunction func) { aggregate_function_ = func; }
+    void setGroupFields(const std::vector<std::string>& group_fields) { group_fields_ = group_fields; }
     
     // 查询构建辅助方法
     void addFieldValue(const std::string& field_name, const std::string& value, 
@@ -80,6 +102,8 @@ private:
     QueryOperator operator_type_;
     FieldType field_type_;
     std::vector<std::unique_ptr<QueryNode>> children_;
+    AggregateFunction aggregate_function_;
+    std::vector<std::string> group_fields_;
 };
 
 /**

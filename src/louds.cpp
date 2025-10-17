@@ -276,11 +276,19 @@ void LayeredNodeStorage::serializeLayer(size_t layer_idx, std::ostream& out) con
 }
 
 void LayeredNodeStorage::deserializeLayer(size_t layer_idx, std::istream& in) {
-    if (layer_idx >= layers_.size()) return;
+    // Ensure the layers vector is large enough to accommodate the layer_idx
+    if (layer_idx >= layers_.size()) {
+        layers_.resize(layer_idx + 1);
+    }
+    
     std::vector<NodeValue>& layer = layers_[layer_idx];
     layer.clear();
     size_t node_count;
     in.read(reinterpret_cast<char*>(&node_count), sizeof(node_count));
+    
+    // Reserve space for efficiency
+    layer.reserve(node_count);
+    
     for (size_t j = 0; j < node_count; ++j) {
         uint8_t type_byte;
         in.read(reinterpret_cast<char*>(&type_byte), 1);
@@ -290,7 +298,7 @@ void LayeredNodeStorage::deserializeLayer(size_t layer_idx, std::istream& in) {
             case 2: { double v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
             case 3: { bool v; in.read(reinterpret_cast<char*>(&v), sizeof(v)); layer.emplace_back(v); break; }
             case 4: { layer.emplace_back(std::nullptr_t{}); break; }
-                            case 5: { uint32_t template_id; in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id)); uint32_t n; in.read(reinterpret_cast<char*>(&n), sizeof(n)); std::vector<uint32_t> var_codes(n); for (uint32_t& code : var_codes) { in.read(reinterpret_cast<char*>(&code), sizeof(code)); } layer.emplace_back(TemplateEncodedTimestamp{template_id, var_codes}); break; }
+            case 5: { uint32_t template_id; in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id)); uint32_t n; in.read(reinterpret_cast<char*>(&n), sizeof(n)); std::vector<uint32_t> var_codes(n); for (uint32_t& code : var_codes) { in.read(reinterpret_cast<char*>(&code), sizeof(code)); } layer.emplace_back(TemplateEncodedTimestamp{template_id, var_codes}); break; }
             case 6: { uint32_t template_id; in.read(reinterpret_cast<char*>(&template_id), sizeof(template_id)); uint32_t n; in.read(reinterpret_cast<char*>(&n), sizeof(n)); std::vector<uint32_t> var_codes(n); for (uint32_t& code : var_codes) { in.read(reinterpret_cast<char*>(&code), sizeof(code)); } layer.emplace_back(EncodedLog{template_id, var_codes}); break; }
             default: layer.emplace_back(std::nullptr_t{}); break; }
     }

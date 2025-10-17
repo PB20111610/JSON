@@ -20,7 +20,7 @@
 using namespace json2;
 
 int main() {
-    const std::string input_file =  "test_data.json"; // "../data/postgresql.log"; // 
+    const std::string input_file = "test_data.json"; // "../data/postgresql.log"; // 
     const size_t BLOCK_SIZE = 20000;
     const size_t CHUNK_SIZE = 1000;
     std::ifstream fin(input_file);

@@ -7,13 +7,22 @@
 #include "trie_traverser.h"
 #include "result_rebuilder.h"
 #include "../chunked_type_aware_compress.h"
+#include "../loudsTotrie.h"  // Add this include for path reconstruction functions
 #include <memory>
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <set>
+#include <map>
+#include <thread>
+#include <future>
+#include <algorithm>
 
 namespace json2 {
 namespace query {
+
+// Forward declaration
+class QueryNode;
 
 // 查询配置
 struct QueryConfig {
@@ -36,6 +45,31 @@ struct QueryResult {
     double query_time_ms = 0.0;             // 查询时间（毫秒）
     bool is_complete = false;               // 是否完整查询
     std::string error_message;              // 错误信息
+};
+
+// 聚合查询结果
+struct AggregateQueryResult {
+    double value = 0.0;                     // 聚合值
+    size_t count = 0;                       // 记录数
+    std::string aggregate_type;             // 聚合类型
+    std::string field_name;                 // 字段名
+    size_t chunks_accessed = 0;             // 访问的块数
+    double query_time_ms = 0.0;             // 查询时间（毫秒）
+    bool is_complete = false;               // 是否完整查询
+    std::string error_message;              // 错误信息
+};
+
+// 分组聚合查询结果
+struct GroupedAggregateQueryResult {
+    std::map<std::vector<std::string>, std::map<std::string, double>> grouped_values;  // 分组值映射
+    std::vector<std::string> group_fields;    // 分组字段
+    std::vector<std::string> aggregate_fields; // 聚合字段
+    size_t total_count = 0;                   // 总记录数
+    size_t groups_count = 0;                  // 分组数
+    size_t chunks_accessed = 0;               // 访问的块数
+    double query_time_ms = 0.0;               // 查询时间（毫秒）
+    bool is_complete = false;                 // 是否完整查询
+    std::string error_message;                // 错误信息
 };
 
 // 字段存在性检查结果
@@ -70,232 +104,215 @@ struct RecordQueryResult {
  */
 class QueryEngine {
 public:
-    explicit QueryEngine(const QueryConfig& config = QueryConfig());
+    // Constructor
+    explicit QueryEngine(const QueryConfig& config = QueryConfig{});
     
-    // ========== 优化的查询方法 ==========
+    // Set the data directory for granular data extraction
+    void setDataDirectory(const std::string& data_dir);
     
-    /**
-     * 检查字段存在性和类型
-     * @param field_name 字段名
-     * @param expected_type 期望类型
-     * @param granular_data 细粒度压缩数据
-     * @return 字段存在性检查结果
-     */
-    FieldExistenceResult checkFieldExistenceAndType(const std::string& field_name,
-                                                   FieldType expected_type,
-                                                   const GranularCompressedData& granular_data);
+    // ========== 查询接口 ==========
     
-    /**
-     * 查询字典
-     * @param field_name 字段名
-     * @param field_type 字段类型
-     * @param granular_data 细粒度压缩数据
-     * @param target_value 目标值（空表示返回所有值）
-     * @return 字典查询结果
-     */
-    DictionaryQueryResult queryDictionary(const std::string& field_name,
-                                         FieldType field_type,
-                                         const GranularCompressedData& granular_data,
-                                         const std::string& target_value = "");
+    // 字段存在性和类型检查
+    FieldExistenceResult checkFieldExistenceAndType(
+        const std::string& field_name,
+        FieldType expected_type,
+        const GranularCompressedData& granular_data);
     
-    /**
-     * 执行精确匹配查询（优化版本）
-     * @param field_name 字段名
-     * @param exact_value 精确值
-     * @param granular_data 细粒度压缩数据
-     * @param chunks 数据块列表
-     * @return 记录查询结果
-     */
-    RecordQueryResult executeExactMatchQuery(const std::string& field_name,
-                                            const std::string& exact_value,
-                                            const GranularCompressedData& granular_data,
-                                            const std::vector<ChunkedTypeAwareBlock>& chunks);
+    // 字典查询（浏览或精确匹配）
+    DictionaryQueryResult queryDictionary(
+        const std::string& field_name,
+        FieldType field_type,
+        const GranularCompressedData& granular_data,
+        const std::string& target_value = ""); // Empty for browsing all values
     
-    /**
-     * 执行范围查询（优化版本）
-     * @param field_name 字段名
-     * @param min_value 最小值
-     * @param max_value 最大值
-     * @param granular_data 细粒度压缩数据
-     * @param chunks 数据块列表
-     * @return 记录查询结果
-     */
-    RecordQueryResult executeRangeQuery(const std::string& field_name,
-                                       const std::string& min_value,
-                                       const std::string& max_value,
-                                       const GranularCompressedData& granular_data,
-                                       const std::vector<ChunkedTypeAwareBlock>& chunks);
+    // 精确匹配查询 (单块版本)
+    RecordQueryResult executeExactMatchQuery(
+        const std::string& field_name,
+        const std::string& exact_value,
+        const GranularCompressedData& granular_data);
     
-    // ========== 管理方法 ==========
+    // 范围查询 (单块版本)
+    RecordQueryResult executeRangeQuery(
+        const std::string& field_name,
+        const std::string& min_value,
+        const std::string& max_value,
+        const GranularCompressedData& granular_data);
     
-    /**
-     * 清除缓存
-     */
-    void clearCache();
+    // 聚合查询 (单块版本)
+    AggregateQueryResult executeAggregateQuery(
+        AggregateFunction aggregate_func,
+        const std::string& field_name,
+        const GranularCompressedData& granular_data);
     
-    /**
-     * 获取性能统计
-     * @return 性能统计
-     */
-    std::unordered_map<std::string, double> getPerformanceStats() const;
+    // 分组聚合查询 (单块版本)
+    GroupedAggregateQueryResult executeGroupedAggregateQuery(
+        const std::vector<AggregateFunction>& aggregate_funcs,
+        const std::vector<std::string>& aggregate_fields,
+        const std::vector<std::string>& group_fields,
+        const GranularCompressedData& granular_data);
     
-    /**
-     * 开始性能分析
-     */
-    void startProfiling();
-    
-    /**
-     * 停止性能分析
-     */
-    void stopProfiling();
+    // 复杂查询（支持逻辑操作符）(单块版本)
+    QueryResult executeComplexQuery(
+        const std::string& complex_query,
+        const GranularCompressedData& granular_data);
+        
+    // 多块遍历接口
+    RecordQueryResult executeExactMatchQueryMultiBlock(
+        const std::string& field_name,
+        const std::string& exact_value,
+        const std::vector<ChunkedTypeAwareBlock>& chunks);
+        
+    RecordQueryResult executeRangeQueryMultiBlock(
+        const std::string& field_name,
+        const std::string& min_value,
+        const std::string& max_value,
+        const std::vector<ChunkedTypeAwareBlock>& chunks);
+        
+    AggregateQueryResult executeAggregateQueryMultiBlock(
+        AggregateFunction aggregate_func,
+        const std::string& field_name,
+        const std::vector<ChunkedTypeAwareBlock>& chunks);
+        
+    GroupedAggregateQueryResult executeGroupedAggregateQueryMultiBlock(
+        const std::vector<AggregateFunction>& aggregate_funcs,
+        const std::vector<std::string>& aggregate_fields,
+        const std::vector<std::string>& group_fields,
+        const std::vector<ChunkedTypeAwareBlock>& chunks);
+        
+    QueryResult executeComplexQueryMultiBlock(
+        const std::string& complex_query,
+        const std::vector<ChunkedTypeAwareBlock>& chunks);
+        
+    // 多线程多块遍历接口
+    RecordQueryResult executeExactMatchQueryMultiBlockParallel(
+        const std::string& field_name,
+        const std::string& exact_value,
+        const std::vector<ChunkedTypeAwareBlock>& chunks,
+        size_t thread_count = std::thread::hardware_concurrency());
+        
+    RecordQueryResult executeRangeQueryMultiBlockParallel(
+        const std::string& field_name,
+        const std::string& min_value,
+        const std::string& max_value,
+        const std::vector<ChunkedTypeAwareBlock>& chunks,
+        size_t thread_count = std::thread::hardware_concurrency());
+        
+    AggregateQueryResult executeAggregateQueryMultiBlockParallel(
+        AggregateFunction aggregate_func,
+        const std::string& field_name,
+        const std::vector<ChunkedTypeAwareBlock>& chunks,
+        size_t thread_count = std::thread::hardware_concurrency());
+        
+    GroupedAggregateQueryResult executeGroupedAggregateQueryMultiBlockParallel(
+        const std::vector<AggregateFunction>& aggregate_funcs,
+        const std::vector<std::string>& aggregate_fields,
+        const std::vector<std::string>& group_fields,
+        const std::vector<ChunkedTypeAwareBlock>& chunks,
+        size_t thread_count = std::thread::hardware_concurrency());
+        
+    QueryResult executeComplexQueryMultiBlockParallel(
+        const std::string& complex_query,
+        const std::vector<ChunkedTypeAwareBlock>& chunks,
+        size_t thread_count = std::thread::hardware_concurrency());
 
 private:
-    // 配置
     QueryConfig config_;
-    
-    // 组件
     std::unique_ptr<QueryParser> parser_;
     std::unique_ptr<FieldAnalyzer> field_analyzer_;
     std::unique_ptr<ChunkSelector> chunk_selector_;
     std::unique_ptr<SelectiveDecompressor> decompressor_;
     std::unique_ptr<TrieTraverser> trie_traverser_;
     std::unique_ptr<ResultRebuilder> result_rebuilder_;
+    mutable std::unordered_map<std::string, double> performance_stats_;
+    std::string data_dir_;  // Data directory for granular data extraction
     
-    // 性能统计
-    std::unordered_map<std::string, double> performance_stats_;
- 
-    /**
-     * 获取字段索引
-     * @param field_name 字段名
-     * @param field_order 字段顺序
-     * @return 字段索引，-1表示未找到
-     */
+    // ========== 内部实现方法 ==========
+    
+    // Helper function to map json2::FieldType to compression::FieldType
+    compression::FieldType mapFieldTypeToCompressionType(FieldType json_field_type) const;
+    
+    // 获取字段在字段顺序中的索引
     int getFieldIndex(const std::string& field_name, const std::vector<FieldKey>& field_order) const;
     
-    /**
-     * 检查字段类型是否需要字典解压
-     * @param field_type 字段类型
-     * @return 是否需要字典解压
-     */
+    // 判断字段类型是否需要字典解压
     bool needsDictionaryDecompression(FieldType field_type) const;
     
-    /**
-     * 重建记录
-     * @param matched_bfs_indices 匹配的BFS索引
-     * @param louds LOUDS结构
-     * @param dict_manager 字典管理器
-     * @return 重建的记录
-     */
-    std::vector<std::string> reconstructRecords(const std::vector<size_t>& matched_bfs_indices,
-                                               const LOUDSTrie& louds,
-                                               const FieldDictionaryManager& dict_manager) const;
+    // 提取字典中的所有值
+    std::vector<std::string> extractAllDictionaryValues(
+        const FieldDictionaryManager& dict_manager,
+        FieldType field_type) const;
     
-    /**
-     * 比较节点值与目标值
-     * @param node_value 节点值
-     * @param target_value 目标值
-     * @param field_key 字段键
-     * @param dict_manager 字典管理器
-     * @return 是否匹配
-     */
-    bool compareNodeValueWithTarget(const NodeValue& node_value,
-                                   const std::string& target_value,
-                                   const FieldKey& field_key,
-                                   const FieldDictionaryManager& dict_manager) const;
+    // 执行字典查找
+    std::string performDictionaryLookup(
+        const FieldDictionaryManager& dict_manager,
+        FieldType field_type,
+        const std::string& target_value) const;
     
-    /**
-     * 检查节点值是否在范围内
-     * @param node_value 节点值
-     * @param min_value 最小值
-     * @param max_value 最大值
-     * @param field_key 字段键
-     * @param dict_manager 字典管理器
-     * @return 是否在范围内
-     */
-    bool isNodeValueInRange(const NodeValue& node_value,
-                           const std::string& min_value,
-                           const std::string& max_value,
-                           const FieldKey& field_key,
-                           const FieldDictionaryManager& dict_manager) const;
+    // 解码节点值为字符串
+    std::string decodeNodeValueToString(
+        const NodeValue& node_value,
+        const FieldKey& field_key,
+        const FieldDictionaryManager& dict_manager) const;
+        
+    // 解码节点值为数值
+    double decodeNodeValueToDouble(
+        const NodeValue& node_value,
+        const FieldKey& field_key,
+        const FieldDictionaryManager& dict_manager) const;
+        
+    // ========== 复杂查询辅助方法 ==========
     
-    /**
-     * 提取所有字典值
-     * @param dict_manager 字典管理器
-     * @param field_type 字段类型
-     * @return 字典值列表
-     */
-    std::vector<std::string> extractAllDictionaryValues(const FieldDictionaryManager& dict_manager,
-                                                       FieldType field_type) const;
+    // 评估查询节点
+    QueryResult evaluateQueryNode(
+        const QueryNode* node,
+        const GranularCompressedData& granular_data);
     
-    /**
-     * 执行字典查找
-     * @param dict_manager 字典管理器
-     * @param field_type 字段类型
-     * @param target_value 目标值
-     * @return 查找到的值
-     */
-    std::string performDictionaryLookup(const FieldDictionaryManager& dict_manager,
-                                       FieldType field_type,
-                                       const std::string& target_value) const;
+    // 评估字段节点
+    QueryResult evaluateFieldNode(
+        const QueryNode* node,
+        const GranularCompressedData& granular_data);
     
-    /**
-     * 在层中查找匹配的节点
-     * @param layer_data 层数据
-     * @param layer_index 层索引
-     * @param target_value 目标值
-     * @param field_key 字段键
-     * @param dict_manager 字典管理器
-     * @return 匹配的层索引列表
-     */
-    std::vector<size_t> findMatchingNodesInLayer(const std::vector<uint8_t>& layer_data,
-                                                size_t layer_index,
-                                                const std::string& target_value,
-                                                const FieldKey& field_key,
-                                                const FieldDictionaryManager& dict_manager) const;
+    // 评估逻辑节点
+    QueryResult evaluateLogicalNode(
+        const QueryNode* node,
+        const GranularCompressedData& granular_data);
+        
+    // 评估聚合节点
+    QueryResult evaluateAggregateNode(
+        const QueryNode* node,
+        const GranularCompressedData& granular_data);
+        
+    // 评估分组节点
+    QueryResult evaluateGroupByNode(
+        const QueryNode* node,
+        const GranularCompressedData& granular_data);
+        
+    // 合并两个查询结果（用于AND操作）
+    QueryResult mergeResultsAND(const QueryResult& left, const QueryResult& right) const;
     
-    /**
-     * 计算解压比例
-     * @param granular_data 细粒度压缩数据
-     * @param layer_index 层索引
-     * @param include_dict 是否包含字典
-     * @return 解压比例
-     */
-    double calculateDecompressionRatio(const GranularCompressedData& granular_data,
-                                      size_t layer_index,
-                                      bool include_dict) const;
+    // 合并两个查询结果（用于OR操作）
+    QueryResult mergeResultsOR(const QueryResult& left, const QueryResult& right) const;
     
-    /**
-     * 在层中查找范围内的节点
-     * @param layer_data 层数据
-     * @param layer_index 层索引
-     * @param min_value 最小值
-     * @param max_value 最大值
-     * @param field_key 字段键
-     * @param dict_manager 字典管理器
-     * @return 匹配的层索引列表
-     */
-    std::vector<size_t> findNodesInRangeInLayer(const std::vector<uint8_t>& layer_data,
-                                               size_t layer_index,
-                                               const std::string& min_value,
-                                               const std::string& max_value,
-                                               const FieldKey& field_key,
-                                               const FieldDictionaryManager& dict_manager) const;
+    // 对查询结果进行NOT操作
+    QueryResult negateResult(const QueryResult& result) const;
     
-    /**
-     * 将路径转换为JSON
-     * @param path 路径
-     * @param field_order 字段顺序
-     * @return JSON字符串
-     */
-    std::string convertPathToJSON(const std::vector<std::string>& path,
-                                 const std::vector<FieldKey>& field_order) const;
+    // Helper function to check if a value exists in a dictionary without full decompression
+    bool checkValueInDictionary(const std::string& field_name,
+                               FieldType field_type,
+                               const std::string& target_value,
+                               const GranularCompressedData& granular_data) const;
+ 
+    // Helper functions to merge RecordQueryResult objects from multiple blocks
+    void mergeRecordQueryResults(RecordQueryResult& target, const RecordQueryResult& source) const;
     
-    /**
-     * 映射字段类型到压缩类型
-     * @param json_field_type JSON字段类型
-     * @return 压缩字段类型
-     */
-    compression::FieldType mapFieldTypeToCompressionType(FieldType json_field_type) const;
+    // Helper functions to merge AggregateQueryResult objects from multiple blocks
+    void mergeAggregateQueryResults(AggregateQueryResult& target, const AggregateQueryResult& source) const;
+    
+    // Helper functions to merge GroupedAggregateQueryResult objects from multiple blocks
+    void mergeGroupedAggregateQueryResults(GroupedAggregateQueryResult& target, const GroupedAggregateQueryResult& source) const;
+    
+    // Helper function to extract granular data from a chunk
+    GranularCompressedData extractGranularDataFromChunk(const ChunkedTypeAwareBlock& chunk, size_t chunk_index) const;
 };
 
 } // namespace query

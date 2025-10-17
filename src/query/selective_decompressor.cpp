@@ -1,6 +1,12 @@
 #include "../include/query/selective_decompressor.h"
 #include "../include/compress.h"
 #include "../include/compress_type_aware.h"
+#include "../include/compression/algorithms/delta_compression.h"
+#include "../include/compression/algorithms/bitpacking_compression.h"
+#include "../include/compression/algorithms/varint_compression.h"
+#include "../include/compression/algorithms/rle_compression.h"
+#include "../include/compression/factory/compression_factory.h"
+#include "../include/compression/core/compression_utils.h"
 #include <algorithm>
 
 namespace json2 {
@@ -201,7 +207,7 @@ bool SelectiveDecompressor::validateDecompressionResult(const DecompressionResul
     return true;
 }
 
-// ========== 新增：适配新查询思路的实现 ==========
+// ========== 适配新查询思路的实现 ==========
 
 bool SelectiveDecompressor::fieldExistsInChunk(const GranularCompressedData& granular_data,
                                               const std::string& field_name) {
@@ -324,6 +330,304 @@ bool SelectiveDecompressor::decompressLoudsAndLayerSizesForQuery(const GranularC
     }
 }
 
+// ========== 新增：部分解压层值的实现 ==========
+
+NodeValue SelectiveDecompressor::getLayerValueAt(const GranularCompressedData& granular_data,
+                                                size_t layer_index,
+                                                size_t node_index_in_layer,
+                                                const std::vector<FieldKey>& field_order,
+                                                const compression::TypeAwareCompressionConfig& config,
+                                                const std::vector<uint32_t>* layer_sizes) {
+    try {
+        // 检查层索引是否有效
+        if (layer_index >= granular_data.layer_data_by_level.size()) {
+            throw std::out_of_range("Layer index out of range");
+        }
+        
+        // 获取字段类型
+        compression::FieldType field_type = compression::FieldType::STRING; // Default
+        if (layer_index < field_order.size()) {
+            field_type = mapJsonFieldTypeToCompressionType(field_order[layer_index].type);
+        }
+        
+        // 获取压缩的层数据
+        const std::vector<uint8_t>& compressed_layer = granular_data.layer_data_by_level[layer_index];
+        
+        // 获取层大小信息（如果可用）
+        size_t layer_size = 0;
+        if (layer_sizes && layer_index < layer_sizes->size()) {
+            layer_size = (*layer_sizes)[layer_index];
+        } else if (!granular_data.layer_sizes.empty()) {
+            // 解压层大小信息
+            std::vector<uint8_t> layer_sizes_raw = Compressor::decompressWithZstd(granular_data.layer_sizes);
+            if (layer_sizes_raw.size() >= sizeof(uint32_t) * (layer_index + 1)) {
+                // 从解压的数据中读取指定层的大小
+                const uint32_t* layer_sizes_data = reinterpret_cast<const uint32_t*>(layer_sizes_raw.data());
+                layer_size = layer_sizes_data[layer_index];
+            }
+        }
+        
+        // 使用配置驱动的部分解压方法
+        return decompressLayerValueAt(compressed_layer, node_index_in_layer, field_type, config, layer_size);
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to get layer value at index: " + std::string(e.what()));
+    }
+}
+
+NodeValue SelectiveDecompressor::decompressLayerValueAt(const std::vector<uint8_t>& compressed_layer,
+                                                       size_t node_index_in_layer,
+                                                       compression::FieldType field_type,
+                                                       const compression::TypeAwareCompressionConfig& config,
+                                                       size_t layer_size) {
+    try {
+        // 首先解压配置头以确定使用的压缩算法
+        if (compressed_layer.size() < 2) {
+            throw std::runtime_error("Compressed layer data too small");
+        }
+        
+        uint8_t compression_flag = compressed_layer[0];
+        
+        if (compression_flag == 0) {
+            // 数据未压缩，直接处理原始数据
+            std::vector<uint8_t> raw_data(compressed_layer.begin() + 1, compressed_layer.end());
+            return extractNodeValueFromRawData(raw_data, node_index_in_layer);
+        } else if (compression_flag == 1) {
+            // 数据已压缩，使用存储的后端进行部分解压
+            if (compressed_layer.size() < 3) {
+                throw std::runtime_error("Compressed layer data too small for header");
+            }
+            
+            compression::CompressionBackend backend = static_cast<compression::CompressionBackend>(compressed_layer[1]);
+            std::vector<uint8_t> compressed_payload(compressed_layer.begin() + 2, compressed_layer.end());
+            
+            // 根据后端类型和字段类型使用相应的*At方法进行部分解压
+            return extractNodeValueUsingCompressionAt(compressed_payload, node_index_in_layer, backend, field_type, layer_size);
+        } else {
+            throw std::runtime_error("Invalid compression flag: " + std::to_string(compression_flag));
+        }
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to decompress layer value at index: " + std::string(e.what()));
+    }
+}
+
+NodeValue SelectiveDecompressor::extractNodeValueUsingCompressionAt(
+    const std::vector<uint8_t>& compressed_data,
+    size_t node_index_in_layer,
+    compression::CompressionBackend backend,
+    compression::FieldType field_type,
+    size_t layer_size) {
+    
+    // 根据后端类型选择合适的*At方法
+    switch (backend) {
+        case compression::CompressionBackend::DELTA_VARINT: {
+            // 对于DELTA_VARINT，使用DeltaCompression的*At方法进行部分解压
+            switch (field_type) {
+                case compression::FieldType::INT64: {
+                    // 使用DeltaCompression的deltaVarintDecompressAt静态方法进行部分解压
+                    // 这适用于直接由deltaVarintCompress压缩的数据
+                    return compression::algorithms::DeltaCompression::deltaVarintDecompressAt(compressed_data, node_index_in_layer);
+                }
+                case compression::FieldType::UINT32: {
+                    // 使用DeltaCompression的decompressUint32At虚方法进行部分解压
+                    compression::algorithms::DeltaCompression deltaCompressor;
+                    return deltaCompressor.decompressUint32At(compressed_data, node_index_in_layer);
+                }
+                case compression::FieldType::DOUBLE: {
+                    // 使用DeltaCompression的decompressDoubleAt虚方法进行部分解压
+                    compression::algorithms::DeltaCompression deltaCompressor;
+                    return deltaCompressor.decompressDoubleAt(compressed_data, node_index_in_layer);
+                }
+                default:
+                    // 对于其他类型，回退到完整解压方法
+                    std::vector<int64_t> decompressed = compression::algorithms::DeltaCompression::deltaVarintDecompress(compressed_data);
+                    std::vector<uint8_t> raw_data = compression::utils::SerializationUtils::int64sToBytes(decompressed);
+                    return extractNodeValueFromRawData(raw_data, node_index_in_layer);
+            }
+        }
+        
+        case compression::CompressionBackend::BIT_PACKING: {
+            // 对于BIT_PACKING，使用BitPackingCompression的decompressBoolAt方法
+            if (field_type == compression::FieldType::BOOL) {
+                // For bit packing, we need the actual count from layer size
+                size_t count = layer_size > 0 ? layer_size : compressed_data.size() * 8;
+                return compression::algorithms::BitPackingCompression::bitPackingDecompressAt(
+                    compressed_data, node_index_in_layer, count);
+            } else {
+                // 对于其他类型，回退到完整解压方法
+                size_t count = layer_size > 0 ? layer_size : compressed_data.size() * 8;
+                std::vector<bool> decompressed = compression::algorithms::BitPackingCompression::bitPackingDecompress(
+                    compressed_data, count);
+                std::vector<uint8_t> raw_data = compression::utils::SerializationUtils::boolsToBytes(decompressed);
+                return extractNodeValueFromRawData(raw_data, node_index_in_layer);
+            }
+        }
+        
+        case compression::CompressionBackend::DELTA_DELTA: {
+            // 对于DELTA_DELTA，使用DeltaDeltaCompression的deltaDeltaDecompressAt静态方法
+            if (field_type == compression::FieldType::TIMESTAMP) {
+                return compression::algorithms::DeltaDeltaCompression::deltaDeltaDecompressAt(
+                    compressed_data, node_index_in_layer);
+            } else {
+                // 对于其他类型，回退到完整解压方法
+                std::vector<int64_t> decompressed = compression::algorithms::DeltaDeltaCompression::deltaDeltaDecompress(
+                    compressed_data);
+                std::vector<uint8_t> raw_data = compression::utils::SerializationUtils::int64sToBytes(decompressed);
+                return extractNodeValueFromRawData(raw_data, node_index_in_layer);
+            }
+        }
+        
+        case compression::CompressionBackend::RLE: {
+            // 对于RLE，使用RLECompression的rleDecompressAt方法
+            uint8_t value = compression::algorithms::RLECompression::rleDecompressAt(
+                compressed_data, node_index_in_layer);
+            return static_cast<uint32_t>(value); // RLE通常用于uint8_t数据
+        }
+        
+        default: {
+            // 对于其他后端或不支持部分解压的算法，回退到完整解压方法
+            auto compressor = compression::factory::CompressionFactory::createCompressor(backend);
+            if (!compressor) {
+                throw std::runtime_error("Failed to create compressor for backend: " + std::to_string(static_cast<int>(backend)));
+            }
+            
+            std::vector<uint8_t> decompressed_data = compressor->decompress(compressed_data);
+            return extractNodeValueFromRawData(decompressed_data, node_index_in_layer);
+        }
+    }
+}
+
+NodeValue SelectiveDecompressor::extractNodeValueFromRawData(
+    const std::vector<uint8_t>& raw_data,
+    size_t node_index_in_layer) {
+    
+    // 解析原始数据以获取指定索引的值
+    std::istringstream layer_stream(std::string(raw_data.begin(), raw_data.end()), std::ios::binary);
+    
+    // 读取节点数量
+    size_t node_count;
+    layer_stream.read(reinterpret_cast<char*>(&node_count), sizeof(node_count));
+    
+    // 检查索引是否有效
+    if (node_index_in_layer >= node_count) {
+        throw std::out_of_range("Node index out of range");
+    }
+    
+    // 跳转到指定节点
+    for (size_t i = 0; i < node_index_in_layer; ++i) {
+        // 读取类型字节
+        uint8_t type_byte;
+        layer_stream.read(reinterpret_cast<char*>(&type_byte), 1);
+        
+        // 根据类型跳过数据
+        switch (type_byte) {
+            case 0: { // uint32_t
+                uint32_t value;
+                layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
+                break;
+            }
+            case 1: { // int64_t
+                int64_t value;
+                layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
+                break;
+            }
+            case 2: { // double
+                double value;
+                layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
+                break;
+            }
+            case 3: { // bool
+                bool value;
+                layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
+                break;
+            }
+            case 4: { // nullptr
+                break;
+            }
+            case 5: { // TemplateEncodedTimestamp
+                uint32_t template_id;
+                layer_stream.read(reinterpret_cast<char*>(&template_id), sizeof(template_id));
+                uint32_t n;
+                layer_stream.read(reinterpret_cast<char*>(&n), sizeof(n));
+                for (uint32_t j = 0; j < n; ++j) {
+                    uint32_t code;
+                    layer_stream.read(reinterpret_cast<char*>(&code), sizeof(code));
+                }
+                break;
+            }
+            case 6: { // EncodedLog
+                uint32_t template_id;
+                layer_stream.read(reinterpret_cast<char*>(&template_id), sizeof(template_id));
+                uint32_t n;
+                layer_stream.read(reinterpret_cast<char*>(&n), sizeof(n));
+                for (uint32_t j = 0; j < n; ++j) {
+                    uint32_t code;
+                    layer_stream.read(reinterpret_cast<char*>(&code), sizeof(code));
+                }
+                break;
+            }
+            default:
+                throw std::runtime_error("Unknown node type: " + std::to_string(type_byte));
+        }
+    }
+    
+    // 读取目标节点的类型字节
+    uint8_t type_byte;
+    layer_stream.read(reinterpret_cast<char*>(&type_byte), 1);
+    
+    // 根据类型读取并返回值
+    switch (type_byte) {
+        case 0: { // uint32_t
+            uint32_t value;
+            layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
+            return value;
+        }
+        case 1: { // int64_t
+            int64_t value;
+            layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
+            return value;
+        }
+        case 2: { // double
+            double value;
+            layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
+            return value;
+        }
+        case 3: { // bool
+            bool value;
+            layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
+            return value;
+        }
+        case 4: { // nullptr
+            return std::nullptr_t{};
+        }
+        case 5: { // TemplateEncodedTimestamp
+            uint32_t template_id;
+            layer_stream.read(reinterpret_cast<char*>(&template_id), sizeof(template_id));
+            uint32_t n;
+            layer_stream.read(reinterpret_cast<char*>(&n), sizeof(n));
+            std::vector<uint32_t> var_codes(n);
+            for (uint32_t& code : var_codes) {
+                layer_stream.read(reinterpret_cast<char*>(&code), sizeof(code));
+            }
+            return TemplateEncodedTimestamp{template_id, std::move(var_codes)};
+        }
+        case 6: { // EncodedLog
+            uint32_t template_id;
+            layer_stream.read(reinterpret_cast<char*>(&template_id), sizeof(template_id));
+            uint32_t n;
+            layer_stream.read(reinterpret_cast<char*>(&n), sizeof(n));
+            std::vector<uint32_t> var_codes(n);
+            for (uint32_t& code : var_codes) {
+                layer_stream.read(reinterpret_cast<char*>(&code), sizeof(code));
+            }
+            return EncodedLog{template_id, std::move(var_codes)};
+        }
+        default:
+            throw std::runtime_error("Unknown node type: " + std::to_string(type_byte));
+    }
+}
+
 // ========== 私有辅助方法实现 ==========
 
 std::unique_ptr<LOUDSTrie> SelectiveDecompressor::decompressLoudsStructure(const std::vector<uint8_t>& trie_bitmap) {
@@ -422,6 +726,31 @@ bool SelectiveDecompressor::decompressLayerSizes(const std::vector<uint8_t>& lay
         return false;
     } catch (const std::exception& e) {
         return false;
+    }
+}
+
+// ========== 私有辅助方法：类型映射 ==========
+
+compression::FieldType SelectiveDecompressor::mapJsonFieldTypeToCompressionType(FieldType json_field_type) const {
+    switch (json_field_type) {
+        case FieldType::Int:
+            return compression::FieldType::INT64;
+        case FieldType::Double:
+            return compression::FieldType::DOUBLE;
+        case FieldType::Bool:
+            return compression::FieldType::BOOL;
+        case FieldType::String:
+            return compression::FieldType::STRING;
+        case FieldType::Timestamp:
+            return compression::FieldType::TIMESTAMP;
+        case FieldType::LogType:
+            return compression::FieldType::LOGTYPE;
+        case FieldType::UnstructuredArray:
+            return compression::FieldType::ARRAY;
+        case FieldType::Null:
+            return compression::FieldType::NULL_TYPE;
+        default:
+            return compression::FieldType::STRING; // Safe default
     }
 }
 

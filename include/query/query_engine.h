@@ -311,6 +311,9 @@ private:
     // Helper functions to merge GroupedAggregateQueryResult objects from multiple blocks
     void mergeGroupedAggregateQueryResults(GroupedAggregateQueryResult& target, const GroupedAggregateQueryResult& source) const;
     
+    // Helper function to merge QueryResult objects efficiently
+    void mergeQueryResults(QueryResult& target, const QueryResult& source);
+    
     // Helper function to extract granular data from a chunk
     GranularCompressedData extractGranularDataFromChunk(const ChunkedTypeAwareBlock& chunk, size_t chunk_index) const;
 };

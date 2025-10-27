@@ -40,6 +40,9 @@ public:
     // 获取所有出现过的字段
     std::set<std::string> getAllFields() const;
 
+    // 获取字段的唯一值集合
+    const std::set<std::string>& getUniqueValues(const FieldKey& key) const;
+
     // 信息熵基础的冗余度计算方法（当前使用的方法）
     double calculateRedundancy(const FieldKey& key, size_t total, size_t unique) const; // 基于信息熵
     

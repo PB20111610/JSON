@@ -275,6 +275,16 @@ std::set<std::string> FieldDictionaryManager::getAllFields() const {
     return fields;
 }
 
+// 获取字段的唯一值集合
+const std::set<std::string>& FieldDictionaryManager::getUniqueValues(const FieldKey& key) const {
+    static const std::set<std::string> empty_set; // Return empty set if not found
+    auto it = field_type_unique_values_.find(key);
+    if (it == field_type_unique_values_.end()) {
+        return empty_set;
+    }
+    return it->second;
+}
+
 double FieldDictionaryManager::calculateRedundancy(const FieldKey& key, size_t total, size_t unique) const {
     if (unique == 0) return 0.0;
     

@@ -10,6 +10,113 @@
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <cstring>  // For strchr and strncmp
+#include <limits>
+
+// Handle getopt for cross-platform compatibility
+#ifdef _WIN32
+    // Simple getopt implementation for Windows
+    char* optarg;
+    int optind = 1;
+    int opterr = 1;
+    int optopt;
+
+    struct option {
+        const char* name;
+        int has_arg;
+        int* flag;
+        int val;
+    };
+
+    enum {
+        no_argument = 0,
+        required_argument = 1,
+        optional_argument = 2
+    };
+
+    int getopt_long(int argc, char* const argv[], const char* optstring, const struct option* longopts, int* longindex) {
+        if (optind >= argc) return -1;
+        
+        const char* arg = argv[optind];
+        if (arg[0] != '-' || arg[1] == '\0') return -1;
+        
+        if (arg[1] == '-') {
+            // Long option
+            const char* long_arg = arg + 2;
+            for (int i = 0; longopts[i].name != nullptr; i++) {
+                const char* opt_name = longopts[i].name;
+                // Check if the option matches
+                const char* eq_pos = strchr(long_arg, '=');
+                size_t name_len = eq_pos ? eq_pos - long_arg : strlen(long_arg);
+                
+                if (strncmp(long_arg, opt_name, name_len) == 0 && opt_name[name_len] == '\0') {
+                    if (longindex) *longindex = i;
+                    
+                    if (longopts[i].has_arg == required_argument) {
+                        if (eq_pos && eq_pos[1] != '\0') {
+                            optarg = const_cast<char*>(eq_pos + 1);
+                        } else if (optind + 1 < argc) {
+                            optarg = argv[++optind];
+                        } else {
+                            if (opterr) std::cerr << "Option --" << opt_name << " requires an argument\n";
+                            return '?';
+                        }
+                    } else if (longopts[i].has_arg == optional_argument) {
+                        if (eq_pos && eq_pos[1] != '\0') {
+                            optarg = const_cast<char*>(eq_pos + 1);
+                        } else {
+                            optarg = nullptr;
+                        }
+                    } else {
+                        optarg = nullptr;
+                    }
+                    
+                    optind++;
+                    if (longopts[i].flag) {
+                        *(longopts[i].flag) = longopts[i].val;
+                        return 0;
+                    }
+                    return longopts[i].val;
+                }
+            }
+            if (opterr) std::cerr << "Unknown option --" << long_arg << "\n";
+            optind++;
+            return '?';
+        } else {
+            // Short option
+            char opt = arg[1];
+            const char* opt_ptr = strchr(optstring, opt);
+            if (!opt_ptr) {
+                optopt = opt;
+                if (opterr) std::cerr << "Unknown option -" << opt << "\n";
+                optind++;
+                return '?';
+            }
+            
+            if (opt_ptr[1] == ':') {
+                // Option requires argument
+                if (arg[2] != '\0') {
+                    optarg = const_cast<char*>(arg + 2);
+                } else if (optind + 1 < argc) {
+                    optarg = argv[++optind];
+                } else {
+                    optopt = opt;
+                    if (opterr) std::cerr << "Option -" << opt << " requires an argument\n";
+                    optind++;
+                    return '?';
+                }
+            } else {
+                optarg = nullptr;
+            }
+            
+            optind++;
+            return opt;
+        }
+    }
+#else
+    #include <unistd.h>
+    #include <getopt.h>
+#endif
 
 using namespace json2;
 using namespace json2::query;
@@ -24,7 +131,7 @@ public:
     ParallelQueryTest() {
         // Create a custom query config with higher max_results limit
         QueryConfig config;
-        config.max_results = 50000;  // Set to 50,000 to accommodate your 20,000 matching records
+        config.max_results = std::numeric_limits<size_t>::max(); 
         config.enable_parallel = true;  // Enable parallel processing
         config.prune_only = false;
         config.sample_limit = 10;
@@ -1068,11 +1175,66 @@ public:
     }
 };
 
-int main() {
-    const std::string compressed_data_dir = "compressed_type_aware_data";
+void printUsage(const char* program_name) {
+    std::cout << "Usage: " << program_name << " [OPTIONS]\n";
+    std::cout << "\nOptions:\n";
+    std::cout << "  -d, --data-dir DIRECTORY    Directory containing compressed data (default: postgresql)\n";
+    std::cout << "  -t, --threads COUNT         Number of threads to use (default: 6)\n";
+    std::cout << "  -h, --help                  Show this help message\n";
+    std::cout << "\nExamples:\n";
+    std::cout << "  " << program_name << " --data-dir compressed_data --threads 8\n";
+    std::cout << "  " << program_name << " -d test_data -t 4\n";
+    std::cout << "  " << program_name << " --data-dir /path/to/data\n";
+    std::cout << "  " << program_name << " -t 12\n";
+}
+
+int main(int argc, char* argv[]) {
+    std::string compressed_data_dir = "postgresql";
+    int num_threads = 6;
+    
+    // Parse command line arguments
+    static struct option long_options[] = {
+        {"data-dir", required_argument, 0, 'd'},
+        {"threads", required_argument, 0, 't'},
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+    
+    int option_index = 0;
+    int c;
+    
+    while ((c = getopt_long(argc, argv, "d:t:h", long_options, &option_index)) != -1) {
+        switch (c) {
+            case 'd':
+                compressed_data_dir = optarg;
+                break;
+            case 't':
+                try {
+                    num_threads = std::stoi(optarg);
+                    if (num_threads <= 0) {
+                        std::cerr << "Error: Thread count must be positive\n";
+                        return 1;
+                    }
+                } catch (const std::exception&) {
+                    std::cerr << "Error: Invalid thread count: " << optarg << "\n";
+                    return 1;
+                }
+                break;
+            case 'h':
+                printUsage(argv[0]);
+                return 0;
+            case '?':
+                // getopt_long already printed an error message
+                return 1;
+            default:
+                std::cerr << "Unknown option\n";
+                return 1;
+        }
+    }
     
     std::cout << "并行查询测试" << std::endl;
     std::cout << "压缩数据目录: " << compressed_data_dir << std::endl;
+    std::cout << "线程数: " << num_threads << std::endl;
     
     if (!std::filesystem::exists(compressed_data_dir)) {
         std::cerr << "错误: 压缩数据目录不存在: " << compressed_data_dir << std::endl;
@@ -1090,14 +1252,14 @@ int main() {
         std::cerr << "加载压缩数据失败" << std::endl;
         return 1;
     }
-    int num_threads = 8;
+    
     // 运行测试
     // tester.testFieldExistenceQueries();
     // tester.testDictionaryQueries();
-    tester.testExactMatchQueries(num_threads);  // 添加精确匹配查询测试
-    tester.testRangeQueries(num_threads);       // 添加范围查询测试
-    tester.testAggregateQueries(num_threads);   // 添加聚合查询测试
+    // tester.testExactMatchQueries(num_threads);  // 添加精确匹配查询测试
+    // tester.testRangeQueries(num_threads);       // 添加范围查询测试
     tester.testComplexQueries(num_threads);     // 添加复杂查询测试
+    tester.testAggregateQueries(num_threads);   // 添加聚合查询测试
     tester.testDirectGroupedAggregateQuery(num_threads); // 添加直接分组聚合查询测试
 
     std::cout << "\n并行测试完成！" << std::endl;

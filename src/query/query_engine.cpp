@@ -1986,22 +1986,72 @@ QueryResult QueryEngine::evaluateFieldNode(
             // In a more sophisticated implementation, we would have specific handling
             std::string min_value, max_value;
             
+            // Determine field type to handle numeric comparisons properly
+            FieldType target_field_type = FieldType::String; // Default to string
+            
+            // Try to determine the field type from the field analyzer or metadata
+            // For now, we'll use a simple heuristic: if the value is numeric, treat as numeric comparison
+            
+            bool is_numeric_field = false;
+            bool is_numeric_value = false;
+            
+            // Check if the value is numeric
+            try {
+                // Try to parse as integer first
+                std::stoll(value);
+                is_numeric_value = true;
+            } catch (const std::exception&) {
+                // Try to parse as double
+                try {
+                    std::stod(value);
+                    is_numeric_value = true;
+                } catch (const std::exception&) {
+                    // Not numeric
+                    is_numeric_value = false;
+                }
+            }
+            
+            // If the value is numeric, assume the field is also numeric for range queries
+            is_numeric_field = is_numeric_value;
+            
             switch (op) {
                 case QueryOperator::GREATER:
-                    min_value = std::to_string(std::stoll(value) + 1);
-                    max_value = "999999999999999999"; // A large number as upper bound
+                    if (is_numeric_value) {
+                        // For numeric values, we can't just add 1 as it might be a float
+                        // We'll use the value as the lower bound (exclusive) and a large upper bound
+                        min_value = value;
+                        max_value = "999999999999999999"; // A large number as upper bound
+                    } else {
+                        result.error_message = "Cannot perform numeric comparison on non-numeric value: " + value;
+                        return result;
+                    }
                     break;
                 case QueryOperator::GREATER_EQUAL:
-                    min_value = value;
-                    max_value = "999999999999999999"; // A large number as upper bound
+                    if (is_numeric_value) {
+                        min_value = value;
+                        max_value = "999999999999999999"; // A large number as upper bound
+                    } else {
+                        result.error_message = "Cannot perform numeric comparison on non-numeric value: " + value;
+                        return result;
+                    }
                     break;
                 case QueryOperator::LESS:
-                    min_value = "0"; // A small number as lower bound
-                    max_value = std::to_string(std::stoll(value) - 1);
+                    if (is_numeric_value) {
+                        min_value = "0"; // A small number as lower bound
+                        max_value = value;
+                    } else {
+                        result.error_message = "Cannot perform numeric comparison on non-numeric value: " + value;
+                        return result;
+                    }
                     break;
                 case QueryOperator::LESS_EQUAL:
-                    min_value = "0"; // A small number as lower bound
-                    max_value = value;
+                    if (is_numeric_value) {
+                        min_value = "0"; // A small number as lower bound
+                        max_value = value;
+                    } else {
+                        result.error_message = "Cannot perform numeric comparison on non-numeric value: " + value;
+                        return result;
+                    }
                     break;
                 default:
                     result.error_message = "Unexpected operator";
@@ -2149,8 +2199,9 @@ QueryResult QueryEngine::evaluateGroupByNode(
         return result;
     }
     
-    // Execute grouped aggregate query with all aggregate functions
-    auto grouped_result = executeGroupedAggregateQuery(
+    // For single chunk queries, we can directly use the more efficient grouped aggregate query
+    std::vector<ChunkedTypeAwareBlock> dummy_chunks; // Empty for single chunk processing
+    GroupedAggregateQueryResult grouped_result = executeGroupedAggregateQuery(
         agg_funcs, agg_fields, group_fields, granular_data);
     
     if (!grouped_result.error_message.empty()) {
@@ -2470,6 +2521,49 @@ void QueryEngine::mergeRecordQueryResults(RecordQueryResult& target, const Recor
     target.is_complete = target.is_complete && source.is_complete && (target.count < config_.max_results);
     
     // Propagate error message if source has one and target doesn't
+    // Only propagate error if no records were found in the source
+    if (!source.error_message.empty() && target.error_message.empty() && source.count == 0) {
+        target.error_message = source.error_message;
+    }
+}
+
+// Helper function to merge QueryResult objects efficiently
+void QueryEngine::mergeQueryResults(QueryResult& target, const QueryResult& source) {
+    if (target.records.empty()) {
+        target = source;
+        return;
+    }
+    
+    // Efficiently merge records
+    target.records.insert(target.records.end(), source.records.begin(), source.records.end());
+    target.count += source.count;
+    target.chunks_accessed += source.chunks_accessed;
+    target.dict_hits += source.dict_hits;
+    target.trie_nodes_visited += source.trie_nodes_visited;
+    target.matching_blocks += source.matching_blocks;
+    
+    // Update decompression ratio (weighted average)
+    if (target.chunks_accessed + source.chunks_accessed > 0) {
+        target.decompression_ratio = 
+            (target.decompression_ratio * target.chunks_accessed + 
+             source.decompression_ratio * source.chunks_accessed) / 
+            (target.chunks_accessed + source.chunks_accessed);
+    }
+    
+    // Update selection ratio (weighted average)
+    if (target.chunks_accessed + source.chunks_accessed > 0) {
+        target.selection_ratio = 
+            (target.selection_ratio * target.chunks_accessed + 
+             source.selection_ratio * source.chunks_accessed) / 
+            (target.chunks_accessed + source.chunks_accessed);
+    }
+    
+    target.query_time_ms += source.query_time_ms;
+    // Update completion status - for complex queries, we should be more lenient about completion
+    // since complex queries might have different completion criteria
+    target.is_complete = target.is_complete && source.is_complete;
+    
+    // Propagate error message if source has one and target doesn't
     if (!source.error_message.empty() && target.error_message.empty()) {
         target.error_message = source.error_message;
     }
@@ -2519,7 +2613,8 @@ void QueryEngine::mergeAggregateQueryResults(AggregateQueryResult& target, const
     target.is_complete = target.is_complete && source.is_complete;
     
     // Propagate error message if source has one and target doesn't
-    if (!source.error_message.empty() && target.error_message.empty()) {
+    // Only propagate error if no records were found in the source
+    if (!source.error_message.empty() && target.error_message.empty() && source.count == 0) {
         target.error_message = source.error_message;
     }
 }
@@ -2580,7 +2675,8 @@ void QueryEngine::mergeGroupedAggregateQueryResults(GroupedAggregateQueryResult&
     target.is_complete = target.is_complete && source.is_complete;
     
     // Propagate error message if source has one and target doesn't
-    if (!source.error_message.empty() && target.error_message.empty()) {
+    // Only propagate error if no records were found in the source
+    if (!source.error_message.empty() && target.error_message.empty() && source.total_count == 0) {
         target.error_message = source.error_message;
     }
 }
@@ -2768,7 +2864,8 @@ QueryResult QueryEngine::executeComplexQueryMultiBlock(
             final_result.is_complete = final_result.is_complete && chunk_result.is_complete;
             
             // Propagate error message if chunk has one and final doesn't
-            if (!chunk_result.error_message.empty() && final_result.error_message.empty()) {
+            // Only propagate error if no records were found in the chunk
+            if (!chunk_result.error_message.empty() && final_result.error_message.empty() && chunk_result.count == 0) {
                 final_result.error_message = chunk_result.error_message;
             }
         }
@@ -2979,7 +3076,7 @@ AggregateQueryResult QueryEngine::executeAggregateQueryMultiBlockParallel(
         if (chunk_groups[group_idx].empty()) continue;
         
         // Launch async task with chunk indices
-        futures.push_back(std::async(std::launch::async, [this, aggregate_func, &field_name, &chunks, group_indices = chunk_groups[group_idx]]() {
+        futures.push_back(std::async(std::launch::async, [this, &aggregate_func, &field_name, &chunks, group_indices = chunk_groups[group_idx]]() {
             AggregateQueryResult group_result;
             group_result.value = 0.0;
             group_result.count = 0;
@@ -3016,6 +3113,100 @@ AggregateQueryResult QueryEngine::executeAggregateQueryMultiBlockParallel(
     
     return final_result;
 }
+
+QueryResult QueryEngine::executeComplexQueryMultiBlockParallel(
+    const std::string& complex_query,
+    const std::vector<ChunkedTypeAwareBlock>& chunks,
+    size_t thread_count) {
+    
+    QueryResult final_result;
+    final_result.count = 0;
+    final_result.chunks_accessed = 0;
+    final_result.dict_hits = 0;
+    final_result.trie_nodes_visited = 0;
+    final_result.matching_blocks = 0;
+    final_result.decompression_ratio = 0.0;
+    final_result.selection_ratio = 0.0;
+    final_result.query_time_ms = 0.0;
+    final_result.is_complete = true; // Start with complete, set to false if any chunk is incomplete
+    
+    // If thread_count is 0 or 1, fall back to sequential processing
+    // For complex queries, we use a lower threshold since they're typically more computationally intensive
+    if (thread_count <= 1 || chunks.empty() || chunks.size() < 2) {
+        return executeComplexQueryMultiBlock(complex_query, chunks);
+    }
+    
+    // Limit thread count to the number of chunks or hardware concurrency
+    thread_count = std::min(thread_count, std::max(static_cast<size_t>(1), chunks.size()));
+    thread_count = std::min(thread_count, static_cast<size_t>(std::thread::hardware_concurrency()));
+    
+    // Split chunk indices into thread_count groups
+    std::vector<std::vector<size_t>> chunk_groups(thread_count);
+    for (size_t i = 0; i < chunks.size(); ++i) {
+        chunk_groups[i % thread_count].push_back(i);
+    }
+    
+    // Launch threads to process each group
+    std::vector<std::future<QueryResult>> futures;
+    for (size_t group_idx = 0; group_idx < thread_count; ++group_idx) {
+        if (chunk_groups[group_idx].empty()) continue;
+        
+        // Launch async task with chunk indices
+        futures.push_back(std::async(std::launch::async, [this, &complex_query, &chunks, group_indices = chunk_groups[group_idx]]() {
+            QueryResult group_result;
+            group_result.count = 0;
+            group_result.chunks_accessed = 0;
+            group_result.dict_hits = 0;
+            group_result.trie_nodes_visited = 0;
+            group_result.matching_blocks = 0;
+            group_result.decompression_ratio = 0.0;
+            group_result.selection_ratio = 0.0;
+            group_result.query_time_ms = 0.0;
+            group_result.is_complete = true;
+            
+            for (size_t chunk_idx : group_indices) {
+                // Extract granular data from chunk using the index
+                GranularCompressedData granular_data = extractGranularDataFromChunk(chunks[chunk_idx], chunk_idx);
+                
+                // Execute query on this chunk
+                QueryResult chunk_result = executeComplexQuery(complex_query, granular_data);
+                
+                // Merge results using the optimized merge function
+                mergeQueryResults(group_result, chunk_result);
+                
+                // Check if we've reached the maximum results limit
+                if (group_result.count >= this->config_.max_results) {
+                    group_result.is_complete = false; // Not complete because we hit the limit
+                    break;
+                }
+            }
+            
+            return group_result;
+        }));
+    }
+    
+    // Collect results from all threads
+    for (auto& future : futures) {
+        try {
+            QueryResult group_result = future.get();
+            mergeQueryResults(final_result, group_result);
+            
+            // Check if we've reached the maximum results limit
+            if (final_result.count >= config_.max_results) {
+                final_result.is_complete = false; // Not complete because we hit the limit
+                break;
+            }
+        } catch (const std::exception& e) {
+            // Handle exceptions from threads
+            if (final_result.error_message.empty()) {
+                final_result.error_message = "Error in parallel processing: " + std::string(e.what());
+            }
+        }
+    }
+    
+    return final_result;
+}
+
 
 GroupedAggregateQueryResult QueryEngine::executeGroupedAggregateQueryMultiBlockParallel(
     const std::vector<AggregateFunction>& aggregate_funcs,
@@ -3079,172 +3270,6 @@ GroupedAggregateQueryResult QueryEngine::executeGroupedAggregateQueryMultiBlockP
         try {
             GroupedAggregateQueryResult group_result = future.get();
             mergeGroupedAggregateQueryResults(final_result, group_result);
-        } catch (const std::exception& e) {
-            // Handle exceptions from threads
-            if (final_result.error_message.empty()) {
-                final_result.error_message = "Error in parallel processing: " + std::string(e.what());
-            }
-        }
-    }
-    
-    return final_result;
-}
-
-QueryResult QueryEngine::executeComplexQueryMultiBlockParallel(
-    const std::string& complex_query,
-    const std::vector<ChunkedTypeAwareBlock>& chunks,
-    size_t thread_count) {
-    
-    QueryResult final_result;
-    final_result.count = 0;
-    final_result.chunks_accessed = 0;
-    final_result.dict_hits = 0;
-    final_result.trie_nodes_visited = 0;
-    final_result.matching_blocks = 0;
-    final_result.decompression_ratio = 0.0;
-    final_result.selection_ratio = 0.0;
-    final_result.query_time_ms = 0.0;
-    final_result.is_complete = true; // Start with complete, set to false if any chunk is incomplete
-    
-    // If thread_count is 0 or 1, fall back to sequential processing
-    if (thread_count <= 1 || chunks.empty()) {
-        return executeComplexQueryMultiBlock(complex_query, chunks);
-    }
-    
-    // Limit thread count to the number of chunks or hardware concurrency
-    thread_count = std::min(thread_count, std::max(static_cast<size_t>(1), chunks.size()));
-    thread_count = std::min(thread_count, static_cast<size_t>(std::thread::hardware_concurrency()));
-    
-    // Split chunk indices into thread_count groups
-    std::vector<std::vector<size_t>> chunk_groups(thread_count);
-    for (size_t i = 0; i < chunks.size(); ++i) {
-        chunk_groups[i % thread_count].push_back(i);
-    }
-    
-    // Launch threads to process each group
-    std::vector<std::future<QueryResult>> futures;
-    for (size_t group_idx = 0; group_idx < thread_count; ++group_idx) {
-        if (chunk_groups[group_idx].empty()) continue;
-        
-        // Launch async task with chunk indices
-        futures.push_back(std::async(std::launch::async, [this, &complex_query, &chunks, group_indices = chunk_groups[group_idx]]() {
-            QueryResult group_result;
-            group_result.count = 0;
-            group_result.chunks_accessed = 0;
-            group_result.dict_hits = 0;
-            group_result.trie_nodes_visited = 0;
-            group_result.matching_blocks = 0;
-            group_result.decompression_ratio = 0.0;
-            group_result.selection_ratio = 0.0;
-            group_result.query_time_ms = 0.0;
-            group_result.is_complete = true;
-            
-            for (size_t chunk_idx : group_indices) {
-                // Extract granular data from chunk using the index
-                GranularCompressedData granular_data = extractGranularDataFromChunk(chunks[chunk_idx], chunk_idx);
-                
-                // Execute query on this chunk
-                QueryResult chunk_result = executeComplexQuery(complex_query, granular_data);
-                
-                // Merge results using existing merge functions
-                if (group_result.records.empty()) {
-                    group_result = chunk_result;
-                } else {
-                    // For complex queries, we'll use a simple merge approach
-                    group_result.records.insert(group_result.records.end(), 
-                                               chunk_result.records.begin(), 
-                                               chunk_result.records.end());
-                    group_result.count += chunk_result.count;
-                    group_result.chunks_accessed += chunk_result.chunks_accessed;
-                    group_result.dict_hits += chunk_result.dict_hits;
-                    group_result.trie_nodes_visited += chunk_result.trie_nodes_visited;
-                    group_result.matching_blocks += chunk_result.matching_blocks;
-                    
-                    // Update decompression ratio (weighted average)
-                    if (group_result.chunks_accessed + chunk_result.chunks_accessed > 0) {
-                        group_result.decompression_ratio = 
-                            (group_result.decompression_ratio * group_result.chunks_accessed + 
-                             chunk_result.decompression_ratio * chunk_result.chunks_accessed) / 
-                            (group_result.chunks_accessed + chunk_result.chunks_accessed);
-                    }
-                    
-                    // Update selection ratio (weighted average)
-                    if (group_result.chunks_accessed + chunk_result.chunks_accessed > 0) {
-                        group_result.selection_ratio = 
-                            (group_result.selection_ratio * group_result.chunks_accessed + 
-                             chunk_result.selection_ratio * chunk_result.chunks_accessed) / 
-                            (group_result.chunks_accessed + chunk_result.chunks_accessed);
-                    }
-                    
-                    group_result.query_time_ms += chunk_result.query_time_ms;
-                    group_result.is_complete = group_result.is_complete && chunk_result.is_complete;
-                    
-                    // Propagate error message if chunk has one and final doesn't
-                    if (!chunk_result.error_message.empty() && group_result.error_message.empty()) {
-                        group_result.error_message = chunk_result.error_message;
-                    }
-                }
-                
-                // Check if we've reached the maximum results limit
-                if (group_result.count >= config_.max_results) {
-                    group_result.is_complete = false; // Not complete because we hit the limit
-                    break;
-                }
-            }
-            
-            return group_result;
-        }));
-    }
-    
-    // Collect results from all threads
-    for (auto& future : futures) {
-        try {
-            QueryResult group_result = future.get();
-            
-            // Merge results using existing merge functions
-            if (final_result.records.empty()) {
-                final_result = group_result;
-            } else {
-                // For complex queries, we'll use a simple merge approach
-                final_result.records.insert(final_result.records.end(), 
-                                           group_result.records.begin(), 
-                                           group_result.records.end());
-                final_result.count += group_result.count;
-                final_result.chunks_accessed += group_result.chunks_accessed;
-                final_result.dict_hits += group_result.dict_hits;
-                final_result.trie_nodes_visited += group_result.trie_nodes_visited;
-                final_result.matching_blocks += group_result.matching_blocks;
-                
-                // Update decompression ratio (weighted average)
-                if (final_result.chunks_accessed + group_result.chunks_accessed > 0) {
-                    final_result.decompression_ratio = 
-                        (final_result.decompression_ratio * final_result.chunks_accessed + 
-                         group_result.decompression_ratio * group_result.chunks_accessed) / 
-                        (final_result.chunks_accessed + group_result.chunks_accessed);
-                }
-                
-                // Update selection ratio (weighted average)
-                if (final_result.chunks_accessed + group_result.chunks_accessed > 0) {
-                    final_result.selection_ratio = 
-                        (final_result.selection_ratio * final_result.chunks_accessed + 
-                         group_result.selection_ratio * group_result.chunks_accessed) / 
-                        (final_result.chunks_accessed + group_result.chunks_accessed);
-                }
-                
-                final_result.query_time_ms += group_result.query_time_ms;
-                final_result.is_complete = final_result.is_complete && group_result.is_complete;
-                
-                // Propagate error message if chunk has one and final doesn't
-                if (!group_result.error_message.empty() && final_result.error_message.empty()) {
-                    final_result.error_message = group_result.error_message;
-                }
-            }
-            
-            // Check if we've reached the maximum results limit
-            if (final_result.count >= config_.max_results) {
-                final_result.is_complete = false; // Not complete because we hit the limit
-                break;
-            }
         } catch (const std::exception& e) {
             // Handle exceptions from threads
             if (final_result.error_message.empty()) {

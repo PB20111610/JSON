@@ -36,20 +36,20 @@ struct TypeGroup {
     std::vector<std::pair<FieldKey, double>> numeric_fields;     // Int, Double, Bool
     std::vector<std::pair<FieldKey, double>> logtype_fields;
     std::vector<std::pair<FieldKey, double>> timestamp_fields;
-    std::vector<std::pair<FieldKey, double>> array_fields;       // UnstructuredArray
+    std::vector<std::pair<FieldKey, double>> array_fields;       // ARRAY
     std::vector<std::pair<FieldKey, double>> other_fields;       // Null, 其他类型
 };
 
 // 获取字段的类型分组
 std::string getFieldTypeGroup(FieldType type) {
     switch (type) {
-        case FieldType::String:     return "string";
-        case FieldType::Int:        
-        case FieldType::Double:     
-        case FieldType::Bool:       return "numeric";
-        case FieldType::LogType:    return "logtype";
-        case FieldType::Timestamp:  return "timestamp";
-        case FieldType::UnstructuredArray: return "array";
+        case FieldType::STRING:     return "string";
+        case FieldType::INT64:        
+        case FieldType::DOUBLE:     
+        case FieldType::BOOL:       return "numeric";
+        case FieldType::LOGTYPE:    return "logtype";
+        case FieldType::TIMESTAMP:  return "timestamp";
+        case FieldType::ARRAY: return "array";
         default:                    return "other";
     }
 }
@@ -342,13 +342,13 @@ void FieldAnalyzer::analyzeAndSortFieldsHierarchical(const std::vector<std::stri
     //     
     //     std::string type_group = getFieldTypeGroup(key.type);
     //     std::cout << std::setw(4) << (i + 1) << ". [" << category << "] " 
-    //               << key.name << "[" << (key.type == FieldType::String ? "String" : 
-    //                    key.type == FieldType::Int ? "Int" : 
-    //                    key.type == FieldType::Double ? "Double" : 
-    //                    key.type == FieldType::Bool ? "Bool" : 
-    //                    key.type == FieldType::Timestamp ? "Timestamp" : 
-    //                    key.type == FieldType::LogType ? "LogType" : 
-    //                    key.type == FieldType::Null ? "Null" : "Other") << "]" 
+    //               << key.name << "[" << (key.type == FieldType::STRING ? "String" : 
+    //                    key.type == FieldType::INT64 ? "Int" : 
+    //                    key.type == FieldType::DOUBLE ? "Double" : 
+    //                    key.type == FieldType::BOOL ? "Bool" : 
+    //                    key.type == FieldType::TIMESTAMP ? "Timestamp" : 
+    //                    key.type == FieldType::LOGTYPE ? "LogType" : 
+    //                    key.type == FieldType::NULL_TYPE ? "Null" : "Other") << "]" 
     //               << " - Occ: " << occ 
     //               << ", Uniq: " << val_count 
     //               << ", Freq: " << std::fixed << std::setprecision(3) << frequency

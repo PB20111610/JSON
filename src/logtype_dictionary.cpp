@@ -70,7 +70,12 @@ std::string LogTypeDictionary::decodeVariable(uint32_t code) const {
     return "";
 }
 
-
+// 获取变量数量
+size_t LogTypeDictionary::getVariableCount() const {
+    // Subtract 1 because variables are 1-indexed (code 0 is unused)
+    // But we need to be careful not to underflow if the vector is empty
+    return code_to_variable_.size() > 0 ? code_to_variable_.size() - 1 : 0;
+}
 
 EncodedLog LogTypeDictionary::encodeLog(const FieldKey& key, const std::string& log_template, const std::vector<std::string>& variables) {
     // 目前FieldKey未参与分发，保留接口兼容性

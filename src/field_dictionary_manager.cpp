@@ -78,35 +78,35 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, const std::s
     }
     field_type_unique_values_[key].insert(value);
     switch (key.type) {
-        case FieldType::Int: {
+        case FieldType::INT64: {
             int64_t v = std::stoll(value);
             auto ret = variable_dict_.addFieldValue(key, key.type, v);
             return ret;
         }
-        case FieldType::Double: {
+        case FieldType::DOUBLE: {
             double v = std::stod(value);
             auto ret = variable_dict_.addFieldValue(key, key.type, v);
             return ret;
         }
-        case FieldType::Bool: {
+        case FieldType::BOOL: {
             bool v = (value == "true");
             auto ret = variable_dict_.addFieldValue(key, key.type, v);
             return ret;
         }
-        case FieldType::String: {
+        case FieldType::STRING: {
             auto ret = variable_dict_.addFieldValue(key, key.type, value);
             return ret;
         }
-        case FieldType::Timestamp: {
+        case FieldType::TIMESTAMP: {
             // 直接使用TimestampDictionary编码，与LogType保持一致
             auto encoded = timestamp_dict_.encodeTemplate(key, value);
             return encoded.template_id;
         }
-        case FieldType::LogType: {
+        case FieldType::LOGTYPE: {
             auto encoded = logtype_dict_.encodeLog(key, value, {});
             return encoded.template_id;
         }
-        case FieldType::Null:
+        case FieldType::NULL_TYPE:
             return variable_dict_.addFieldValue(key, key.type, nullptr);
         default:
             return variable_dict_.addFieldValue(key, key.type, value);
@@ -188,7 +188,7 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
     field_type_unique_values_[key].insert(value_str);
     
     switch (key.type) {
-        case FieldType::Int:
+        case FieldType::INT64:
             if (std::holds_alternative<int64_t>(value)) {
                 return variable_dict_.addFieldValue(key, key.type, std::get<int64_t>(value));
             } else if (std::holds_alternative<double>(value)) {
@@ -198,7 +198,7 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
             } else {
                 return variable_dict_.addFieldValue(key, key.type, int64_t(0));
             }
-        case FieldType::Double:
+        case FieldType::DOUBLE:
             if (std::holds_alternative<double>(value)) {
                 return variable_dict_.addFieldValue(key, key.type, std::get<double>(value));
             } else if (std::holds_alternative<int64_t>(value)) {
@@ -208,7 +208,7 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
             } else {
                 return variable_dict_.addFieldValue(key, key.type, 0.0);
             }
-        case FieldType::Bool:
+        case FieldType::BOOL:
             if (std::holds_alternative<bool>(value)) {
                 return variable_dict_.addFieldValue(key, key.type, std::get<bool>(value));
             } else if (std::holds_alternative<int64_t>(value)) {
@@ -218,7 +218,7 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
             } else {
                 return variable_dict_.addFieldValue(key, key.type, false);
             }
-        case FieldType::String:
+        case FieldType::STRING:
             if (std::holds_alternative<std::string>(value)) {
                 return variable_dict_.addFieldValue(key, key.type, std::get<std::string>(value));
             } else if (std::holds_alternative<int64_t>(value)) {
@@ -230,21 +230,21 @@ uint32_t FieldDictionaryManager::addFieldValue(const FieldKey& key, FieldType ty
             } else {
                 return variable_dict_.addFieldValue(key, key.type, "");
             }
-        case FieldType::Timestamp:
+        case FieldType::TIMESTAMP:
             if (std::holds_alternative<std::string>(value)) {
                 auto encoded = timestamp_dict_.encodeTemplate(key, std::get<std::string>(value));
                 return encoded.template_id;
             } else {
                 return variable_dict_.addFieldValue(key, key.type, "");
             }
-        case FieldType::LogType:
+        case FieldType::LOGTYPE:
             if (std::holds_alternative<std::string>(value)) {
                 auto encoded = logtype_dict_.encodeLog(key, std::get<std::string>(value), {});
                 return encoded.template_id;
             } else {
                 return variable_dict_.addFieldValue(key, key.type, "");
             }
-        case FieldType::Null:
+        case FieldType::NULL_TYPE:
             return variable_dict_.addFieldValue(key, key.type, nullptr);
         default:
             return variable_dict_.addFieldValue(key, key.type, "");
@@ -330,19 +330,19 @@ bool FieldDictionaryManager::isLogTemplate(const std::string& value) const {
 
 std::optional<Value> FieldDictionaryManager::getFieldValueByCode(const FieldKey& key, uint32_t code) const {
     switch (key.type) {
-        case FieldType::String:
-        case FieldType::Null:
-        case FieldType::Int:
-        case FieldType::Double:
-        case FieldType::Bool:
-        case FieldType::UnstructuredArray:
+        case FieldType::STRING:
+        case FieldType::NULL_TYPE:
+        case FieldType::INT64:
+        case FieldType::DOUBLE:
+        case FieldType::BOOL:
+        case FieldType::ARRAY:
             return variable_dict_.getFieldValueByCode(key, code);
-        case FieldType::Timestamp: {
+        case FieldType::TIMESTAMP: {
             // 直接使用TimestampDictionary解码，与LogType保持一致
             std::string val = timestamp_dict_.getTemplateById(code);
             return val.empty() ? std::nullopt : std::optional<Value>(val);
         }
-        case FieldType::LogType: {
+        case FieldType::LOGTYPE: {
             std::string val = logtype_dict_.getLogTypeById(code);
             return val.empty() ? std::nullopt : std::optional<Value>(val);
         }

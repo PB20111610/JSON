@@ -40,13 +40,13 @@ static bool isDouble(const std::string& s) {
 static bool isBool(const std::string& s) {
     return s == "true" || s == "false";
 }
-static nlohmann::json parseValue(const std::string& s, FieldType type = FieldType::String) {
+static nlohmann::json parseValue(const std::string& s, FieldType type = FieldType::STRING) {
     if (isBool(s)) return s == "true";
     if (isInteger(s)) return std::stoll(s);
     if (isDouble(s)) return std::stod(s);
     
     // 检查是否为非结构化数组字符串
-    if (type == FieldType::UnstructuredArray || 
+    if (type == FieldType::ARRAY || 
         (s.length() >= 2 && s[0] == '[' && s[s.length()-1] == ']')) {
         try {
             return nlohmann::json::parse(s);

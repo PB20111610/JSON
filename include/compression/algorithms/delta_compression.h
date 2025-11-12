@@ -2,6 +2,8 @@
 
 #include "../core/compression_interface.h"
 #include "varint_compression.h"
+#include "../../timestamp_dictionary.h"
+#include "../../logtype_dictionary.h"
 #include <vector>
 #include <cstdint>
 
@@ -59,6 +61,10 @@ public:
     
     // 部分解压指定索引的值
     static int64_t deltaVarintDecompressAt(const std::vector<uint8_t>& compressed, size_t index);
+    
+    // New methods for structured data random access
+    static TemplateEncodedTimestamp deltaVarintDecompressTimestampAt(const std::vector<uint8_t>& compressed, size_t index);
+    static EncodedLog deltaVarintDecompressLogtypeAt(const std::vector<uint8_t>& compressed, size_t index);
     
     // 数据分析：判断是否适合Delta压缩
     static bool isSorted(const std::vector<int64_t>& values);

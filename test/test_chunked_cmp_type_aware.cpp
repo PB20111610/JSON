@@ -7,7 +7,8 @@
 #include "../include/reconstruct.h"
 #include "../include/compress_type_aware.h"
 #include "../include/compress.h"
-#include "../include/compression/backends/zstd_backend.h" 
+#include "../include/compression/backends/zstd_backend.h"
+#include "test_config_utils.h" 
 #include <simdjson.h>
 #include <iostream>
 #include <fstream>
@@ -42,14 +43,15 @@ std::string backendToString(compression::CompressionBackend backend) {
 // Helper function to convert FieldType enum to readable string
 std::string fieldTypeToString(FieldType type) {
     switch (type) {
-        case FieldType::Int: return "Int";
-        case FieldType::Double: return "Double";
-        case FieldType::Bool: return "Bool";
-        case FieldType::String: return "String";
-        case FieldType::Timestamp: return "Timestamp";
-        case FieldType::LogType: return "LogType";
+        case FieldType::INT64: return "Int";
+        case FieldType::DOUBLE: return "Double";
+        case FieldType::BOOL: return "Bool";
+        case FieldType::STRING: return "String";
+        case FieldType::TIMESTAMP: return "Timestamp";
+        case FieldType::LOGTYPE: return "LogType";
         case FieldType::Null: return "Null";
-        case FieldType::UnstructuredArray: return "UnstructuredArray";
+        case FieldType::ARRAY: return "UnstructuredArray";
+
         default: return "Unknown";
     }
 }
@@ -181,21 +183,8 @@ void testChunkedTypeAwareCompression() {
         config.chunk_size = 1000;      // Production chunk size for field analysis
         config.structurize_arrays = false;
         
-        // Configure type-aware compression with balanced settings
-        // Option 1: Balanced configuration (good compression + reasonable speed)
-        config.type_aware_config.louds_backend = compression::CompressionBackend::BIT_PACKING;  // Fast for bitmaps
-        config.type_aware_config.dictionary_backend = compression::CompressionBackend::ZSTD;    // Good ratio for dictionaries
-        config.type_aware_config.metadata_backend = compression::CompressionBackend::ZSTD;      // Good ratio for metadata
-        
-        // Configure ALL field type backends explicitly for optimal performance
-        config.type_aware_config.layer_config.int_backend = compression::CompressionBackend::DELTA_VARINT; // Specialized for integers
-        config.type_aware_config.layer_config.double_backend = compression::CompressionBackend::DELTA_VARINT; // Specialized for doubles
-        config.type_aware_config.layer_config.bool_backend = compression::CompressionBackend::BIT_PACKING;  // Optimal for boolean values
-        config.type_aware_config.layer_config.string_backend = compression::CompressionBackend::DELTA_VARINT;  // Good balance for string dictionary codes
-        config.type_aware_config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_DELTA; // Optimal for timestamp patterns
-        config.type_aware_config.layer_config.logtype_backend = compression::CompressionBackend::DELTA_VARINT; // Good for logtype dictionary codes
-        config.type_aware_config.layer_config.array_backend = compression::CompressionBackend::RLE;       // Effective for array patterns
-        config.type_aware_config.layer_config.null_backend = compression::CompressionBackend::BIT_PACKING; // Optimal for null masks
+        // Configure type-aware compression with standard test settings
+        config.type_aware_config = json2::test::createStandardTestConfig();
         
         // Configure type-aware compression with optimized settings (matching original test)
         // config.type_aware_config.louds_backend = compression::CompressionBackend::BIT_PACKING;
@@ -214,8 +203,6 @@ void testChunkedTypeAwareCompression() {
         // config.type_aware_config.dictionary_backend = compression::CompressionBackend::LZMA;
         // config.type_aware_config.metadata_backend = compression::CompressionBackend::BROTLI;
         // config.type_aware_config.layer_config.string_backend = compression::CompressionBackend::BROTLI;
-        // Use compression level 3 to match compress.cpp's ZSTD_CLEVEL_DEFAULT
-        config.type_aware_config.compression_level = 3;
         
         // Initialize field dictionary manager
         FieldDictionaryManager manager;

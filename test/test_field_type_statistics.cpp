@@ -14,14 +14,15 @@ namespace json2 {
 // Get a human-readable name for each field type
 std::string getFieldTypeName(FieldType type) {
     switch (type) {
-        case FieldType::String: return "String";
-        case FieldType::Int: return "Numeric";
-        case FieldType::Double: return "Numeric";
-        case FieldType::Bool: return "Boolean";
-        case FieldType::Timestamp: return "Timestamp";
-        case FieldType::LogType: return "LogType";
-        case FieldType::Null: return "Other";
-        case FieldType::UnstructuredArray: return "Array";
+        case FieldType::STRING: return "String";
+        case FieldType::INT64: return "Numeric";
+        case FieldType::DOUBLE: return "Numeric";
+        case FieldType::BOOL: return "Boolean";
+        case FieldType::TIMESTAMP: return "Timestamp";
+        case FieldType::LOGTYPE: return "LogType";
+        case FieldType::NULL_TYPE: return "Other";
+        case FieldType::ARRAY: return "Array";
+
         default: return "Other";
     }
 }

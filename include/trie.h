@@ -20,6 +20,17 @@ namespace dom {
 
 namespace json2 {
 
+// Node value type codes for serialization/deserialization
+enum class NodeValueType : uint8_t {
+    UINT32 = 0,
+    INT64 = 1,
+    DOUBLE = 2,
+    BOOL = 3,
+    NULLPTR = 4,
+    TEMPLATE_ENCODED_TIMESTAMP = 5,
+    ENCODED_LOG = 6
+};
+
 // 节点值类型：可以是编码值或原始值，std::nullptr_t用于空字段占位
 using NodeValue = std::variant<uint32_t, int64_t, double, bool, std::nullptr_t, TemplateEncodedTimestamp, EncodedLog>;
 

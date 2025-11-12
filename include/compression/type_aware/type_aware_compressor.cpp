@@ -20,31 +20,6 @@
 
 namespace json2 {
 namespace compression {
-
-// Map the original FieldType to new compression FieldType
-FieldType mapFieldType(const json2::FieldType& oldType) {
-    switch (oldType) {
-        case json2::FieldType::Int:
-            return FieldType::INT64;
-        case json2::FieldType::Double:
-            return FieldType::DOUBLE;
-        case json2::FieldType::Bool:
-            return FieldType::BOOL;
-        case json2::FieldType::String:
-            return FieldType::STRING;
-        case json2::FieldType::Timestamp:
-            return FieldType::TIMESTAMP;
-        case json2::FieldType::LogType:
-            return FieldType::LOGTYPE;
-        case json2::FieldType::UnstructuredArray:
-            return FieldType::ARRAY;
-        case json2::FieldType::Null:
-            return FieldType::NULL_TYPE;
-        default:
-            return FieldType::STRING;
-    }
-}
-
 namespace type_aware {
 
 TypeAwareCompressor::TypeAwareCompressor(const TypeAwareCompressionConfig& config)
@@ -286,8 +261,42 @@ std::vector<uint8_t> TypeAwareCompressor::compressWithBackend(const std::vector<
                         algorithms::DeltaCompression delta;
                         std::vector<uint8_t> compressed = delta.compressDouble(values);
                         result.insert(result.end(), compressed.begin(), compressed.end());
+                    } else if (type == FieldType::TIMESTAMP) {
+                        // For TIMESTAMP, preserve TemplateEncodedTimestamp structure
+                        // Convert structured data to a sequence of uint32_t values that can be properly reconstructed
+                        std::vector<uint32_t> structured_values = json2::compression::utils::SerializationUtils::bytesToUint32s(data);
+                        
+                        // Debug output for TIMESTAMP compression
+                        std::cout << "DEBUG: TIMESTAMP compression - structured_values size: " << structured_values.size() << std::endl;
+                        std::cout << "DEBUG: TIMESTAMP compression - structured_values: [";
+                        for (size_t i = 0; i < structured_values.size(); ++i) {
+                            if (i > 0) std::cout << ",";
+                            std::cout << structured_values[i];
+                        }
+                        std::cout << "]" << std::endl;
+                        
+                        std::vector<uint8_t> compressed = algorithms::DeltaCompression::deltaVarintCompress(
+                            std::vector<int64_t>(structured_values.begin(), structured_values.end()));
+                        result.insert(result.end(), compressed.begin(), compressed.end());
+                    } else if (type == FieldType::LOGTYPE) {
+                        // For LOGTYPE, preserve EncodedLog structure
+                        // Convert structured data to a sequence of uint32_t values that can be properly reconstructed
+                        std::vector<uint32_t> structured_values = json2::compression::utils::SerializationUtils::bytesToUint32s(data);
+                        
+                        // Debug output for LOGTYPE compression
+                        std::cout << "DEBUG: LOGTYPE compression - structured_values size: " << structured_values.size() << std::endl;
+                        std::cout << "DEBUG: LOGTYPE compression - structured_values: [";
+                        for (size_t i = 0; i < structured_values.size(); ++i) {
+                            if (i > 0) std::cout << ",";
+                            std::cout << structured_values[i];
+                        }
+                        std::cout << "]" << std::endl;
+                        
+                        std::vector<uint8_t> compressed = algorithms::DeltaCompression::deltaVarintCompress(
+                            std::vector<int64_t>(structured_values.begin(), structured_values.end()));
+                        result.insert(result.end(), compressed.begin(), compressed.end());
                     } else {
-                        // 对于其他类型（String/Timestamp/LogType/Array），假设是编码值序列
+                        // For other types (String/Array), assume they are encoded value sequences
                         std::vector<uint32_t> codes = utils::SerializationUtils::bytesToUint32s(data);
                         std::vector<int64_t> int64_codes(codes.begin(), codes.end());
                         std::vector<uint8_t> compressed = algorithms::DeltaCompression::deltaVarintCompress(int64_codes);

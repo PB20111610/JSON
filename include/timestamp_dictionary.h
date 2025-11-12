@@ -56,6 +56,9 @@ public:
     // 预注册变量（用于反序列化）
     void registerVariable(const std::string& variable);
     
+    // 提取模板和变量
+    std::pair<std::string, std::vector<std::string>> extractTemplateAndVars(const std::string& timestamp) const;
+    
     void clear();
     // 兼容 Trie 类型分发接口
     uint32_t getOrAddFieldValue(const FieldKey& key, const Value& value);
@@ -73,7 +76,6 @@ private:
     uint32_t addTemplate(const std::string& template_str);
     uint32_t encodeVariable(const std::string& var);
     std::string decodeVariable(uint32_t code) const;
-    std::pair<std::string, std::vector<std::string>> extractTemplateAndVars(const std::string& timestamp) const;
 };
 
 } // namespace json2 

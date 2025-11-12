@@ -47,22 +47,22 @@ std::pair<std::string, std::vector<std::string>> TimestampDictionary::extractTem
     std::vector<std::string> vars;
     std::string tmpl = timestamp;
     
-    // 时间戳特定的变量提取正则：年、月、日、时、分、秒、毫秒、时区
-    // 修改正则表达式，优先匹配更长的数字（如毫秒）
-    std::regex var_regex(R"((\d{4})|(\d{3})|(\d{2})|(\d{1,2})|([A-Z]{3,4}))");
+    // Simple and reliable approach for ISO 8601 timestamp format like "2023-01-05T14:00:00Z"
+    // Extract numeric components: year, month, day, hour, minute, second
+    std::regex var_regex(R"(\d{4}|\d{2})");
     std::smatch match;
     std::string::const_iterator searchStart(tmpl.cbegin());
     size_t offset = 0;
     
     while (std::regex_search(searchStart, tmpl.cend(), match, var_regex)) {
         std::string matched = match.str();
-        // 过滤掉分隔符（-、:、T、Z等）
-        if (matched.find_first_not_of("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") == std::string::npos) {
+        // Only add actual numeric components, not separators
+        if (matched.length() >= 2 && std::all_of(matched.begin(), matched.end(), ::isdigit)) {
             vars.push_back(matched);
-            // 替换为 *
+            // Replace with *
             size_t pos = match.position(0) + offset;
             tmpl.replace(pos, match.length(0), "*");
-            offset = pos + 1; // * 长度为1
+            offset = pos + 1; // * length is 1
             searchStart = tmpl.cbegin() + offset;
         } else {
             searchStart = match.suffix().first;

@@ -70,29 +70,6 @@ static void validateTypeAwareConfig(const compression::TypeAwareCompressionConfi
     }
 }
 
-// Helper function to map json2::FieldType to compression::FieldType
-static compression::FieldType mapFieldType(json2::FieldType json_field_type) {
-    switch (json_field_type) {
-        case json2::FieldType::String:
-        case json2::FieldType::UnstructuredArray:
-            return compression::FieldType::STRING;
-        case json2::FieldType::Timestamp:
-            return compression::FieldType::TIMESTAMP;
-        case json2::FieldType::LogType:
-            return compression::FieldType::LOGTYPE;
-        case json2::FieldType::Int:
-            return compression::FieldType::INT64;
-        case json2::FieldType::Double:
-            return compression::FieldType::DOUBLE;
-        case json2::FieldType::Bool:
-            return compression::FieldType::BOOL;
-        case json2::FieldType::Null:
-            return compression::FieldType::NULL_TYPE;
-        default:
-            return compression::FieldType::STRING; // Safe default
-    }
-}
-
 // Helper function to validate compression effectiveness for type-aware compression
 static bool validateTypeAwareCompressionEffectiveness(size_t original_size, size_t compressed_size, double threshold = 0.9) {
     if (original_size == 0) return true;
@@ -304,11 +281,8 @@ CompressedData TypeAwareCompressor::compressLouds(const LOUDSTrie& louds,
             layers_raw_total += layer_str.size();
             
             // Map field type for configuration-driven compression
-            compression::FieldType field_type = compression::FieldType::STRING; // Default
-            if (i < field_order.size()) {
-                field_type = mapFieldType(field_order[i].type);
-            }
-            
+            compression::FieldType field_type = field_order[i].type;
+
             auto compressed = compressWithConfig(std::vector<uint8_t>(layer_str.begin(), layer_str.end()),
                                                field_type, config);
             layer_sizes.push_back(static_cast<uint32_t>(compressed.size()));
@@ -388,7 +362,25 @@ TypeAwareCompressor::decompressLouds(const CompressedData& compressed_data,
         auto louds = std::make_unique<LOUDSTrie>();
         louds->deserializeBitmap(bv_stream);
 
-        // 2. Enhanced layer data decompression with systematic validation
+        // 2. Extract field order from metadata first, so we can use correct field types for layer decompression
+        if (compressed_data.metadata_data.empty()) {
+            throw std::runtime_error("TypeAware: Empty metadata for decompression");
+        }
+        
+        std::vector<uint8_t> meta_data = decompressWithConfig(compressed_data.metadata_data, 
+                                                             compression::FieldType::STRING, config);
+        if (meta_data.empty()) {
+            throw std::runtime_error("TypeAware: Decompressed metadata is empty");
+        }
+        
+        std::vector<FieldKey> ordered_field_keys = Compressor::deserializeMetadata(meta_data);
+        if (ordered_field_keys.empty()) {
+            throw std::runtime_error("TypeAware: No field keys recovered from metadata");
+        }
+        
+        louds->setFieldOrder(ordered_field_keys);
+
+        // 3. Enhanced layer data decompression with systematic validation
         if (compressed_data.layer_data.empty()) {
             throw std::runtime_error("TypeAware: Empty layer data for decompression");
         }
@@ -418,7 +410,7 @@ TypeAwareCompressor::decompressLouds(const CompressedData& compressed_data,
         for (uint32_t i = 0; i < layer_count; ++i) {
             if (i >= louds->getLayeredStorage().getLayerCount()) {
                 // Use temporary field names and default types
-                FieldKey temp_fk{"temp_field_" + std::to_string(i), json2::FieldType::String};
+                FieldKey temp_fk{"temp_field_" + std::to_string(i), json2::compression::FieldType::STRING};
                 louds->getLayeredStorage().addLayer(temp_fk, 0);
             }
         }
@@ -433,8 +425,11 @@ TypeAwareCompressor::decompressLouds(const CompressedData& compressed_data,
                                                  layer_data.begin() + offset + layer_sizes[i]);
             offset += layer_sizes[i];
             
-            // Use field type-specific decompression (default to STRING for safety)
-            compression::FieldType field_type = compression::FieldType::STRING;
+            // Use field type-specific decompression based on field order
+            compression::FieldType field_type = compression::FieldType::STRING; // Default
+            if (i < ordered_field_keys.size()) {
+                field_type = ordered_field_keys[i].type;
+            }
             
             std::vector<uint8_t> layer_raw = decompressWithConfig(compressed_layer, field_type, config);
             if (layer_raw.empty()) {
@@ -445,7 +440,7 @@ TypeAwareCompressor::decompressLouds(const CompressedData& compressed_data,
             louds->getLayeredStorage().deserializeLayer(i, layer_stream);
         }
 
-        // 3. Enhanced dictionary decompression with validation
+        // 4. Enhanced dictionary decompression with validation
         if (compressed_data.dictionary_data.empty()) {
             throw std::runtime_error("TypeAware: Empty dictionary data for decompression");
         }
@@ -460,24 +455,6 @@ TypeAwareCompressor::decompressLouds(const CompressedData& compressed_data,
         if (!manager) {
             throw std::runtime_error("TypeAware: Failed to deserialize dictionary manager");
         }
-
-        // 4. Enhanced metadata decompression with validation
-        if (compressed_data.metadata_data.empty()) {
-            throw std::runtime_error("TypeAware: Empty metadata for decompression");
-        }
-        
-        std::vector<uint8_t> meta_data = decompressWithConfig(compressed_data.metadata_data, 
-                                                             compression::FieldType::STRING, config);
-        if (meta_data.empty()) {
-            throw std::runtime_error("TypeAware: Decompressed metadata is empty");
-        }
-        
-        std::vector<FieldKey> ordered_field_keys = Compressor::deserializeMetadata(meta_data);
-        if (ordered_field_keys.empty()) {
-            throw std::runtime_error("TypeAware: No field keys recovered from metadata");
-        }
-        
-        louds->setFieldOrder(ordered_field_keys);
 
         return {std::move(louds), std::move(manager)};
         
@@ -593,24 +570,27 @@ GranularCompressedData TypeAwareCompressor::compressGranularLouds(const LOUDSTri
             
             // 序列化层大小信息
             std::vector<uint32_t> layer_sizes;
+            std::vector<std::vector<uint8_t>> layer_data_by_level(layer_count);
+            
+            // 首先序列化所有层数据
             for (size_t i = 0; i < layer_count; ++i) {
                 std::ostringstream layer_stream(std::ios::binary);
                 louds.getLayeredStorage().serializeLayer(i, layer_stream);
                 std::string layer_str = layer_stream.str();
-                std::vector<uint8_t> layer_data(layer_str.begin(), layer_str.end());
-                layer_sizes.push_back(static_cast<uint32_t>(layer_data.size()));
+                layer_data_by_level[i] = std::vector<uint8_t>(layer_str.begin(), layer_str.end());
+                
+                // 存储层中实际的元素数量，而不是序列化后的字节大小
+                size_t layer_element_count = louds.getLayeredStorage().getLayer(i).size();
+                layer_sizes.push_back(static_cast<uint32_t>(layer_element_count));
                 
                 // 根据字段类型选择压缩算法
-                compression::FieldType field_type = compression::FieldType::STRING; // Default
-                if (i < field_order.size()) {
-                    field_type = mapFieldType(field_order[i].type);
-                }
-                
-                std::vector<uint8_t> compressed_layer = compressWithConfig(layer_data, field_type, config);
+                compression::FieldType field_type = field_order[i].type;
+
+                std::vector<uint8_t> compressed_layer = compressWithConfig(layer_data_by_level[i], field_type, config);
                 result.layer_data_by_level.push_back(std::move(compressed_layer));
                 
                 // 累计原始大小
-                layer_raw.insert(layer_raw.end(), layer_data.begin(), layer_data.end());
+                layer_raw.insert(layer_raw.end(), layer_data_by_level[i].begin(), layer_data_by_level[i].end());
             }
             
             // 序列化层大小信息
@@ -806,9 +786,9 @@ TypeAwareCompressor::decompressGranularLouds(const GranularCompressedData& compr
                 // 根据字段类型选择解压缩算法
                 compression::FieldType field_type = compression::FieldType::STRING; // Default
                 if (i < field_order.size()) {
-                    field_type = mapFieldType(field_order[i].type);
+                    field_type = field_order[i].type;
                 }
-                
+
                 std::vector<uint8_t> layer_data = decompressWithConfig(compressed_data.layer_data_by_level[i], 
                                                                       field_type, config);
                 if (!layer_data.empty()) {
@@ -924,9 +904,9 @@ TypeAwareCompressor::decompressGranularPartial(const GranularCompressedData& com
                             // 根据字段类型选择解压缩算法
                             compression::FieldType field_type = compression::FieldType::STRING; // Default
                             if (layer_idx < field_order.size()) {
-                                field_type = mapFieldType(field_order[layer_idx].type);
+                                field_type = field_order[layer_idx].type;
                             }
-                            
+
                             std::vector<uint8_t> layer_data = decompressWithConfig(compressed_data.layer_data_by_level[layer_idx], 
                                                                                   field_type, config);
                             if (!layer_data.empty()) {
@@ -940,7 +920,7 @@ TypeAwareCompressor::decompressGranularPartial(const GranularCompressedData& com
                     for (size_t i = 0; i < compressed_data.layer_data_by_level.size(); ++i) {
                         compression::FieldType field_type = compression::FieldType::STRING; // Default
                         if (i < field_order.size()) {
-                            field_type = mapFieldType(field_order[i].type);
+                            field_type = field_order[i].type;
                         }
                         
                         std::vector<uint8_t> layer_data = decompressWithConfig(compressed_data.layer_data_by_level[i], 

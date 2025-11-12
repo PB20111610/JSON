@@ -31,7 +31,7 @@ bool FieldAnalyzer::isFieldUsed(const std::string& field_name, const FieldAnalys
 
 FieldType FieldAnalyzer::getFieldType(const std::string& field_name, const FieldAnalysis& analysis) const {
     auto it = analysis.field_types.find(field_name);
-    return it != analysis.field_types.end() ? it->second : FieldType::String;
+    return it != analysis.field_types.end() ? it->second : FieldType::STRING;
 }
 
 size_t FieldAnalyzer::estimateComplexity(const FieldAnalysis& analysis) const {
@@ -148,32 +148,32 @@ void FieldAnalyzer::analyzeLogicalNode(const QueryNode& node, FieldAnalysis& ana
 FieldType FieldAnalyzer::inferFieldType(const std::string& field_name, const std::string& value) const {
     // 基于字段名推断类型
     if (isTimestampField(field_name)) {
-        return FieldType::Timestamp;
+        return FieldType::TIMESTAMP;
     }
     
     if (isTemplateField(field_name)) {
-        return FieldType::LogType;
+        return FieldType::LOGTYPE;
     }
     
     // 基于值推断类型
     if (value == "true" || value == "false") {
-        return FieldType::Bool;
+        return FieldType::BOOL;
     }
     
     if (value == "null") {
-        return FieldType::Null;
+        return FieldType::NULL_TYPE;
     }
     
     // 检查是否为数字
     try {
         std::stoll(value);
-        return FieldType::Int;
+        return FieldType::INT64;
     } catch (...) {
         try {
             std::stod(value);
-            return FieldType::Double;
+            return FieldType::DOUBLE;
         } catch (...) {
-            return FieldType::String;
+            return FieldType::STRING;
         }
     }
 }

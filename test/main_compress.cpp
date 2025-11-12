@@ -20,13 +20,13 @@ using nlohmann::json;
 // Helper function to将FieldType转为字符串
 std::string fieldTypeToString(FieldType type) {
     switch (type) {
-        case FieldType::Int: return "Int";
-        case FieldType::Double: return "Double";
-        case FieldType::Bool: return "Bool";
-        case FieldType::String: return "String";
-        case FieldType::Timestamp: return "Timestamp";
-        case FieldType::LogType: return "LogType";
-        case FieldType::UnstructuredArray: return "UnstructuredArray";
+        case FieldType::INT64: return "Int";
+        case FieldType::DOUBLE: return "Double";
+        case FieldType::BOOL: return "Bool";
+        case FieldType::STRING: return "String";
+        case FieldType::TIMESTAMP: return "Timestamp";
+        case FieldType::LOGTYPE: return "LogType";
+        case FieldType::ARRAY: return "UnstructuredArray";
         case FieldType::Null: return "Null";
         default: return "Unknown";
     }

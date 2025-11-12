@@ -12,9 +12,9 @@ FieldType FieldParser::inferFieldType(const std::string& field_name,
                                      simdjson::dom::element value_node, 
                                      FieldDictionaryManager& manager,
                                      bool is_serialized_array) {
-    // 如果是序列化的数组，直接返回 UnstructuredArray 类型
+    // 如果是序列化的数组，直接返回 Array 类型
     if (is_serialized_array) {
-        return FieldType::UnstructuredArray;
+        return FieldType::ARRAY;
     }
     
     if (value_node.type() == simdjson::dom::element_type::STRING) {
@@ -23,29 +23,29 @@ FieldType FieldParser::inferFieldType(const std::string& field_name,
             std::string value_str = std::string(str_res.value());
             // 统一类型推断逻辑
             if (manager.isTimestampField(field_name) || manager.isTimestampValue(value_str)) {
-                return FieldType::Timestamp;
+                return FieldType::TIMESTAMP;
             } else if (manager.isLogTemplate(value_str)) {
-                return FieldType::LogType;
+                return FieldType::LOGTYPE;
             } else {
-                return FieldType::String;
+                return FieldType::STRING;
             }
         }
-        return FieldType::String;
+        return FieldType::STRING;
     } else if (value_node.type() == simdjson::dom::element_type::ARRAY) {
-        // 数组类型处理 - 只返回 UnstructuredArray，结构化数组会被分解为具体类型字段
-        return FieldType::UnstructuredArray;
+        // 数组类型处理 - 只返回 Array，结构化数组会被分解为具体类型字段
+        return FieldType::ARRAY;
     } else {
         switch (value_node.type()) {
             case simdjson::dom::element_type::INT64:
-                return FieldType::Int;
+                return FieldType::INT64;
             case simdjson::dom::element_type::DOUBLE:
-                return FieldType::Double;
+                return FieldType::DOUBLE;
             case simdjson::dom::element_type::BOOL:
-                return FieldType::Bool;
+                return FieldType::BOOL;
             case simdjson::dom::element_type::NULL_VALUE:
-                return FieldType::Null;
+                return FieldType::NULL_TYPE;
             default:
-                return FieldType::String;
+                return FieldType::STRING;
         }
     }
 }
@@ -202,8 +202,8 @@ std::vector<std::tuple<std::string, FieldType, Value>> FieldParser::parseFields(
                         Value value = array_str;
                         result.emplace_back(prefix, type, value);
                     } else {
-                        // 如果解析失败，直接使用 UnstructuredArray 类型
-                        FieldType type = FieldType::UnstructuredArray;
+                        // 如果解析失败，直接使用 ARRAY 类型
+                        FieldType type = FieldType::ARRAY;
                         Value value = array_str;
                         result.emplace_back(prefix, type, value);
                     }
@@ -268,40 +268,40 @@ void FieldParser::collectAllFields(simdjson::dom::element node,
             // 添加到manager
             Value value = extractValue(node);
             switch (type) {
-                case FieldType::String:
-                case FieldType::Timestamp:
-                case FieldType::LogType:
+                case FieldType::STRING:
+                case FieldType::TIMESTAMP:
+                case FieldType::LOGTYPE:
                     if (std::holds_alternative<std::string>(value)) {
                         manager.addFieldValue(key, type, std::get<std::string>(value));
                     } else {
                         manager.addFieldValue(key, type, "");
                     }
                     break;
-                case FieldType::Int:
+                case FieldType::INT64:
                     if (std::holds_alternative<int64_t>(value)) {
                         manager.addFieldValue(key, type, std::get<int64_t>(value));
                     } else {
                         manager.addFieldValue(key, type, int64_t(0));
                     }
                     break;
-                case FieldType::Double:
+                case FieldType::DOUBLE:
                     if (std::holds_alternative<double>(value)) {
                         manager.addFieldValue(key, type, std::get<double>(value));
                     } else {
                         manager.addFieldValue(key, type, 0.0);
                     }
                     break;
-                case FieldType::Bool:
+                case FieldType::BOOL:
                     if (std::holds_alternative<bool>(value)) {
                         manager.addFieldValue(key, type, std::get<bool>(value));
                     } else {
                         manager.addFieldValue(key, type, false);
                     }
                     break;
-                case FieldType::Null:
+                case FieldType::NULL_TYPE:
                     manager.addFieldValue(key, type, nullptr);
                     break;
-                case FieldType::UnstructuredArray:
+                case FieldType::ARRAY:
                     if (std::holds_alternative<std::string>(value)) {
                         manager.addFieldValue(key, type, std::get<std::string>(value));
                     } else {
@@ -351,23 +351,23 @@ void FieldParser::parseStructuredArray(simdjson::dom::element array_node,
                 FieldType type;
                 switch (element.type()) {
                     case simdjson::dom::element_type::STRING:
-                        type = FieldType::String;
+                        type = FieldType::STRING;
                         break;
                     case simdjson::dom::element_type::INT64:
                     case simdjson::dom::element_type::UINT64:
-                        type = FieldType::Int;
+                        type = FieldType::INT64;
                         break;
                     case simdjson::dom::element_type::DOUBLE:
-                        type = FieldType::Double;
+                        type = FieldType::DOUBLE;
                         break;
                     case simdjson::dom::element_type::BOOL:
-                        type = FieldType::Bool;
+                        type = FieldType::BOOL;
                         break;
                     case simdjson::dom::element_type::NULL_VALUE:
-                        type = FieldType::Null;
+                        type = FieldType::NULL_TYPE;
                         break;
                     default:
-                        type = FieldType::String;
+                        type = FieldType::STRING;
                         break;
                 }
                 Value value = extractValue(element);
@@ -455,20 +455,20 @@ void FieldParser::extractAllFieldValues(simdjson::dom::element node,
                 }
                 
                 // 推断字段类型
-                FieldType type = FieldType::String; // 默认类型
+                FieldType type = FieldType::STRING; // 默认类型
                 if (value.type() == simdjson::dom::element_type::INT64 || 
                     value.type() == simdjson::dom::element_type::UINT64) {
-                    type = FieldType::Int;
+                    type = FieldType::INT64;
                 } else if (value.type() == simdjson::dom::element_type::DOUBLE) {
-                    type = FieldType::Double;
+                    type = FieldType::DOUBLE;
                 } else if (value.type() == simdjson::dom::element_type::BOOL) {
-                    type = FieldType::Bool;
+                    type = FieldType::BOOL;
                 } else if (value.type() == simdjson::dom::element_type::NULL_VALUE) {
-                    type = FieldType::Null;
+                    type = FieldType::NULL_TYPE;
                 } else if (value.type() == simdjson::dom::element_type::STRING) {
                     // 对于字符串，需要进一步判断是否为时间戳或日志模板
                     // 这里简化处理，直接设为String类型
-                    type = FieldType::String;
+                    type = FieldType::STRING;
                 }
                 
                 FieldKey key{field_name, type};

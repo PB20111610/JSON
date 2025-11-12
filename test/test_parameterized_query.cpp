@@ -58,7 +58,7 @@ public:
             config.layer_config.double_backend = compression::CompressionBackend::DELTA_VARINT;
             config.layer_config.bool_backend = compression::CompressionBackend::BIT_PACKING;
             config.layer_config.string_backend = compression::CompressionBackend::DELTA_VARINT;
-            config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_DELTA;
+            config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_VARINT;
             config.layer_config.logtype_backend = compression::CompressionBackend::DELTA_VARINT;
             config.layer_config.array_backend = compression::CompressionBackend::RLE;
             config.layer_config.null_backend = compression::CompressionBackend::BIT_PACKING;
@@ -278,7 +278,7 @@ private:
             auto start = std::chrono::high_resolution_clock::now();
             
             auto result = engine_.checkFieldExistenceAndType(
-                field_name, FieldType::String, granular_data);
+                field_name, FieldType::STRING, granular_data);
             
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration<double, std::milli>(end - start);
@@ -316,7 +316,7 @@ private:
             std::cout << "Dictionary query for " << field_name << ":" << std::endl;
             auto start = std::chrono::high_resolution_clock::now();
             auto result = engine_.queryDictionary(
-                field_name, FieldType::String, granular_data, "");
+                field_name, FieldType::STRING, granular_data, "");
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration<double, std::milli>(end - start);
             

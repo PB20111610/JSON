@@ -63,7 +63,7 @@ public:
     
     // 静态工厂方法
     static std::unique_ptr<QueryNode> field(const std::string& field_name, 
-                                           FieldType field_type = FieldType::String);
+                                           FieldType field_type = FieldType::STRING);
     static std::unique_ptr<QueryNode> value(const std::string& value);
     static std::unique_ptr<QueryNode> operator_(QueryOperator op);
     static std::unique_ptr<QueryNode> logical(QueryOperator op);
@@ -90,7 +90,7 @@ public:
     
     // 查询构建辅助方法
     void addFieldValue(const std::string& field_name, const std::string& value, 
-                      FieldType field_type = FieldType::String);
+                      FieldType field_type = FieldType::STRING);
     void addLogicalOperator(QueryOperator op);
     
     // 调试输出

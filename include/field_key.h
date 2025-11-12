@@ -4,18 +4,13 @@
 #include <vector>
 #include <unordered_map>
 
+// Use the unified FieldType enum from compression backend
+#include "compression/core/compression_backend.h"
+
 namespace json2 {
 
-enum class FieldType {
-    Int = 0,
-    Double = 1,
-    Bool = 2,
-    String = 3,
-    Timestamp = 4,
-    LogType = 5,
-    Null = 6,
-    UnstructuredArray = 7   // 非结构化数组（序列化为字符串）
-};
+// Use the unified FieldType enum
+using compression::FieldType;
 
 struct FieldKey {
     std::string name;

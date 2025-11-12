@@ -112,14 +112,14 @@ public:
     static CompressedData compressLouds(const LOUDSTrie& louds, const FieldDictionaryManager& manager, const std::vector<FieldKey>& field_order);
     static std::pair<std::unique_ptr<LOUDSTrie>, std::unique_ptr<FieldDictionaryManager>> decompressLouds(const CompressedData& compressed_data);
 
-    // ========== 原有字典序列化接口（兼容性） ==========
+    // ========== 总体字典序列化接口 ==========
     // 序列化字典数据
     static std::vector<uint8_t> serializeDictionary(const FieldDictionaryManager& manager);
     
     // 反序列化字典数据
     static std::unique_ptr<FieldDictionaryManager> deserializeDictionary(const std::vector<uint8_t>& data);
 
-    // ========== 新的分离字典序列化接口 ==========
+    // ========== 分离字典序列化接口 ==========
     // 分别序列化不同类型的字典
     static std::vector<uint8_t> serializeStringDictionary(const FieldDictionaryManager& manager);
     static std::vector<uint8_t> serializeTimestampDictionary(const FieldDictionaryManager& manager);

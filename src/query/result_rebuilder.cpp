@@ -174,18 +174,18 @@ std::string ResultRebuilder::rebuildNodeValue(const NodeValue& node_value,
                                              const FieldKey& field_key,
                                              const FieldDictionaryManager& dict_manager) {
     switch (field_key.type) {
-        case FieldType::String:
+        case FieldType::STRING:
             return rebuildStringField(node_value, dict_manager);
-        case FieldType::Int:
-        case FieldType::Double:
+        case FieldType::INT64:
+        case FieldType::DOUBLE:
             return rebuildNumericField(node_value, field_key.type);
-        case FieldType::Bool:
+        case FieldType::BOOL:
             return rebuildBooleanField(node_value);
-        case FieldType::Timestamp:
+        case FieldType::TIMESTAMP:
             return rebuildTimestampField(node_value, dict_manager);
-        case FieldType::LogType:
+        case FieldType::LOGTYPE:
             return rebuildLogTypeField(node_value, dict_manager);
-        case FieldType::Null:
+        case FieldType::NULL_TYPE:
             return rebuildNullField();
         default:
             return rebuildStringField(node_value, dict_manager);

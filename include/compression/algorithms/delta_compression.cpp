@@ -471,6 +471,101 @@ int64_t DeltaCompression::deltaVarintDecompressAt(const std::vector<uint8_t>& co
     }
 }
 
+// New methods for structured data random access
+TemplateEncodedTimestamp DeltaCompression::deltaVarintDecompressTimestampAt(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.empty()) {
+        throw std::runtime_error("Delta-varint: Empty compressed data");
+    }
+    
+    try {
+        // For TIMESTAMP, the data is serialized as a sequence of uint32_t values:
+        // [template_id, var_count, var_code1, var_code2, ..., template_id, var_count, var_code1, ...]
+        
+        // We need to find the position of the requested index by navigating through the structures
+        size_t current_index = 0;
+        size_t int64_pos = 0; // Position in the int64_t sequence
+        
+        while (current_index < index) {
+            // Read the template_id at the current position
+            int64_t template_id = deltaVarintDecompressAt(compressed, int64_pos);
+            
+            // Read the var_count at the next position
+            int64_t var_count = deltaVarintDecompressAt(compressed, int64_pos + 1);
+            
+            // Move to the start of the next structure
+            int64_pos += 2 + var_count;
+            current_index++;
+        }
+        
+        // Now we're at the requested index, read the structure
+        // Read template_id
+        int64_t template_id = deltaVarintDecompressAt(compressed, int64_pos);
+        
+        // Read var_count
+        int64_t var_count = deltaVarintDecompressAt(compressed, int64_pos + 1);
+        
+        // Read var_codes
+        std::vector<uint32_t> var_codes;
+        var_codes.reserve(static_cast<size_t>(var_count));
+        for (int64_t i = 0; i < var_count; ++i) {
+            int64_t code = deltaVarintDecompressAt(compressed, int64_pos + 2 + i);
+            var_codes.push_back(static_cast<uint32_t>(code));
+        }
+        
+        return TemplateEncodedTimestamp{static_cast<uint32_t>(template_id), std::move(var_codes)};
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Delta-varint timestamp partial decompression failed: " + std::string(e.what()));
+    }
+}
+
+EncodedLog DeltaCompression::deltaVarintDecompressLogtypeAt(const std::vector<uint8_t>& compressed, size_t index) {
+    if (compressed.empty()) {
+        throw std::runtime_error("Delta-varint: Empty compressed data");
+    }
+    
+    try {
+        // For LOGTYPE, the data is serialized as a sequence of uint32_t values:
+        // [template_id, var_count, var_code1, var_code2, ..., template_id, var_count, var_code1, ...]
+        
+        // We need to find the position of the requested index by navigating through the structures
+        size_t current_index = 0;
+        size_t int64_pos = 0; // Position in the int64_t sequence
+        
+        while (current_index < index) {
+            // Read the template_id at the current position
+            int64_t template_id = deltaVarintDecompressAt(compressed, int64_pos);
+            
+            // Read the var_count at the next position
+            int64_t var_count = deltaVarintDecompressAt(compressed, int64_pos + 1);
+            
+            // Move to the start of the next structure
+            int64_pos += 2 + var_count;
+            current_index++;
+        }
+        
+        // Now we're at the requested index, read the structure
+        // Read template_id
+        int64_t template_id = deltaVarintDecompressAt(compressed, int64_pos);
+        
+        // Read var_count
+        int64_t var_count = deltaVarintDecompressAt(compressed, int64_pos + 1);
+        
+        // Read var_codes
+        std::vector<uint32_t> var_codes;
+        var_codes.reserve(static_cast<size_t>(var_count));
+        for (int64_t i = 0; i < var_count; ++i) {
+            int64_t code = deltaVarintDecompressAt(compressed, int64_pos + 2 + i);
+            var_codes.push_back(static_cast<uint32_t>(code));
+        }
+        
+        return EncodedLog{static_cast<uint32_t>(template_id), std::move(var_codes)};
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Delta-varint logtype partial decompression failed: " + std::string(e.what()));
+    }
+}
+
 // ========== Enhanced Analysis Functions with Error Handling ==========
 
 bool DeltaCompression::isSorted(const std::vector<int64_t>& values) {

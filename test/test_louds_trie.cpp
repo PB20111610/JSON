@@ -25,13 +25,13 @@ void printDecodedNodeValue(const NodeValue& v, const FieldKey& field_key, const 
 // Helper function to convert FieldType to string
 std::string fieldTypeToString(FieldType type) {
     switch (type) {
-        case FieldType::Int: return "Int";
-        case FieldType::Double: return "Double";
-        case FieldType::Bool: return "Bool";
-        case FieldType::String: return "String";
-        case FieldType::Timestamp: return "Timestamp";
-        case FieldType::LogType: return "LogType";
-        case FieldType::UnstructuredArray: return "UnstructuredArray";
+        case FieldType::INT64: return "Int";
+        case FieldType::DOUBLE: return "Double";
+        case FieldType::BOOL: return "Bool";
+        case FieldType::STRING: return "String";
+        case FieldType::TIMESTAMP: return "Timestamp";
+        case FieldType::LOGTYPE: return "LogType";
+        case FieldType::Array: return "UnstructuredArray";
         case FieldType::Null: return "Null";
         default: return "Unknown";
     }
@@ -1083,14 +1083,14 @@ void writeReconstructedPathsToJson(const LOUDSTrie& louds_trie, const FieldDicti
             
             // 根据字段类型决定如何格式化值
             switch (field_order[j].type) {
-                case FieldType::String:
-                case FieldType::LogType:
-                case FieldType::Timestamp:
+                case FieldType::STRING:
+                case FieldType::LOGTYPE:
+                case FieldType::TIMESTAMP:
                 case FieldType::UnstructuredArray:
                     out_file << "\"" << path[j] << "\"";
                     break;
-                case FieldType::Int:
-                case FieldType::Double:
+                case FieldType::INT64:
+                case FieldType::DOUBLE:
                     // 尝试解析为数字，如果失败则作为字符串
                     try {
                         // 简化处理，直接输出值
@@ -1099,7 +1099,7 @@ void writeReconstructedPathsToJson(const LOUDSTrie& louds_trie, const FieldDicti
                         out_file << "\"" << path[j] << "\"";
                     }
                     break;
-                case FieldType::Bool:
+                case FieldType::BOOL:
                     out_file << (path[j] == "true" ? "true" : "false");
                     break;
                 default:

@@ -10,7 +10,7 @@ namespace query {
 
 // QueryNode 实现
 QueryNode::QueryNode(QueryNodeType type, const std::string& content)
-    : type_(type), content_(content), operator_type_(QueryOperator::EQUALS), field_type_(FieldType::String) {
+    : type_(type), content_(content), operator_type_(QueryOperator::EQUALS), field_type_(FieldType::STRING) {
 }
 
 std::unique_ptr<QueryNode> QueryNode::field(const std::string& field_name, FieldType field_type) {
@@ -321,7 +321,7 @@ std::unique_ptr<QueryNode> QueryParser::parseFieldExpression(const std::vector<s
         throw std::invalid_argument("Expected field name");
     }
     std::string field_name = tokens[pos++];
-    FieldType field_type = FieldType::String;
+    FieldType field_type = FieldType::STRING;
 
     // 支持类型声明 field:type: value
     if (pos < tokens.size() && tokens[pos] == ":") {
@@ -422,17 +422,17 @@ QueryOperator QueryParser::parseOperator(const std::string& token) {
 }
 
 FieldType QueryParser::parseFieldType(const std::string& type_str) {
-    if (type_str == "string") return FieldType::String;
-    if (type_str == "int") return FieldType::Int;
-    if (type_str == "double") return FieldType::Double;
-    if (type_str == "bool") return FieldType::Bool;
-    if (type_str == "timestamp") return FieldType::Timestamp;
-    if (type_str == "logtype") return FieldType::LogType;
-    if (type_str == "null") return FieldType::Null;
-    if (type_str == "array") return FieldType::UnstructuredArray;
-    
+    if (type_str == "string") return FieldType::STRING;
+    if (type_str == "int") return FieldType::INT64;
+    if (type_str == "double") return FieldType::DOUBLE;
+    if (type_str == "bool") return FieldType::BOOL;
+    if (type_str == "timestamp") return FieldType::TIMESTAMP;
+    if (type_str == "logtype") return FieldType::LOGTYPE;
+    if (type_str == "null") return FieldType::NULL_TYPE;
+    if (type_str == "array") return FieldType::ARRAY;
+    if (type_str == "object") return FieldType::OBJECT;
     // 默认返回String类型
-    return FieldType::String;
+    return FieldType::STRING;
 }
 
 std::string QueryParser::unquote(const std::string& str) {

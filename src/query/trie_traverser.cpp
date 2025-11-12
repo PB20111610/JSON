@@ -63,7 +63,7 @@ void TrieTraverser::traverseLouds(const LOUDSTrie& louds,
     // 仅用于简单字段查询的值层剪枝（FIELD 类型）
     bool enable_value_prune = (query_node.getType() == QueryNodeType::FIELD);
     std::string target_field;
-    FieldType target_type = FieldType::String;
+    FieldType target_type = FieldType::STRING;
     QueryOperator target_op = QueryOperator::EQUALS;
     std::string expected_value;
     size_t target_depth = static_cast<size_t>(-1);
@@ -216,8 +216,8 @@ std::string TrieTraverser::extractFieldValue(const std::vector<NodeValue>& path,
     for (const NodeValue& nv : path) {
         // 仅对不同类型分支做基本解码
         switch (field_type) {
-            case FieldType::String:
-            case FieldType::UnstructuredArray: {
+            case FieldType::STRING:
+            case FieldType::ARRAY: {
                 if (std::holds_alternative<uint32_t>(nv)) {
                     uint32_t code = std::get<uint32_t>(nv);
                     // 使用字典管理器解码字符串值
@@ -229,25 +229,25 @@ std::string TrieTraverser::extractFieldValue(const std::vector<NodeValue>& path,
                 }
                 break;
             }
-            case FieldType::Int: {
+            case FieldType::INT64: {
                 if (std::holds_alternative<int64_t>(nv)) {
                     return std::to_string(std::get<int64_t>(nv));
                 }
                 break;
             }
-            case FieldType::Double: {
+            case FieldType::DOUBLE: {
                 if (std::holds_alternative<double>(nv)) {
                     return std::to_string(std::get<double>(nv));
                 }
                 break;
             }
-            case FieldType::Bool: {
+            case FieldType::BOOL: {
                 if (std::holds_alternative<bool>(nv)) {
                     return std::get<bool>(nv) ? "true" : "false";
                 }
                 break;
             }
-            case FieldType::Timestamp: {
+            case FieldType::TIMESTAMP: {
                 if (std::holds_alternative<TemplateEncodedTimestamp>(nv)) {
                     const auto& enc = std::get<TemplateEncodedTimestamp>(nv);
                     // 使用字典管理器解码时间戳
@@ -256,7 +256,7 @@ std::string TrieTraverser::extractFieldValue(const std::vector<NodeValue>& path,
                 }
                 break;
             }
-            case FieldType::LogType: {
+            case FieldType::LOGTYPE: {
                 if (std::holds_alternative<EncodedLog>(nv)) {
                     const auto& enc = std::get<EncodedLog>(nv);
                     // 使用字典管理器解码日志类型

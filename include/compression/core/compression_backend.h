@@ -74,7 +74,7 @@ struct TypeAwareCompressionConfig {
         CompressionBackend double_backend = CompressionBackend::DELTA_VARINT;  // 浮点数: Delta+Varint
         CompressionBackend bool_backend = CompressionBackend::BIT_PACKING;     // 布尔: 位打包
         CompressionBackend string_backend = CompressionBackend::DELTA_VARINT;  // 字符串编码值: Delta+Varint
-        CompressionBackend timestamp_backend = CompressionBackend::DELTA_DELTA; // 时间戳: Delta-of-delta
+        CompressionBackend timestamp_backend = CompressionBackend::DELTA_VARINT; // 时间戳: Delta+Varint (保持模板结构)
         CompressionBackend logtype_backend = CompressionBackend::DELTA_VARINT;  // 日志类型编码值: Delta+Varint
         CompressionBackend array_backend = CompressionBackend::RLE;             // 数组编码值: RLE
         CompressionBackend null_backend = CompressionBackend::BIT_PACKING;      // Null掩码: 位打包
@@ -87,7 +87,7 @@ struct TypeAwareCompressionConfig {
     bool enable_null_aware = true;
     
     // 压缩级别（对支持的算法）
-    int compression_level = 6;  // 1-22 for ZSTD, 0-11 for Brotli
+    int compression_level = 3;  // 1-22 for ZSTD, 0-9 for LZMA, 0-11 for Brotli
 };
 
 } // namespace compression

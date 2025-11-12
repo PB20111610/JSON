@@ -7,6 +7,7 @@
 #include "../include/reconstruct.h"
 #include "../include/compress_type_aware.h"
 #include "../include/compress.h"
+#include "../test/test_config_utils.h"
 #include <simdjson.h>
 #include <iostream>
 #include <fstream>
@@ -24,6 +25,25 @@
 #endif
 
 using namespace json2;
+
+// Helper function to convert compression backend enum to readable string
+std::string backendToString(compression::CompressionBackend backend) {
+    switch (backend) {
+        case compression::CompressionBackend::AUTO: return "AUTO";
+        case compression::CompressionBackend::RLE: return "RLE";
+        case compression::CompressionBackend::BIT_PACKING: return "BIT_PACKING";
+        case compression::CompressionBackend::DICTIONARY: return "DICTIONARY";
+        case compression::CompressionBackend::DELTA_VARINT: return "DELTA_VARINT";
+        case compression::CompressionBackend::DELTA_DELTA: return "DELTA_DELTA";
+        case compression::CompressionBackend::ZSTD: return "ZSTD";
+        case compression::CompressionBackend::BROTLI: return "BROTLI";
+        case compression::CompressionBackend::LZMA: return "LZMA";
+        case compression::CompressionBackend::LZ4: return "LZ4";
+        case compression::CompressionBackend::SNAPPY: return "SNAPPY";
+        case compression::CompressionBackend::NONE: return "NONE";
+        default: return "UNKNOWN";
+    }
+}
 
 // Helper function to parse command-line arguments
 std::unordered_map<std::string, std::string> parseArguments(int argc, char* argv[]) {
@@ -66,30 +86,13 @@ int main(int argc, char* argv[]) {
     // 设置记录数量限制，默认为0表示无限制
     size_t NUM_LIMIT = std::stoull(args["--num_limit"]);
     
-    // 配置细粒度类型敏感分块压缩
-    ChunkedTypeAwareConfig config;
+    // 配置细粒度类型敏感分块压缩 - 使用统一的测试配置
+    ChunkedTypeAwareConfig config = json2::getTestConfig();
     config.block_size = BLOCK_SIZE;
     config.chunk_size = CHUNK_SIZE;
-    config.enable_granular_compression = true;
-    config.enable_layer_separation = true;
-    config.structurize_arrays = false;
-    
-    // 配置类型敏感压缩后端（参考test_chunked_cmp_type_aware.cpp）
-    config.type_aware_config.louds_backend = compression::CompressionBackend::BIT_PACKING;
-    config.type_aware_config.dictionary_backend = compression::CompressionBackend::ZSTD;
-    config.type_aware_config.metadata_backend = compression::CompressionBackend::ZSTD;
-    
-    // 配置各字段类型的压缩后端
-    config.type_aware_config.layer_config.int_backend = compression::CompressionBackend::DELTA_VARINT;
-    config.type_aware_config.layer_config.double_backend = compression::CompressionBackend::DELTA_VARINT;
-    config.type_aware_config.layer_config.bool_backend = compression::CompressionBackend::BIT_PACKING;
-    config.type_aware_config.layer_config.string_backend = compression::CompressionBackend::DELTA_VARINT;
-    config.type_aware_config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_DELTA;
-    config.type_aware_config.layer_config.logtype_backend = compression::CompressionBackend::DELTA_VARINT;
-    config.type_aware_config.layer_config.array_backend = compression::CompressionBackend::RLE;
-    config.type_aware_config.layer_config.null_backend = compression::CompressionBackend::BIT_PACKING;
-    
-    config.type_aware_config.compression_level = 3;
+    config.enable_granular_compression = true;  
+    config.enable_layer_separation = true;  
+    config.structurize_arrays = false;  
 
     ChunkedTypeAwareCompressor compressor(config);
     std::vector<std::string> timestamp_fields = {"@timestamp", "request_received", "response_delivered", "timestamp", "session_start"};
@@ -102,12 +105,24 @@ int main(int argc, char* argv[]) {
     std::cout << "  Input file: " << input_file << std::endl;
     std::cout << "  Block size: " << BLOCK_SIZE << std::endl;
     std::cout << "  Chunk size: " << CHUNK_SIZE << std::endl;
-    std::cout << "  LOUDS backend: BIT_PACKING" << std::endl;
-    std::cout << "  Dictionary backend: ZSTD" << std::endl;
-    std::cout << "  Metadata backend: ZSTD" << std::endl;
+    std::cout << "  LOUDS backend: " << backendToString(config.type_aware_config.louds_backend) << std::endl;
+    std::cout << "  Dictionary backend: " << backendToString(config.type_aware_config.dictionary_backend) << std::endl;
+    std::cout << "  Metadata backend: " << backendToString(config.type_aware_config.metadata_backend) << std::endl;
     std::cout << "  Compression level: " << config.type_aware_config.compression_level << std::endl;
     std::cout << "  Granular compression: " << (compressor.isGranularCompressionEnabled() ? "enabled" : "disabled") << std::endl;
     std::cout << "  Layer separation: " << (compressor.isLayerSeparationEnabled() ? "enabled" : "disabled") << std::endl;
+    
+    // Print detailed field type compression configurations
+    std::cout << "  Field type compression backends:" << std::endl;
+    std::cout << "    INT64: " << backendToString(config.type_aware_config.layer_config.int_backend) << std::endl;
+    std::cout << "    DOUBLE: " << backendToString(config.type_aware_config.layer_config.double_backend) << std::endl;
+    std::cout << "    BOOL: " << backendToString(config.type_aware_config.layer_config.bool_backend) << std::endl;
+    std::cout << "    STRING: " << backendToString(config.type_aware_config.layer_config.string_backend) << std::endl;
+    std::cout << "    TIMESTAMP: " << backendToString(config.type_aware_config.layer_config.timestamp_backend) << std::endl;
+    std::cout << "    LOGTYPE: " << backendToString(config.type_aware_config.layer_config.logtype_backend) << std::endl;
+    std::cout << "    ARRAY: " << backendToString(config.type_aware_config.layer_config.array_backend) << std::endl;
+    std::cout << "    NULL: " << backendToString(config.type_aware_config.layer_config.null_backend) << std::endl;
+    
     if (NUM_LIMIT > 0) {
         std::cout << "  Record limit: " << NUM_LIMIT << std::endl;
     } else {

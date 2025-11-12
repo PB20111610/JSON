@@ -126,13 +126,13 @@ DecompressionOptions SelectiveDecompressor::createOptions(const FieldAnalysis& a
     // 确定需要解压的类型
     for (const auto& field_type : analysis.field_types) {
         switch (field_type.second) {
-            case FieldType::String:
+            case FieldType::STRING:
                 options.decompress_string_dict = true;
                 break;
-            case FieldType::Timestamp:
+            case FieldType::TIMESTAMP:
                 options.decompress_timestamp_dict = true;
                 break;
-            case FieldType::LogType:
+            case FieldType::LOGTYPE:
                 options.decompress_logtype_dict = true;
                 break;
             default:
@@ -166,11 +166,11 @@ bool SelectiveDecompressor::needsFieldDecompression(const std::string& field_nam
 bool SelectiveDecompressor::needsTypeDecompression(FieldType field_type, 
                                                   const DecompressionOptions& options) const {
     switch (field_type) {
-        case FieldType::String:
+        case FieldType::STRING:
             return options.decompress_string_dict;
-        case FieldType::Timestamp:
+        case FieldType::TIMESTAMP:
             return options.decompress_timestamp_dict;
-        case FieldType::LogType:
+        case FieldType::LOGTYPE:
             return options.decompress_logtype_dict;
         default:
             return options.decompress_string_dict;
@@ -236,13 +236,13 @@ bool SelectiveDecompressor::decompressFieldDictionaryForQuery(const GranularComp
     try {
         // INT, FLOAT, BOOL 不用解压任何字典，因为它们存的是原始值
         switch (field_type) {
-            case FieldType::Int:
-            case FieldType::Double:
-            case FieldType::Bool:
+            case FieldType::INT64:
+            case FieldType::DOUBLE:
+            case FieldType::BOOL:
                 // 这些类型存储原始值，不需要字典
                 return true;
-            case FieldType::String:
-            case FieldType::UnstructuredArray: {
+            case FieldType::STRING:
+            case FieldType::ARRAY: {
                 if (!granular_data.string_dict.empty()) {
                     std::vector<uint8_t> dict_raw = Compressor::decompressWithZstd(granular_data.string_dict);
                     Compressor::deserializeStringDictionary(dict_raw, manager);
@@ -250,7 +250,7 @@ bool SelectiveDecompressor::decompressFieldDictionaryForQuery(const GranularComp
                 }
                 break;
             }
-            case FieldType::Timestamp: {
+            case FieldType::TIMESTAMP: {
                 if (!granular_data.timestamp_dict.empty()) {
                     std::vector<uint8_t> dict_raw = Compressor::decompressWithZstd(granular_data.timestamp_dict);
                     Compressor::deserializeTimestampDictionary(dict_raw, manager);
@@ -258,7 +258,7 @@ bool SelectiveDecompressor::decompressFieldDictionaryForQuery(const GranularComp
                 }
                 break;
             }
-            case FieldType::LogType: {
+            case FieldType::LOGTYPE: {
                 if (!granular_data.logtype_dict.empty()) {
                     std::vector<uint8_t> dict_raw = Compressor::decompressWithZstd(granular_data.logtype_dict);
                     Compressor::deserializeLogTypeDictionary(dict_raw, manager);
@@ -429,7 +429,7 @@ NodeValue SelectiveDecompressor::extractNodeValueUsingCompressionAt(
                     // 这适用于直接由deltaVarintCompress压缩的数据
                     return compression::algorithms::DeltaCompression::deltaVarintDecompressAt(compressed_data, node_index_in_layer);
                 }
-                case compression::FieldType::UINT32: {
+                case compression::FieldType::UINT32: {  // String 编码值
                     // 使用DeltaCompression的decompressUint32At虚方法进行部分解压
                     compression::algorithms::DeltaCompression deltaCompressor;
                     return deltaCompressor.decompressUint32At(compressed_data, node_index_in_layer);
@@ -439,11 +439,21 @@ NodeValue SelectiveDecompressor::extractNodeValueUsingCompressionAt(
                     compression::algorithms::DeltaCompression deltaCompressor;
                     return deltaCompressor.decompressDoubleAt(compressed_data, node_index_in_layer);
                 }
-                default:
+                case compression::FieldType::TIMESTAMP: {
+                    // For TIMESTAMP fields, use the new efficient random access method
+                    return compression::algorithms::DeltaCompression::deltaVarintDecompressTimestampAt(compressed_data, node_index_in_layer);
+                }
+                case compression::FieldType::LOGTYPE: {
+                    // For LOGTYPE fields, use the new efficient random access method
+                    return compression::algorithms::DeltaCompression::deltaVarintDecompressLogtypeAt(compressed_data, node_index_in_layer);
+                }
+                default: {
                     // 对于其他类型，回退到完整解压方法
+                    std::cout << "DEBUG: Using full decompression for " << static_cast<int>(field_type) << std::endl;
                     std::vector<int64_t> decompressed = compression::algorithms::DeltaCompression::deltaVarintDecompress(compressed_data);
                     std::vector<uint8_t> raw_data = compression::utils::SerializationUtils::int64sToBytes(decompressed);
                     return extractNodeValueFromRawData(raw_data, node_index_in_layer);
+                }
             }
         }
         
@@ -465,16 +475,22 @@ NodeValue SelectiveDecompressor::extractNodeValueUsingCompressionAt(
         }
         
         case compression::CompressionBackend::DELTA_DELTA: {
-            // 对于DELTA_DELTA，使用DeltaDeltaCompression的deltaDeltaDecompressAt静态方法
-            if (field_type == compression::FieldType::TIMESTAMP) {
-                return compression::algorithms::DeltaDeltaCompression::deltaDeltaDecompressAt(
-                    compressed_data, node_index_in_layer);
-            } else {
-                // 对于其他类型，回退到完整解压方法
-                std::vector<int64_t> decompressed = compression::algorithms::DeltaDeltaCompression::deltaDeltaDecompress(
-                    compressed_data);
-                std::vector<uint8_t> raw_data = compression::utils::SerializationUtils::int64sToBytes(decompressed);
-                return extractNodeValueFromRawData(raw_data, node_index_in_layer);
+            // 对于DELTA_DELTA，使TIMESTAMP字段与LOGTYPE字段使用相同的处理方式
+            switch (field_type) {
+                case compression::FieldType::TIMESTAMP:
+                case compression::FieldType::LOGTYPE: {
+                    // TIMESTAMP和LOGTYPE字段使用相同的处理方式
+                    std::vector<int64_t> decompressed = compression::algorithms::DeltaDeltaCompression::deltaDeltaDecompress(compressed_data);
+                    std::vector<uint8_t> raw_data = compression::utils::SerializationUtils::int64sToBytes(decompressed);
+                    return extractNodeValueFromRawData(raw_data, node_index_in_layer);
+                }
+                default: {
+                    // 对于其他类型，回退到完整解压方法
+                    std::vector<int64_t> decompressed = compression::algorithms::DeltaDeltaCompression::deltaDeltaDecompress(
+                        compressed_data);
+                    std::vector<uint8_t> raw_data = compression::utils::SerializationUtils::int64sToBytes(decompressed);
+                    return extractNodeValueFromRawData(raw_data, node_index_in_layer);
+                }
             }
         }
         
@@ -522,30 +538,30 @@ NodeValue SelectiveDecompressor::extractNodeValueFromRawData(
         
         // 根据类型跳过数据
         switch (type_byte) {
-            case 0: { // uint32_t
+            case static_cast<uint8_t>(NodeValueType::UINT32): { // uint32_t
                 uint32_t value;
                 layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
                 break;
             }
-            case 1: { // int64_t
+            case static_cast<uint8_t>(NodeValueType::INT64): { // int64_t
                 int64_t value;
                 layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
                 break;
             }
-            case 2: { // double
+            case static_cast<uint8_t>(NodeValueType::DOUBLE): { // double
                 double value;
                 layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
                 break;
             }
-            case 3: { // bool
+            case static_cast<uint8_t>(NodeValueType::BOOL): { // bool
                 bool value;
                 layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
                 break;
             }
-            case 4: { // nullptr
+            case static_cast<uint8_t>(NodeValueType::NULLPTR): { // nullptr
                 break;
             }
-            case 5: { // TemplateEncodedTimestamp
+            case static_cast<uint8_t>(NodeValueType::TEMPLATE_ENCODED_TIMESTAMP): { // TemplateEncodedTimestamp
                 uint32_t template_id;
                 layer_stream.read(reinterpret_cast<char*>(&template_id), sizeof(template_id));
                 uint32_t n;
@@ -556,7 +572,7 @@ NodeValue SelectiveDecompressor::extractNodeValueFromRawData(
                 }
                 break;
             }
-            case 6: { // EncodedLog
+            case static_cast<uint8_t>(NodeValueType::ENCODED_LOG): { // EncodedLog
                 uint32_t template_id;
                 layer_stream.read(reinterpret_cast<char*>(&template_id), sizeof(template_id));
                 uint32_t n;
@@ -578,30 +594,30 @@ NodeValue SelectiveDecompressor::extractNodeValueFromRawData(
     
     // 根据类型读取并返回值
     switch (type_byte) {
-        case 0: { // uint32_t
+        case static_cast<uint8_t>(NodeValueType::UINT32): { // uint32_t
             uint32_t value;
             layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
             return value;
         }
-        case 1: { // int64_t
+        case static_cast<uint8_t>(NodeValueType::INT64): { // int64_t
             int64_t value;
             layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
             return value;
         }
-        case 2: { // double
+        case static_cast<uint8_t>(NodeValueType::DOUBLE): { // double
             double value;
             layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
             return value;
         }
-        case 3: { // bool
+        case static_cast<uint8_t>(NodeValueType::BOOL): { // bool
             bool value;
             layer_stream.read(reinterpret_cast<char*>(&value), sizeof(value));
             return value;
         }
-        case 4: { // nullptr
+        case static_cast<uint8_t>(NodeValueType::NULLPTR): { // nullptr
             return std::nullptr_t{};
         }
-        case 5: { // TemplateEncodedTimestamp
+        case static_cast<uint8_t>(NodeValueType::TEMPLATE_ENCODED_TIMESTAMP): { // TemplateEncodedTimestamp
             uint32_t template_id;
             layer_stream.read(reinterpret_cast<char*>(&template_id), sizeof(template_id));
             uint32_t n;
@@ -612,7 +628,7 @@ NodeValue SelectiveDecompressor::extractNodeValueFromRawData(
             }
             return TemplateEncodedTimestamp{template_id, std::move(var_codes)};
         }
-        case 6: { // EncodedLog
+        case static_cast<uint8_t>(NodeValueType::ENCODED_LOG): { // EncodedLog
             uint32_t template_id;
             layer_stream.read(reinterpret_cast<char*>(&template_id), sizeof(template_id));
             uint32_t n;
@@ -733,21 +749,21 @@ bool SelectiveDecompressor::decompressLayerSizes(const std::vector<uint8_t>& lay
 
 compression::FieldType SelectiveDecompressor::mapJsonFieldTypeToCompressionType(FieldType json_field_type) const {
     switch (json_field_type) {
-        case FieldType::Int:
+        case FieldType::INT64:
             return compression::FieldType::INT64;
-        case FieldType::Double:
+        case FieldType::DOUBLE:
             return compression::FieldType::DOUBLE;
-        case FieldType::Bool:
+        case FieldType::BOOL:
             return compression::FieldType::BOOL;
-        case FieldType::String:
+        case FieldType::STRING:
             return compression::FieldType::STRING;
-        case FieldType::Timestamp:
+        case FieldType::TIMESTAMP:
             return compression::FieldType::TIMESTAMP;
-        case FieldType::LogType:
+        case FieldType::LOGTYPE:
             return compression::FieldType::LOGTYPE;
-        case FieldType::UnstructuredArray:
+        case FieldType::ARRAY:
             return compression::FieldType::ARRAY;
-        case FieldType::Null:
+        case FieldType::NULL_TYPE:
             return compression::FieldType::NULL_TYPE;
         default:
             return compression::FieldType::STRING; // Safe default

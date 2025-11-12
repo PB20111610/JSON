@@ -181,12 +181,12 @@ ChunkMetadata ChunkSelector::extractMetadata(size_t chunk_id, const ChunkedTrieC
         metadata.field_types[field.name] = field.type;
         
         // 检查时间戳字段
-        if (field.type == FieldType::Timestamp) {
+        if (field.type == FieldType::TIMESTAMP) {
             metadata.has_timestamp = true;
         }
         
         // 检查模板字段
-        if (field.type == FieldType::LogType) {
+        if (field.type == FieldType::LOGTYPE) {
             metadata.has_template = true;
         }
     }
@@ -212,12 +212,12 @@ ChunkMetadata ChunkSelector::extractMetadata(size_t chunk_id, const ChunkedTypeA
         metadata.field_types[field.name] = field.type;
         
         // 检查时间戳字段
-        if (field.type == FieldType::Timestamp) {
+        if (field.type == FieldType::TIMESTAMP) {
             metadata.has_timestamp = true;
         }
         
         // 检查模板字段
-        if (field.type == FieldType::LogType) {
+        if (field.type == FieldType::LOGTYPE) {
             metadata.has_template = true;
         }
     }

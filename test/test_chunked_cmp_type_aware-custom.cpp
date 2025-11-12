@@ -7,6 +7,7 @@
 #include "../include/reconstruct.h"
 #include "../include/compress_type_aware.h"
 #include "../include/compress.h"
+#include "test_config_utils.h"
 #include <simdjson.h>
 #include <iostream>
 #include <fstream>
@@ -78,14 +79,15 @@ std::string backendToString(compression::CompressionBackend backend) {
 // Helper function to convert FieldType enum to readable string
 std::string fieldTypeToString(FieldType type) {
     switch (type) {
-        case FieldType::Int: return "Int";
-        case FieldType::Double: return "Double";
-        case FieldType::Bool: return "Bool";
-        case FieldType::String: return "String";
-        case FieldType::Timestamp: return "Timestamp";
-        case FieldType::LogType: return "LogType";
+        case FieldType::INT64: return "Int";
+        case FieldType::DOUBLE: return "Double";
+        case FieldType::BOOL: return "Bool";
+        case FieldType::STRING: return "String";
+        case FieldType::TIMESTAMP: return "Timestamp";
+        case FieldType::LOGTYPE: return "LogType";
         case FieldType::Null: return "Null";
-        case FieldType::UnstructuredArray: return "UnstructuredArray";
+        case FieldType::ARRAY: return "UnstructuredArray";
+
         default: return "Unknown";
     }
 }
@@ -223,15 +225,8 @@ void testChunkedTypeAwareCompression() {
         config.type_aware_config.dictionary_backend = compression::CompressionBackend::ZSTD;    // Good ratio for dictionaries
         config.type_aware_config.metadata_backend = compression::CompressionBackend::ZSTD;      // Good ratio for metadata
         
-        // Configure ALL field type backends explicitly for optimal performance
-        config.type_aware_config.layer_config.int_backend = compression::CompressionBackend::DELTA_VARINT; // Specialized for integers
-        config.type_aware_config.layer_config.double_backend = compression::CompressionBackend::DELTA_VARINT; // Specialized for doubles
-        config.type_aware_config.layer_config.bool_backend = compression::CompressionBackend::BIT_PACKING;  // Optimal for boolean values
-        config.type_aware_config.layer_config.string_backend = compression::CompressionBackend::DELTA_VARINT;  // Good balance for string dictionary codes
-        config.type_aware_config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_DELTA; // Optimal for timestamp patterns
-        config.type_aware_config.layer_config.logtype_backend = compression::CompressionBackend::DELTA_VARINT; // Good for logtype dictionary codes
-        config.type_aware_config.layer_config.array_backend = compression::CompressionBackend::RLE;       // Effective for array patterns
-        config.type_aware_config.layer_config.null_backend = compression::CompressionBackend::BIT_PACKING; // Optimal for null masks
+        // Configure ALL field type backends using standard test configuration
+        config.type_aware_config = json2::test::createStandardTestConfig();
         
         // Configure type-aware compression with optimized settings (matching original test)
         // config.type_aware_config.louds_backend = compression::CompressionBackend::BIT_PACKING;
@@ -250,8 +245,7 @@ void testChunkedTypeAwareCompression() {
         // config.type_aware_config.dictionary_backend = compression::CompressionBackend::LZMA;
         // config.type_aware_config.metadata_backend = compression::CompressionBackend::BROTLI;
         // config.type_aware_config.layer_config.string_backend = compression::CompressionBackend::BROTLI;
-        // Use compression level 3 to match compress.cpp's ZSTD_CLEVEL_DEFAULT
-        config.type_aware_config.compression_level = 3;
+        // Compression level is already set in createStandardTestConfig()
         
         // Initialize field dictionary manager
         FieldDictionaryManager manager;
@@ -298,36 +292,36 @@ void testChunkedTypeAwareCompression() {
         
         // Apply custom field ordering based on user requirements
         std::vector<FieldKey> custom_field_order = {
-            {"clicked", FieldType::String},
-            {"category", FieldType::String},
-            {"cbf_feature_type", FieldType::String},
-            {"processingTime", FieldType::Int},
-            {"cbf_feature_count", FieldType::Int},
-            {"recommendation_class", FieldType::String},
-            {"request_received", FieldType::Timestamp},
-            {"response_delivered", FieldType::Timestamp},
-            {"cbf_feature_count", FieldType::String},
-            {"recommendation_id", FieldType::Int}
+            {"clicked", FieldType::STRING},
+            {"category", FieldType::STRING},
+            {"cbf_feature_type", FieldType::STRING},
+            {"processingTime", FieldType::INT64},
+            {"cbf_feature_count", FieldType::INT64},
+            {"recommendation_class", FieldType::STRING},
+            {"request_received", FieldType::TIMESTAMP},
+            {"response_delivered", FieldType::TIMESTAMP},
+            {"cbf_feature_count", FieldType::STRING},
+            {"recommendation_id", FieldType::INT64}
         };
         // std::vector<FieldKey> custom_field_order = {
-        //     {"application_name", FieldType::String},
-        //     {"backend_type", FieldType::LogType},
-        //     {"dbname", FieldType::String},
-        //     {"query_id", FieldType::Int}, 
-        //     {"remote_host", FieldType::String},
-        //     {"session_start", FieldType::Timestamp},
-        //     {"user", FieldType::String},
-        //     {"vxid", FieldType::String},
-        //     {"session_id", FieldType::String},
-        //     {"pid", FieldType::Int},
-        //     {"txid", FieldType::Int},
-        //     {"line_num", FieldType::Int}, 
-        //     {"error_severity", FieldType::String},
-        //     {"message", FieldType::LogType},
-        //     {"timestamp", FieldType::Timestamp},
-        //     {"ps", FieldType::String},
-        //     {"ps", FieldType::LogType},
-        //     {"statement", FieldType::String}
+        //     {"application_name", FieldType::STRING},
+        //     {"backend_type", FieldType::LOGTYPE},
+        //     {"dbname", FieldType::STRING},
+        //     {"query_id", FieldType::INT64}, 
+        //     {"remote_host", FieldType::STRING},
+        //     {"session_start", FieldType::TIMESTAMP},
+        //     {"user", FieldType::STRING},
+        //     {"vxid", FieldType::STRING},
+        //     {"session_id", FieldType::STRING},
+        //     {"pid", FieldType::INT64},
+        //     {"txid", FieldType::INT64},
+        //     {"line_num", FieldType::INT64}, 
+        //     {"error_severity", FieldType::STRING},
+        //     {"message", FieldType::LOGTYPE},
+        //     {"timestamp", FieldType::TIMESTAMP},
+        //     {"ps", FieldType::STRING},
+        //     {"ps", FieldType::LOGTYPE},
+        //     {"statement", FieldType::STRING}
         // };
         compressor.setCustomFieldOrder(custom_field_order);
         compressor.enableCustomFieldOrder(true);

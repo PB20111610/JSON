@@ -106,15 +106,15 @@ uint32_t Dictionary::addFieldValue(const FieldKey& key, FieldType type, std::nul
 // 只保留 getFieldValueCode(const FieldKey&, const Value&) const 和 getFieldValueByCode(const FieldKey&, uint32_t) const 的实现，移除其它重载和老接口实现。
 uint32_t Dictionary::getFieldValueCode(const FieldKey& key, const Value& value) const {
     switch (key.type) {
-        case FieldType::String:
+        case FieldType::STRING:
             return global_variable_dict.value_to_code.at(std::get<std::string>(value));
-        case FieldType::Null:
+        case FieldType::NULL_TYPE:
             return global_variable_dict.value_to_code.at("<null>");
-        case FieldType::Int:
+        case FieldType::INT64:
             return field_dicts.at(key).integer_dict.value_to_code.at(std::get<int64_t>(value));
-        case FieldType::Double:
+        case FieldType::DOUBLE:
             return field_dicts.at(key).float_dict.value_to_code.at(std::get<double>(value));
-        case FieldType::Bool:
+        case FieldType::BOOL:
             return field_dicts.at(key).boolean_dict.value_to_code.at(std::get<bool>(value));
         default:
             throw std::invalid_argument("Unsupported type in getFieldValueCode");
@@ -123,28 +123,28 @@ uint32_t Dictionary::getFieldValueCode(const FieldKey& key, const Value& value) 
 
 std::optional<Value> Dictionary::getFieldValueByCode(const FieldKey& key, uint32_t code) const {
     switch (key.type) {
-        case FieldType::String:
-        case FieldType::Null: {
+        case FieldType::STRING:
+        case FieldType::NULL_TYPE: {
             const auto& dict = global_variable_dict;
             if (code == 0 || code > dict.code_to_value.size()) return std::nullopt;
             return dict.code_to_value[code - 1];
         }
-        case FieldType::Int: {
+        case FieldType::INT64: {
             const auto& dict = field_dicts.at(key).integer_dict;
             if (code == 0 || code > dict.code_to_value.size()) return std::nullopt;
             return dict.code_to_value[code - 1];
         }
-        case FieldType::Double: {
+        case FieldType::DOUBLE: {
             const auto& dict = field_dicts.at(key).float_dict;
             if (code == 0 || code > dict.code_to_value.size()) return std::nullopt;
             return dict.code_to_value[code - 1];
         }
-        case FieldType::Bool: {
+        case FieldType::BOOL: {
             const auto& dict = field_dicts.at(key).boolean_dict;
             if (code == 0 || code > dict.code_to_value.size()) return std::nullopt;
             return dict.code_to_value[code - 1];
         }
-        case FieldType::UnstructuredArray:
+        case FieldType::ARRAY:
             // 数组类型作为字符串处理，从全局字符串字典中查找
             {
                 const auto& dict = global_variable_dict;
@@ -158,21 +158,21 @@ std::optional<Value> Dictionary::getFieldValueByCode(const FieldKey& key, uint32
 
 uint32_t Dictionary::getOrAddFieldValue(const FieldKey& key, const Value& value) {
     switch (key.type) {
-        case FieldType::String:
+        case FieldType::STRING:
             return addFieldValue(key, key.type, std::get<std::string>(value));
-        case FieldType::Null:
+        case FieldType::NULL_TYPE:
             return addFieldValue(key, key.type, nullptr);
-        case FieldType::Int:
+        case FieldType::INT64:
             return addFieldValue(key, key.type, std::get<int64_t>(value));
-        case FieldType::Double:
+        case FieldType::DOUBLE:
             return addFieldValue(key, key.type, std::get<double>(value));
-        case FieldType::Bool:
+        case FieldType::BOOL:
             return addFieldValue(key, key.type, std::get<bool>(value));
-        case FieldType::UnstructuredArray:
+        case FieldType::ARRAY:
             // 数组类型作为字符串处理
             return addFieldValue(key, key.type, std::get<std::string>(value));
-        case FieldType::Timestamp:
-        case FieldType::LogType:
+        case FieldType::TIMESTAMP:
+        case FieldType::LOGTYPE:
             throw std::invalid_argument("Dictionary::getOrAddFieldValue should not be used for Timestamp/LogType. Use timestampDict/logtypeDict directly.");
         default:
             throw std::invalid_argument("Unsupported type in getOrAddFieldValue");
@@ -186,20 +186,20 @@ void Dictionary::clear() {
 
 size_t Dictionary::getFieldValueCount(const FieldKey& key) const {
     switch (key.type) {
-        case FieldType::String:
-        case FieldType::Null:
+        case FieldType::STRING:
+        case FieldType::NULL_TYPE:
             return global_variable_dict.code_to_value.size();
-        case FieldType::Int: {
+        case FieldType::INT64: {
             auto it = field_dicts.find(key);
             if (it == field_dicts.end()) return 0;
             return it->second.integer_dict.code_to_value.size();
         }
-        case FieldType::Double: {
+        case FieldType::DOUBLE: {
             auto it = field_dicts.find(key);
             if (it == field_dicts.end()) return 0;
             return it->second.float_dict.code_to_value.size();
         }
-        case FieldType::Bool: {
+        case FieldType::BOOL: {
             auto it = field_dicts.find(key);
             if (it == field_dicts.end()) return 0;
             return it->second.boolean_dict.code_to_value.size();
@@ -214,12 +214,12 @@ void Dictionary::loadFromCodeToValue(const std::vector<FieldKey>& ordered_fields
     for (const auto& key : ordered_fields) {
         auto it = field_code_to_value.find(key);
         if (it != field_code_to_value.end()) {
-            if (key.type == FieldType::String || key.type == FieldType::Null) {
+            if (key.type == FieldType::STRING || key.type == FieldType::NULL_TYPE) {
                 // 合并所有字段的字符串到全局字典（不再按FieldKey分类）
                 for (const auto& val : it->second) {
                     addFieldValue(key, key.type, val);
                 }
-            } else if (key.type == FieldType::Int) {
+            } else if (key.type == FieldType::INT64) {
                 auto& dict = field_dicts[key].integer_dict;
                 dict.code_to_value.clear();
                 dict.code_to_value.reserve(it->second.size());
@@ -230,7 +230,7 @@ void Dictionary::loadFromCodeToValue(const std::vector<FieldKey>& ordered_fields
                 for (size_t i = 0; i < it->second.size(); ++i) {
                     dict.value_to_code[std::stoll(it->second[i])] = static_cast<uint32_t>(i + 1);
                 }
-            } else if (key.type == FieldType::Double) {
+            } else if (key.type == FieldType::DOUBLE) {
                 auto& dict = field_dicts[key].float_dict;
                 dict.code_to_value.clear();
                 dict.code_to_value.reserve(it->second.size());
@@ -241,7 +241,7 @@ void Dictionary::loadFromCodeToValue(const std::vector<FieldKey>& ordered_fields
                 for (size_t i = 0; i < it->second.size(); ++i) {
                     dict.value_to_code[std::stod(it->second[i])] = static_cast<uint32_t>(i + 1);
                 }
-            } else if (key.type == FieldType::Bool) {
+            } else if (key.type == FieldType::BOOL) {
                 auto& dict = field_dicts[key].boolean_dict;
                 dict.code_to_value.clear();
                 dict.next_code = 1;

@@ -308,36 +308,36 @@ void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const
     for (size_t idx = 0; idx < node->getPath().size(); ++idx) {
         const auto& val = node->getPath()[idx];
         uint8_t type_byte = 0;
-        if (std::holds_alternative<uint32_t>(val)) type_byte = 0;
-        else if (std::holds_alternative<int64_t>(val)) type_byte = 1;
-        else if (std::holds_alternative<double>(val)) type_byte = 2;
-        else if (std::holds_alternative<bool>(val)) type_byte = 3;
-        else if (std::holds_alternative<TemplateEncodedTimestamp>(val)) type_byte = 4;
-        else if (std::holds_alternative<EncodedLog>(val)) type_byte = 5;
-        else if (std::holds_alternative<std::nullptr_t>(val)) type_byte = 6;
+        if (std::holds_alternative<uint32_t>(val)) type_byte = static_cast<uint8_t>(NodeValueType::UINT32);
+        else if (std::holds_alternative<int64_t>(val)) type_byte = static_cast<uint8_t>(NodeValueType::INT64);
+        else if (std::holds_alternative<double>(val)) type_byte = static_cast<uint8_t>(NodeValueType::DOUBLE);
+        else if (std::holds_alternative<bool>(val)) type_byte = static_cast<uint8_t>(NodeValueType::BOOL);
+        else if (std::holds_alternative<std::nullptr_t>(val)) type_byte = static_cast<uint8_t>(NodeValueType::NULLPTR);
+        else if (std::holds_alternative<TemplateEncodedTimestamp>(val)) type_byte = static_cast<uint8_t>(NodeValueType::TEMPLATE_ENCODED_TIMESTAMP);
+        else if (std::holds_alternative<EncodedLog>(val)) type_byte = static_cast<uint8_t>(NodeValueType::ENCODED_LOG);
         data.push_back(type_byte);
         switch (type_byte) {
-            case 0: {
+            case static_cast<int>(NodeValueType::UINT32): {
                 uint32_t v = std::get<uint32_t>(val);
                 data.insert(data.end(), reinterpret_cast<uint8_t*>(&v), reinterpret_cast<uint8_t*>(&v) + sizeof(v));
                 break;
             }
-            case 1: {
+            case static_cast<int>(NodeValueType::INT64): {
                 int64_t v = std::get<int64_t>(val);
                 data.insert(data.end(), reinterpret_cast<uint8_t*>(&v), reinterpret_cast<uint8_t*>(&v) + sizeof(v));
                 break;
             }
-            case 2: {
+            case static_cast<int>(NodeValueType::DOUBLE): {
                 double v = std::get<double>(val);
                 data.insert(data.end(), reinterpret_cast<uint8_t*>(&v), reinterpret_cast<uint8_t*>(&v) + sizeof(v));
                 break;
             }
-            case 3: {
+            case static_cast<int>(NodeValueType::BOOL): {
                 bool v = std::get<bool>(val);
                 data.push_back(v ? 1 : 0);
                 break;
             }
-            case 4: { // TemplateEncodedTimestamp
+            case static_cast<int>(NodeValueType::TEMPLATE_ENCODED_TIMESTAMP): { // TemplateEncodedTimestamp
                 const auto& ts = std::get<TemplateEncodedTimestamp>(val);
                 data.insert(data.end(), reinterpret_cast<const uint8_t*>(&ts.template_id), reinterpret_cast<const uint8_t*>(&ts.template_id) + sizeof(ts.template_id));
                 uint32_t var_count = static_cast<uint32_t>(ts.var_codes.size());
@@ -347,7 +347,7 @@ void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const
                 }
                 break;
             }
-            case 5: { // EncodedLog
+            case static_cast<int>(NodeValueType::ENCODED_LOG): { // EncodedLog
                 const auto& log = std::get<EncodedLog>(val);
                 data.insert(data.end(), reinterpret_cast<const uint8_t*>(&log.template_id), reinterpret_cast<const uint8_t*>(&log.template_id) + sizeof(log.template_id));
                 uint32_t n = static_cast<uint32_t>(log.var_codes.size());
@@ -357,7 +357,7 @@ void Trie::serializeNode(const TrieNode* node, std::vector<uint8_t>& data) const
                 }
                 break;
             }
-            case 6: // std::nullptr_t
+            case static_cast<int>(NodeValueType::NULLPTR): // std::nullptr_t
                 // 空值不写内容
                 break;
         }
@@ -391,33 +391,33 @@ TrieNode* Trie::deserializeNode(const std::vector<uint8_t>& data, size_t& pos, b
         if (pos >= data.size()) return nullptr;
         uint8_t type_byte = data[pos++];
         switch (type_byte) {
-            case 0: {
+            case static_cast<int>(NodeValueType::UINT32): {
                 uint32_t v;
                 std::memcpy(&v, &data[pos], sizeof(v));
                 pos += sizeof(v);
                 path.emplace_back(v);
                 break;
             }
-            case 1: {
+            case static_cast<int>(NodeValueType::INT64): {
                 int64_t v;
                 std::memcpy(&v, &data[pos], sizeof(v));
                 pos += sizeof(v);
                 path.emplace_back(v);
                 break;
             }
-            case 2: {
+            case static_cast<int>(NodeValueType::DOUBLE): {
                 double v;
                 std::memcpy(&v, &data[pos], sizeof(v));
                 pos += sizeof(v);
                 path.emplace_back(v);
                 break;
             }
-            case 3: {
+            case static_cast<int>(NodeValueType::BOOL): {
                 bool v = (data[pos++] == 1);
                 path.emplace_back(v);
                 break;
             }
-            case 4: { // TemplateEncodedTimestamp
+            case static_cast<int>(NodeValueType::TEMPLATE_ENCODED_TIMESTAMP): { // TemplateEncodedTimestamp
                 uint32_t template_id;
                 std::memcpy(&template_id, &data[pos], sizeof(template_id));
                 pos += sizeof(template_id);
@@ -432,7 +432,7 @@ TrieNode* Trie::deserializeNode(const std::vector<uint8_t>& data, size_t& pos, b
                 path.emplace_back(TemplateEncodedTimestamp{template_id, var_codes});
                 break;
             }
-            case 5: { // EncodedLog
+            case static_cast<int>(NodeValueType::ENCODED_LOG): { // EncodedLog
                 uint32_t template_id;
                 std::memcpy(&template_id, &data[pos], sizeof(template_id));
                 pos += sizeof(template_id);
@@ -447,7 +447,7 @@ TrieNode* Trie::deserializeNode(const std::vector<uint8_t>& data, size_t& pos, b
                 path.emplace_back(EncodedLog{template_id, var_codes});
                 break;
             }
-            case 6: // std::nullptr_t
+            case static_cast<int>(NodeValueType::NULLPTR): // std::nullptr_t
                 path.emplace_back(std::nullptr_t{});
                 break;
             default:
@@ -502,28 +502,28 @@ void Trie::copyChildren(const TrieNode* src, TrieNode* dest) {
 // 类型对齐辅助（融合trie_type_aware的类型感知）
 static Value alignValueType(const FieldKey& key, const Value& value) {
         switch (key.type) {
-            case FieldType::Double:
+            case FieldType::DOUBLE:
                 if (std::holds_alternative<double>(value)) return value;
                 if (std::holds_alternative<int64_t>(value)) return static_cast<double>(std::get<int64_t>(value));
                 if (std::holds_alternative<bool>(value)) return static_cast<double>(std::get<bool>(value) ? 1.0 : 0.0);
             return Value(nullptr);
-            case FieldType::Int:
+            case FieldType::INT64:
                 if (std::holds_alternative<int64_t>(value)) return value;
                 if (std::holds_alternative<double>(value)) return static_cast<int64_t>(std::get<double>(value));
                 if (std::holds_alternative<bool>(value)) return static_cast<int64_t>(std::get<bool>(value) ? 1 : 0);
             return Value(nullptr);
-            case FieldType::Bool:
+            case FieldType::BOOL:
                 if (std::holds_alternative<bool>(value)) return value;
                 if (std::holds_alternative<int64_t>(value)) return static_cast<bool>(std::get<int64_t>(value) != 0);
                 if (std::holds_alternative<double>(value)) return static_cast<bool>(std::get<double>(value) != 0.0);
             return Value(nullptr);
-            case FieldType::String:
+            case FieldType::STRING:
             if (std::holds_alternative<std::string>(value)) return value;
             return Value(nullptr);
-            case FieldType::Null:
-            case FieldType::Timestamp:
-            case FieldType::LogType:
-            case FieldType::UnstructuredArray:
+            case FieldType::NULL_TYPE:
+            case FieldType::TIMESTAMP:
+            case FieldType::LOGTYPE:
+            case FieldType::ARRAY:
             // 保持原有逻辑
                 if (std::holds_alternative<std::string>(value)) return value;
                 if (std::holds_alternative<int64_t>(value)) return std::to_string(std::get<int64_t>(value));
@@ -544,8 +544,8 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
     
     // 使用传入的字段类型进行编码，避免类型漂移导致的字典不匹配
     switch (key.type) {
-        case FieldType::String:
-        case FieldType::Null: {
+        case FieldType::STRING:
+        case FieldType::NULL_TYPE: {
             uint32_t code = 0;
             if (std::holds_alternative<std::string>(aligned)) {
                 code = manager.addFieldValue(key, key.type, std::get<std::string>(aligned));
@@ -562,7 +562,7 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
             }
             return NodeValue(code);
         }
-        case FieldType::Timestamp: {
+        case FieldType::TIMESTAMP: {
             // 快速提取字符串值
             std::string str_val;
             if (std::holds_alternative<std::string>(aligned)) {
@@ -582,7 +582,7 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
             auto encoded = manager.timestampDict().encodeTemplate(key, str_val);
             return NodeValue(encoded);
         }
-        case FieldType::LogType: {
+        case FieldType::LOGTYPE: {
             // 快速提取字符串值
             std::string str_val;
             if (std::holds_alternative<std::string>(aligned)) {
@@ -603,22 +603,22 @@ NodeValue Trie::createNodeValue(const FieldKey& key, const Value& value, FieldDi
             auto encoded = manager.logtypeDict().encodeLog(key, tmpl, vars);
             return NodeValue(encoded);
         }
-        case FieldType::Int:
+        case FieldType::INT64:
             if (std::holds_alternative<int64_t>(aligned))
                 return NodeValue(std::get<int64_t>(aligned));
             else
                 return NodeValue(nullptr);
-        case FieldType::Double:
+        case FieldType::DOUBLE:
             if (std::holds_alternative<double>(aligned))
                 return NodeValue(std::get<double>(aligned));
             else
                 return NodeValue(nullptr);
-        case FieldType::Bool:
+        case FieldType::BOOL:
             if (std::holds_alternative<bool>(aligned))
                 return NodeValue(std::get<bool>(aligned));
             else
                 return NodeValue(nullptr);
-        case FieldType::UnstructuredArray:
+        case FieldType::ARRAY:
             // 数组类型作为字符串处理
             if (std::holds_alternative<std::string>(aligned)) {
                 uint32_t code = manager.addFieldValue(key, key.type, std::get<std::string>(aligned));
@@ -657,20 +657,20 @@ std::string Trie::reconstructFieldValue(const FieldKey& key, const NodeValue& no
     FieldKey lookup_key{lookup_name, key.type};
     
     switch (key.type) {
-        case FieldType::Timestamp:
+        case FieldType::TIMESTAMP:
         if (std::holds_alternative<TemplateEncodedTimestamp>(node_value)) {
             const auto& ts = std::get<TemplateEncodedTimestamp>(node_value);
             return manager.timestampDict().decodeTemplate(lookup_key, ts);
         }
             else
                 return "";
-        case FieldType::LogType:
+        case FieldType::LOGTYPE:
             if (std::holds_alternative<EncodedLog>(node_value))
                 return manager.logtypeDict().decodeLogToString(lookup_key, std::get<EncodedLog>(node_value));
             else
                 return "";
-        case FieldType::String:
-        case FieldType::Null:
+        case FieldType::STRING:
+        case FieldType::NULL_TYPE:
             if (std::holds_alternative<uint32_t>(node_value)) {
                 auto opt_value = manager.getFieldValueByCode(lookup_key, std::get<uint32_t>(node_value));
                 if (opt_value) {
@@ -681,22 +681,22 @@ std::string Trie::reconstructFieldValue(const FieldKey& key, const NodeValue& no
                 }
             }
             return "";
-        case FieldType::Int:
+        case FieldType::INT64:
             if (std::holds_alternative<int64_t>(node_value))
                 return std::to_string(std::get<int64_t>(node_value));
             else
                 return "";
-        case FieldType::Double:
+        case FieldType::DOUBLE:
             if (std::holds_alternative<double>(node_value))
                 return std::to_string(std::get<double>(node_value));
             else
                 return "";
-        case FieldType::Bool:
+        case FieldType::BOOL:
             if (std::holds_alternative<bool>(node_value))
                 return std::get<bool>(node_value) ? "true" : "false";
             else
                 return "";
-        case FieldType::UnstructuredArray:
+        case FieldType::ARRAY:
             if (std::holds_alternative<uint32_t>(node_value)) {
                 auto code = std::get<uint32_t>(node_value);
                 auto opt_value = manager.getFieldValueByCode(lookup_key, code);

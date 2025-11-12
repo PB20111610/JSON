@@ -52,7 +52,7 @@ public:
             config.layer_config.double_backend = compression::CompressionBackend::DELTA_VARINT;
             config.layer_config.bool_backend = compression::CompressionBackend::BIT_PACKING;
             config.layer_config.string_backend = compression::CompressionBackend::DELTA_VARINT;
-            config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_DELTA;
+            config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_VARINT;
             config.layer_config.logtype_backend = compression::CompressionBackend::DELTA_VARINT;
             config.layer_config.array_backend = compression::CompressionBackend::RLE;
             config.layer_config.null_backend = compression::CompressionBackend::BIT_PACKING;
@@ -244,7 +244,7 @@ public:
                 auto start = std::chrono::high_resolution_clock::now();
                 
                 auto result = engine_.checkFieldExistenceAndType(
-                    field_name, FieldType::String, granular_data);
+                    field_name, FieldType::STRING, granular_data);
                 
                 auto end = std::chrono::high_resolution_clock::now();
                 auto duration = std::chrono::duration<double, std::milli>(end - start);
@@ -282,7 +282,7 @@ public:
             std::cout << "字符串字典查询:" << std::endl;
             auto start = std::chrono::high_resolution_clock::now();
             auto string_result = engine_.queryDictionary(
-                "user", FieldType::String, granular_data, "");
+                "user", FieldType::STRING, granular_data, "");
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration<double, std::milli>(end - start);
             
@@ -305,7 +305,7 @@ public:
             std::cout << "\n时间戳字典查询:" << std::endl;
             start = std::chrono::high_resolution_clock::now();
             auto timestamp_result = engine_.queryDictionary(
-                "timestamp", FieldType::Timestamp, granular_data, "");
+                "timestamp", FieldType::TIMESTAMP, granular_data, "");
             end = std::chrono::high_resolution_clock::now();
             duration = std::chrono::duration<double, std::milli>(end - start);
             
@@ -321,7 +321,7 @@ public:
             std::cout << "\n日志类型字典查询:" << std::endl;
             start = std::chrono::high_resolution_clock::now();
             auto logtype_result = engine_.queryDictionary(
-                "message", FieldType::LogType, granular_data, "");
+                "message", FieldType::LOGTYPE, granular_data, "");
             end = std::chrono::high_resolution_clock::now();
             duration = std::chrono::duration<double, std::milli>(end - start);
             
@@ -426,7 +426,7 @@ public:
             
             // 首先检查字段是否存在
             std::cout << "检查字段存在性:" << std::endl;
-            auto pid_existence = engine_.checkFieldExistenceAndType("pid", FieldType::Int, granular_data);
+            auto pid_existence = engine_.checkFieldExistenceAndType("pid", FieldType::INT64, granular_data);
             std::cout << "  pid字段存在: " << (pid_existence.exists ? "是" : "否") << std::endl;
             if (pid_existence.exists) {
                 std::cout << "  pid字段类型: " << static_cast<int>(pid_existence.field_type) << std::endl;
@@ -888,13 +888,13 @@ int main() {
     }
     
     // 运行测试
-    tester.testFieldExistenceQueries();  // 字段存在性测试
-    tester.testDictionaryQueries();  // 字典查询测试
-    tester.testExactMatchQueries();  // 精确匹配查询测试
-    tester.testRangeQueries();       // 范围查询测试
-    tester.testAggregateQueries();   // 聚合查询测试
-    tester.testComplexQueries();     // 复杂查询测试
-    tester.testDirectGroupedAggregateQuery(); // 分组聚合查询测试
+    tester.testFieldExistenceQueries();
+    tester.testDictionaryQueries();
+    tester.testExactMatchQueries();  // 添加精确匹配查询测试
+    tester.testRangeQueries();       // 添加范围查询测试
+    tester.testAggregateQueries();   // 添加聚合查询测试
+    tester.testComplexQueries();     // 添加复杂查询测试
+    tester.testDirectGroupedAggregateQuery(); // 添加直接分组聚合查询测试
 
     std::cout << "\n测试完成！" << std::endl;
     return 0;

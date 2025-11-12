@@ -159,7 +159,7 @@ std::string decodeNodeValueToFieldValue(const FieldKey& field_key,
                                        const FieldDictionaryManager& dict_manager) {
     // 根据字段类型和NodeValue类型进行解码
     switch (field_key.type) {
-        case FieldType::String: {
+        case FieldType::STRING: {
             if (std::holds_alternative<uint32_t>(node_value)) {
                 // 字典编码的字符串
                 auto code = std::get<uint32_t>(node_value);
@@ -170,7 +170,7 @@ std::string decodeNodeValueToFieldValue(const FieldKey& field_key,
             }
             return "null";
         }
-        case FieldType::Int: {
+        case FieldType::INT64: {
             if (std::holds_alternative<int64_t>(node_value)) {
                 return std::to_string(std::get<int64_t>(node_value));
             } else if (std::holds_alternative<uint32_t>(node_value)) {
@@ -178,19 +178,19 @@ std::string decodeNodeValueToFieldValue(const FieldKey& field_key,
             }
             return "null";
         }
-        case FieldType::Double: {
+        case FieldType::DOUBLE: {
             if (std::holds_alternative<double>(node_value)) {
                 return std::to_string(std::get<double>(node_value));
             }
             return "null";
         }
-        case FieldType::Bool: {
+        case FieldType::BOOL: {
             if (std::holds_alternative<bool>(node_value)) {
                 return std::get<bool>(node_value) ? "true" : "false";
             }
             return "null";
         }
-        case FieldType::Timestamp: {
+        case FieldType::TIMESTAMP: {
             if (std::holds_alternative<TemplateEncodedTimestamp>(node_value)) {
                 const auto& ts = std::get<TemplateEncodedTimestamp>(node_value);
                 // 使用字典管理器正确解码时间戳
@@ -198,7 +198,7 @@ std::string decodeNodeValueToFieldValue(const FieldKey& field_key,
             }
             return "null";
         }
-        case FieldType::LogType: {
+        case FieldType::LOGTYPE: {
             if (std::holds_alternative<EncodedLog>(node_value)) {
                 const auto& log = std::get<EncodedLog>(node_value);
                 // 使用字典管理器正确解码日志类型
@@ -206,7 +206,7 @@ std::string decodeNodeValueToFieldValue(const FieldKey& field_key,
             }
             return "null";
         }
-        case FieldType::UnstructuredArray: {
+        case FieldType::ARRAY: {
             if (std::holds_alternative<uint32_t>(node_value)) {
                 auto code = std::get<uint32_t>(node_value);
                 auto opt_value = dict_manager.getFieldValueByCode(field_key, code);

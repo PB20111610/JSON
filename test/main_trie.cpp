@@ -20,14 +20,15 @@ using nlohmann::json;
 // Helper function to convert FieldType to string
 std::string fieldTypeToString(FieldType type) {
     switch (type) {
-        case FieldType::Int: return "Int";
-        case FieldType::Double: return "Double";
-        case FieldType::Bool: return "Bool";
-        case FieldType::String: return "String";
-        case FieldType::Timestamp: return "Timestamp";
-        case FieldType::LogType: return "LogType";
+        case FieldType::INT64: return "Int";
+        case FieldType::DOUBLE: return "Double";
+        case FieldType::BOOL: return "Bool";
+        case FieldType::STRING: return "String";
+        case FieldType::TIMESTAMP: return "Timestamp";
+        case FieldType::LOGTYPE: return "LogType";
         case FieldType::Null: return "Null";
-        case FieldType::UnstructuredArray: return "UnstructuredArray";
+        case FieldType::ARRAY: return "UnstructuredArray";
+
         default: return "Unknown";
     }
 }
@@ -253,7 +254,8 @@ int main() {
         }
         // 打印变量字典
         std::cout << "\n=== LogTypeDictionary Variables ===\n";
-        for (uint32_t i = 1; i < 1000; ++i) { // 假定变量数不会超过1000
+        // Use the same approach as timestamp dictionary with proper bounds checking
+        for (uint32_t i = 1; i <= log_dict.getVariableCount(); ++i) {
             std::string var = log_dict.decodeVariable(i);
             if (!var.empty()) {
                 std::cout << "VarCode " << i << ": " << var << std::endl;

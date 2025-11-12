@@ -6,6 +6,7 @@
 #include "../include/reconstruct.h"
 #include "../include/compress_type_aware.h"
 #include "../include/compress.h" // For file I/O operations
+#include "test_config_utils.h"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -228,17 +229,7 @@ int main() {
         config.metadata_backend = compression::CompressionBackend::ZSTD;
         
         // Configure ALL field type backends explicitly for optimal performance
-        config.layer_config.int_backend = compression::CompressionBackend::DELTA_VARINT;
-        config.layer_config.double_backend = compression::CompressionBackend::DELTA_VARINT;
-        config.layer_config.bool_backend = compression::CompressionBackend::BIT_PACKING;
-        config.layer_config.string_backend = compression::CompressionBackend::DELTA_VARINT;
-        config.layer_config.timestamp_backend = compression::CompressionBackend::DELTA_DELTA;
-        config.layer_config.logtype_backend = compression::CompressionBackend::DELTA_VARINT;
-        config.layer_config.array_backend = compression::CompressionBackend::RLE;
-        config.layer_config.null_backend = compression::CompressionBackend::BIT_PACKING;
-        
-        // Use compression level 3 to match compress.cpp's ZSTD_CLEVEL_DEFAULT
-        config.compression_level = 3;
+        config = json2::test::createStandardTestConfig();
         
         // Display current compression configuration
         displayCompressionConfig(config);

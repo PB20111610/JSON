@@ -82,72 +82,17 @@ std::vector<FieldKey> readFieldKeyVector(const std::vector<uint8_t>& data, size_
 
 // ========== 重构：序列化字典数据 ==========
 std::vector<uint8_t> Compressor::serializeDictionary(const FieldDictionaryManager& manager) {
+    // Delegate to the new granular methods and combine their results
+    std::vector<uint8_t> string_data = serializeStringDictionary(manager);
+    std::vector<uint8_t> timestamp_data = serializeTimestampDictionary(manager);
+    std::vector<uint8_t> logtype_data = serializeLogTypeDictionary(manager);
+    
+    // Combine all data in the same order as the original implementation
     std::vector<uint8_t> data;
-    // 1. String字典（按FieldKey分组）
-    std::vector<FieldKey> all_field_keys = manager.getAllFieldsAndTypes();
-    uint32_t string_dict_count = 0;
-    std::vector<std::pair<FieldKey, std::vector<std::string>>> string_dicts;
-    const Dictionary& dict = manager.variableDict();
-    for (size_t fk_idx = 0; fk_idx < all_field_keys.size(); ++fk_idx) {
-        const auto& fk = all_field_keys[fk_idx];
-        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
-            std::vector<std::string> values;
-            size_t count = dict.getFieldValueCount(fk);
-            for (uint32_t code = 1; code <= count; ++code) {
-                auto opt_value = dict.getFieldValueByCode(fk, code);
-                if (opt_value && std::holds_alternative<std::string>(*opt_value)) {
-                    values.push_back(std::get<std::string>(*opt_value));
-                }
-            }
-            if (!values.empty()) {
-                string_dicts.emplace_back(fk, values);
-                ++string_dict_count;
-            }
-        }
-    }
-    writeValue(data, string_dict_count);
-    for (size_t i = 0; i < string_dicts.size(); ++i) {
-        const auto& [fk, values] = string_dicts[i];
-        writeString(data, fk.name);
-        writeValue(data, static_cast<uint32_t>(fk.type));
-        writeVector(data, values);
-    }
-    // 2. Timestamp模板和变量列表
-    const auto& ts_dict = manager.timestampDict();
-    // 序列化模板
-    std::vector<std::string> templates;
-    for (uint32_t i = 1; i <= ts_dict.getTemplateCount(); ++i) {
-        std::string template_str = ts_dict.getTemplateById(i);
-        if (!template_str.empty()) {
-            templates.push_back(template_str);
-        }
-    }
-    writeVector(data, templates);
-    // 序列化变量
-    std::vector<std::string> variables;
-    for (uint32_t i = 1; i <= ts_dict.getVariableCount(); ++i) {
-        std::string variable = ts_dict.getVariableByCode(i);
-        if (!variable.empty()) {
-            variables.push_back(variable);
-        }
-    }
-    writeVector(data, variables);
-    // 3. LogType模板和变量字典
-    const auto& log_dict = manager.logtypeDict();
-    // 模板
-    std::vector<std::string> log_templates;
-    for (uint32_t i = 1; i <= log_dict.getLogTypeCount(); ++i) {
-        log_templates.push_back(log_dict.getLogTypeById(i));
-    }
-    writeVector(data, log_templates);
-    // 变量字典
-    std::vector<std::string> log_vars;
-    for (uint32_t i = 1; i < 100000; ++i) { // 假定变量数不会超过10万
-        std::string var = log_dict.decodeVariable(i);
-        if (var.empty()) break;
-        log_vars.push_back(var);
-    }
-    writeVector(data, log_vars);
+    data.insert(data.end(), string_data.begin(), string_data.end());
+    data.insert(data.end(), timestamp_data.begin(), timestamp_data.end());
+    data.insert(data.end(), logtype_data.begin(), logtype_data.end());
+    
     return data;
 }
 
@@ -156,7 +101,7 @@ std::vector<uint8_t> Compressor::serializeDictionary(const FieldDictionaryManage
 std::vector<uint8_t> Compressor::serializeStringDictionary(const FieldDictionaryManager& manager) {
     std::vector<uint8_t> data;
     
-    // 序列化String字典（按FieldKey分组）
+    // 序列化String字典
     std::vector<FieldKey> all_field_keys = manager.getAllFieldsAndTypes();
     uint32_t string_dict_count = 0;
     std::vector<std::pair<FieldKey, std::vector<std::string>>> string_dicts;
@@ -164,11 +109,11 @@ std::vector<uint8_t> Compressor::serializeStringDictionary(const FieldDictionary
     const Dictionary& dict = manager.variableDict();
     for (size_t fk_idx = 0; fk_idx < all_field_keys.size(); ++fk_idx) {
         const auto& fk = all_field_keys[fk_idx];
-        if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
+        if (fk.type == FieldType::STRING || fk.type == FieldType::ARRAY) {
             std::vector<std::string> values;
             size_t count = dict.getFieldValueCount(fk);
             // For String fields, we should check the global dictionary
-            if (fk.type == FieldType::String) {
+            if (fk.type == FieldType::STRING) {
                 // Get all values from the global dictionary
                 std::vector<std::string> all_string_values = dict.getAllStringValues();
                 // For String fields, we store all values in the global dictionary
@@ -245,10 +190,11 @@ std::vector<uint8_t> Compressor::serializeLogTypeDictionary(const FieldDictionar
     
     // 变量字典
     std::vector<std::string> log_vars;
-    for (uint32_t i = 1; i < 100000; ++i) { // 假定变量数不会超过10万
+    for (uint32_t i = 1; i <= log_dict.getVariableCount(); ++i) {
         std::string var = log_dict.decodeVariable(i);
-        if (var.empty()) break;
-        log_vars.push_back(var);
+        if (!var.empty()) {
+            log_vars.push_back(var);
+        }
     }
     writeVector(data, log_vars);
     
@@ -637,7 +583,7 @@ CompressedData Compressor::compressLouds(const LOUDSTrie& louds, const FieldDict
         const Dictionary& dict = manager.variableDict();
         for (size_t fk_idx = 0; fk_idx < all_field_keys.size(); ++fk_idx) {
             const auto& fk = all_field_keys[fk_idx];
-            if (fk.type == FieldType::String || fk.type == FieldType::UnstructuredArray) {
+            if (fk.type == FieldType::STRING || fk.type == FieldType::ARRAY) {
                 std::vector<std::string> values;
                 size_t count = dict.getFieldValueCount(fk);
                 for (uint32_t code = 1; code <= count; ++code) {
@@ -704,10 +650,11 @@ CompressedData Compressor::compressLouds(const LOUDSTrie& louds, const FieldDict
     {
         const auto& log_dict = manager.logtypeDict();
         std::vector<std::string> log_vars;
-        for (uint32_t i = 1; i < 100000; ++i) {
+        for (uint32_t i = 1; i <= log_dict.getVariableCount(); ++i) {
             std::string var = log_dict.decodeVariable(i);
-            if (var.empty()) break;
-            log_vars.push_back(var);
+            if (!var.empty()) {
+                log_vars.push_back(var);
+            }
         }
         writeVector(log_vars_raw, log_vars);
     }
@@ -1013,18 +960,25 @@ GranularCompressedData Compressor::compressGranularLouds(const LOUDSTrie& louds,
         
         // 序列化层大小信息
         std::vector<uint32_t> layer_sizes;
+        std::vector<std::vector<uint8_t>> layer_data_by_level(layer_count);
+        
+        // 首先序列化所有层数据
         for (size_t i = 0; i < layer_count; ++i) {
             std::ostringstream layer_stream(std::ios::binary);
             louds.getLayeredStorage().serializeLayer(i, layer_stream);
             std::string layer_str = layer_stream.str();
-            std::vector<uint8_t> layer_data(layer_str.begin(), layer_str.end());
-            layer_sizes.push_back(static_cast<uint32_t>(layer_data.size()));
+            layer_data_by_level[i] = std::vector<uint8_t>(layer_str.begin(), layer_str.end());
             
-            std::vector<uint8_t> compressed_layer = compressWithZstd(layer_data);
+            // 存储层中实际的元素数量，而不是序列化后的字节大小
+            size_t layer_element_count = louds.getLayeredStorage().getLayer(i).size();
+            layer_sizes.push_back(static_cast<uint32_t>(layer_element_count));
+        
+            // 然后压缩所有层数据
+            std::vector<uint8_t> compressed_layer = compressWithZstd(layer_data_by_level[i]);
             result.layer_data_by_level.push_back(std::move(compressed_layer));
             
             // 累计原始大小
-            layer_raw.insert(layer_raw.end(), layer_data.begin(), layer_data.end());
+            layer_raw.insert(layer_raw.end(), layer_data_by_level[i].begin(), layer_data_by_level[i].end());
         }
         
         // 序列化层大小信息
@@ -1347,11 +1301,6 @@ std::string Compressor::getStringValueAt(const std::vector<uint8_t>& data, const
     
     uint32_t string_dict_count = readValue<uint32_t>(decompressed_data, pos);
     
-    // Safety check to prevent infinite loops or buffer overflows
-    if (string_dict_count > 10000) {
-        throw std::runtime_error("Invalid dictionary count - possible data corruption");
-    }
-    
     // Handle empty dictionary case
     if (string_dict_count == 0) {
         throw std::runtime_error("String dictionary is empty");
@@ -1359,7 +1308,7 @@ std::string Compressor::getStringValueAt(const std::vector<uint8_t>& data, const
     
     // For String fields, all fields share a global dictionary
     // So we just need to find the first String field and get its values
-    if (target_fk.type == FieldType::String) {
+    if (target_fk.type == FieldType::STRING) {
         // Look for any String field to get the global dictionary
         for (uint32_t i = 0; i < string_dict_count; ++i) {
             std::string name = readString(decompressed_data, pos);
@@ -1369,7 +1318,7 @@ std::string Compressor::getStringValueAt(const std::vector<uint8_t>& data, const
             std::vector<std::string> values = readVector(decompressed_data, pos);
             
             // If this is a String field, use its values as the global dictionary
-            if (type == FieldType::String) {
+            if (type == FieldType::STRING) {
                 // Check if code is valid
                 if (code > 0 && code <= values.size()) {
                     std::string value = values[code - 1];
@@ -1381,7 +1330,7 @@ std::string Compressor::getStringValueAt(const std::vector<uint8_t>& data, const
         }
         
         // If we get here, we didn't find any String fields
-        throw std::runtime_error("No String fields found in dictionary");
+        throw std::runtime_error("No STRING fields found in dictionary");
     }
     
     // For non-String fields or if we need field-specific matching

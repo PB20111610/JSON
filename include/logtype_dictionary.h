@@ -42,6 +42,9 @@ public:
     size_t getLogTypeCount(const std::string& log_template) const;
     void clear();
     size_t getLogTypeCount() const;
+    
+    // 获取变量数量
+    size_t getVariableCount() const;
 
     // 变量编码
     uint32_t encodeVariable(const std::string& var);

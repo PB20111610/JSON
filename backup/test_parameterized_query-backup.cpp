@@ -29,9 +29,10 @@ public:
     ParameterizedQueryTest() {
         // Create a custom query config with unlimited max_results
         QueryConfig config;
-        config.enable_caching = true;  // Use the correct member from QueryConfig
-        config.max_cache_entries = 1000;
-        config.enable_parallel_processing = false;
+        config.max_results = std::numeric_limits<size_t>::max();  // Set to maximum value for unlimited results
+        config.enable_parallel = false;
+        config.prune_only = false;
+        config.sample_limit = 10;
         
         engine_ = QueryEngine(config);
     }
@@ -102,6 +103,8 @@ public:
         try {
             if (query_type == "field") {
                 executeFieldExistenceQuery(params);
+            } else if (query_type == "dict") {
+                executeDictionaryQuery(params);
             } else if (query_type == "point") {
                 executeExactMatchQuery(params);
             } else if (query_type == "range") {
@@ -283,7 +286,7 @@ private:
             std::cout << "Field: " << field_name << std::endl;
             std::cout << "  Exists: " << (result.exists ? "Yes" : "No") << std::endl;
             if (result.exists) {
-                std::cout << "  Type: " << static_cast<int>(result.actual_type) << std::endl;
+                std::cout << "  Type: " << static_cast<int>(result.field_type) << std::endl;
                 std::cout << "  Type matches: " << (result.type_matches ? "Yes" : "No") << std::endl;
             }
             std::cout << "  Query time: " << std::fixed << std::setprecision(2) 
@@ -295,7 +298,45 @@ private:
         }
     }
     
-
+    // Dictionary query (--dict field_name)
+    void executeDictionaryQuery(const std::vector<std::string>& params) {
+        if (params.empty()) {
+            std::cout << "Dictionary query requires a field name parameter" << std::endl;
+            return;
+        }
+        
+        std::string field_name = params[0];
+        std::cout << "Querying dictionary for field: " << field_name << std::endl;
+        
+        // Process all chunks
+        for (size_t chunk_idx = 0; chunk_idx < granular_data_.size(); ++chunk_idx) {
+            std::cout << "\n--- Processing chunk " << chunk_idx << " ---" << std::endl;
+            const auto& granular_data = granular_data_[chunk_idx];
+            
+            std::cout << "Dictionary query for " << field_name << ":" << std::endl;
+            auto start = std::chrono::high_resolution_clock::now();
+            auto result = engine_.queryDictionary(
+                field_name, FieldType::STRING, granular_data, "");
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration<double, std::milli>(end - start);
+            
+            std::cout << "  Found: " << (result.found ? "Yes" : "No") << std::endl;
+            std::cout << "  Value count: " << result.values.size() << std::endl;
+            std::cout << "  Query time: " << std::fixed << std::setprecision(2) 
+                      << duration.count() << " ms" << std::endl;
+            if (!result.error_message.empty()) {
+                std::cout << "  Error: " << result.error_message << std::endl;
+            } else {
+                // Output first few values for debugging
+                std::cout << "  First few values: ";
+                for (size_t i = 0; i < std::min(size_t(5), result.values.size()); ++i) {
+                    std::cout << "\"" << result.values[i] << "\" ";
+                }
+                std::cout << std::endl;
+            }
+        }
+    }
+    
     // Exact match query (--point field_name value)
     void executeExactMatchQuery(const std::vector<std::string>& params) {
         if (params.size() < 2) {
@@ -309,11 +350,12 @@ private:
         
         auto start = std::chrono::high_resolution_clock::now();
         auto result = engine_.executeExactMatchQueryMultiBlock(
-            field_name, value, FieldType::STRING, blocks_);
+            field_name, value, blocks_);
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration<double, std::milli>(end - start);
         
         std::cout << "  Records found: " << result.count << std::endl;
+        std::cout << "  Chunks accessed: " << result.chunks_accessed << std::endl;
         std::cout << "  Query time: " << std::fixed << std::setprecision(2) 
                   << duration.count() << " ms" << std::endl;
         if (!result.error_message.empty()) {
@@ -341,11 +383,12 @@ private:
         
         auto start = std::chrono::high_resolution_clock::now();
         auto result = engine_.executeRangeQueryMultiBlock(
-            field_name, lower_bound, upper_bound, FieldType::STRING, blocks_);
+            field_name, lower_bound, upper_bound, blocks_);
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration<double, std::milli>(end - start);
         
         std::cout << "  Records found: " << result.count << std::endl;
+        std::cout << "  Chunks accessed: " << result.chunks_accessed << std::endl;
         std::cout << "  Query time: " << std::fixed << std::setprecision(2) 
                   << duration.count() << " ms" << std::endl;
         if (!result.error_message.empty()) {
@@ -389,7 +432,7 @@ private:
         
         auto start = std::chrono::high_resolution_clock::now();
         auto result = engine_.executeAggregateQueryMultiBlock(
-            agg_func, field_name, FieldType::STRING, blocks_);
+            agg_func, field_name, blocks_);
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration<double, std::milli>(end - start);
         
@@ -424,6 +467,7 @@ private:
         auto duration = std::chrono::duration<double, std::milli>(end - start);
         
         std::cout << "  Records found: " << result.count << std::endl;
+        std::cout << "  Chunks accessed: " << result.chunks_accessed << std::endl;
         std::cout << "  Query time: " << std::fixed << std::setprecision(2) 
                   << duration.count() << " ms" << std::endl;
         if (!result.error_message.empty()) {
@@ -451,29 +495,34 @@ private:
         }
         std::cout << std::endl;
         
-        // Create field types vector (assuming all are STRING for simplicity)
-        std::vector<FieldType> field_types(params.size(), FieldType::STRING);
+        // Try the direct grouped aggregate query method first (more reliable)
+        std::cout << "Using direct grouped aggregate query method..." << std::endl;
+        std::vector<AggregateFunction> agg_funcs = {AggregateFunction::COUNT};
+        std::vector<std::string> agg_fields = {""}; // COUNT(*) uses empty field name
         
         auto start = std::chrono::high_resolution_clock::now();
-        auto result = engine_.executeGroupQueryMultiBlock(
-            params, field_types, blocks_);
+        auto result = engine_.executeGroupedAggregateQueryMultiBlock(agg_funcs, agg_fields, params, blocks_);
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration<double, std::milli>(end - start);
         
-        std::cout << "  Groups found: " << result.grouped_records.size() << std::endl;
+        std::cout << "  Total records: " << result.total_count << std::endl;
+        std::cout << "  Groups found: " << result.groups_count << std::endl;
         std::cout << "  Query time: " << std::fixed << std::setprecision(2) 
                   << duration.count() << " ms" << std::endl;
         if (!result.error_message.empty()) {
             std::cout << "  Error: " << result.error_message << std::endl;
+            // Fall back to complex query method if direct method fails
+            std::cout << "Falling back to complex query method..." << std::endl;
+            executeGroupByQueryFallback(params);
         } else {
             // Show first few group results
             std::cout << "  Group examples:" << std::endl;
             size_t count = 0;
-            for (const auto& group_entry : result.grouped_records) {
+            for (const auto& group_entry : result.grouped_values) {
                 if (count >= 5) break;
                 
                 const std::vector<std::string>& group_values = group_entry.first;
-                const std::vector<std::string>& records = group_entry.second;
+                const auto& agg_values = group_entry.second;
                 
                 std::cout << "    Group: ";
                 for (size_t i = 0; i < std::min(params.size(), group_values.size()); ++i) {
@@ -481,8 +530,45 @@ private:
                     std::cout << params[i] << "=" << group_values[i];
                 }
                 
-                std::cout << " (Count: " << records.size() << ")" << std::endl;
+                std::cout << " => ";
+                for (const auto& agg_entry : agg_values) {
+                    std::cout << agg_entry.first << "=" << agg_entry.second << " ";
+                }
+                std::cout << std::endl;
+                
                 count++;
+            }
+        }
+    }
+    
+    // Fallback method using complex query string
+    void executeGroupByQueryFallback(const std::vector<std::string>& params) {
+        // Construct the proper GROUP BY query string following the pattern from the original test
+        // Format: "COUNT(*) GROUP BY field1, field2, ..."
+        std::string query_str = "COUNT(*) GROUP BY ";
+        for (size_t i = 0; i < params.size(); ++i) {
+            if (i > 0) query_str += ", ";
+            query_str += params[i];
+        }
+        
+        std::cout << "Constructed fallback query: " << query_str << std::endl;
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        auto result = engine_.executeComplexQueryMultiBlock(query_str, blocks_);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double, std::milli>(end - start);
+        
+        std::cout << "  Groups found: " << result.count << std::endl;
+        std::cout << "  Chunks accessed: " << result.chunks_accessed << std::endl;
+        std::cout << "  Query time: " << std::fixed << std::setprecision(2) 
+                  << duration.count() << " ms" << std::endl;
+        if (!result.error_message.empty()) {
+            std::cout << "  Error: " << result.error_message << std::endl;
+        } else {
+            // Show first few group results
+            std::cout << "  Group examples:" << std::endl;
+            for (size_t i = 0; i < std::min(size_t(10), result.records.size()); ++i) {
+                std::cout << "    " << result.records[i] << std::endl;
             }
         }
     }
@@ -514,7 +600,7 @@ void printUsage(const char* program_name) {
     std::cout << "  " << program_name << " --data-dir compressed_data --point message \"error occurred\"\n";
     std::cout << "  " << program_name << " --data-dir compressed_data --point name \"John Doe\" --range city \"New York\" \"San Francisco\"\n";
     std::cout << "\nSupported operators in complex queries:\n";
-    std::cout << "  =, !=, >, >=, <, <=, AND, OR\n";
+    std::cout << "  =, !=, >, >=, <, <=, AND, OR, NOT\n";
     std::cout << "\nNote: Use quotes around values that contain spaces.\n";
     std::cout << "\nMultiple queries can be executed in sequence:\n";
     std::cout << "  " << program_name << " --data-dir compressed_data --field user --point user postgres --aggregate COUNT\n";

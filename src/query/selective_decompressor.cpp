@@ -393,7 +393,7 @@ NodeValue SelectiveDecompressor::decompressLayerValueAt(const std::vector<uint8_
             std::vector<uint8_t> raw_data(compressed_layer.begin() + 1, compressed_layer.end());
             return extractNodeValueFromRawData(raw_data, node_index_in_layer);
         } else if (compression_flag == 1) {
-            // 数据已压缩，使用存储的后端进行部分解压
+            // 数据已压缩，先解压该层数据，然后从解压后的数据中提取节点值
             if (compressed_layer.size() < 3) {
                 throw std::runtime_error("Compressed layer data too small for header");
             }
@@ -401,8 +401,16 @@ NodeValue SelectiveDecompressor::decompressLayerValueAt(const std::vector<uint8_
             compression::CompressionBackend backend = static_cast<compression::CompressionBackend>(compressed_layer[1]);
             std::vector<uint8_t> compressed_payload(compressed_layer.begin() + 2, compressed_layer.end());
             
+            // 创建相应的解压器并解压整个数据
+            auto decompressor = compression::factory::CompressionFactory::createCompressor(backend);
+            if (!decompressor) {
+                throw std::runtime_error("Failed to create decompressor for backend: " + std::to_string(static_cast<int>(backend)));
+            }
+            
+            std::vector<uint8_t> decompressed_data = decompressor->decompress(compressed_payload);
+            return extractNodeValueFromRawData(decompressed_data, node_index_in_layer);
             // 根据后端类型和字段类型使用相应的*At方法进行部分解压
-            return extractNodeValueUsingCompressionAt(compressed_payload, node_index_in_layer, backend, field_type, layer_size);
+            // return extractNodeValueUsingCompressionAt(compressed_payload, node_index_in_layer, backend, field_type, layer_size);
         } else {
             throw std::runtime_error("Invalid compression flag: " + std::to_string(compression_flag));
         }

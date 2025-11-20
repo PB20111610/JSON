@@ -31,9 +31,10 @@ public:
     FieldFilterResult checkFieldExistenceAndType(
         const std::string& field_name,
         FieldType expected_type,
-        const GranularCompressedData& granular_data) override {
+        const GranularCompressedData& granular_data,
+        const std::vector<FieldKey>* field_order = nullptr) override {
         
-        return QueryEngine::checkFieldExistenceAndType(field_name, expected_type, granular_data);
+        return QueryEngine::checkFieldExistenceAndType(field_name, expected_type, granular_data, field_order);
     }
 
     // filterDictionaryValues method removed as filterLayerValues now handles all field types
@@ -43,9 +44,10 @@ public:
         FieldType field_type,
         const std::string& target_value,
         const std::string& comparison_op,
-        const GranularCompressedData& granular_data) override {
+        const GranularCompressedData& granular_data,
+        const FieldDictionaryManager* dict_manager = nullptr) override {
         
-        return QueryEngine::filterLayerValues(field_name, field_type, target_value, comparison_op, granular_data);
+        return QueryEngine::filterLayerValues(field_name, field_type, target_value, comparison_op, granular_data, dict_manager);
     }
 
     ValueFilterResult filterFieldAndValues(

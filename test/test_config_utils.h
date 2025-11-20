@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../include/compression/type_aware/type_aware_compressor.h"
 #include "../include/chunked_type_aware_compress.h"
 
 namespace json2 {

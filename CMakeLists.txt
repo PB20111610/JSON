@@ -44,7 +44,6 @@ add_executable(json2
     include/compression/backends/lzma_backend.cpp
     include/compression/backends/lz4_backend.cpp
     include/compression/backends/snappy_backend.cpp
-    include/compression/type_aware/type_aware_compressor.cpp
     include/compression/type_aware/layer_compressor.cpp
     include/compression/type_aware/metadata_compressor.cpp
     include/compression/factory/compression_factory.cpp
@@ -80,7 +79,6 @@ add_executable(chunked_compressor
     include/compression/backends/lzma_backend.cpp
     include/compression/backends/lz4_backend.cpp
     include/compression/backends/snappy_backend.cpp
-    include/compression/type_aware/type_aware_compressor.cpp
     include/compression/type_aware/layer_compressor.cpp
     include/compression/type_aware/metadata_compressor.cpp
     include/compression/factory/compression_factory.cpp
@@ -90,6 +88,11 @@ add_executable(chunked_compressor
 add_executable(parameterized_query
     test/test_parameterized_query.cpp
     src/query/query_engine.cpp
+    src/query/exact_match.cpp
+    src/query/range_query.cpp
+    src/query/aggregate.cpp
+    src/query/group.cpp
+    src/query/complex_query.cpp
     src/query/field_analyzer.cpp
     src/query/query_parser.cpp
     src/query/chunk_selector.cpp
@@ -122,95 +125,93 @@ add_executable(parameterized_query
     include/compression/backends/lzma_backend.cpp
     include/compression/backends/lz4_backend.cpp
     include/compression/backends/snappy_backend.cpp
-    include/compression/type_aware/type_aware_compressor.cpp
     include/compression/type_aware/layer_compressor.cpp
     include/compression/type_aware/metadata_compressor.cpp
     include/compression/factory/compression_factory.cpp
 )
 
 # Field queries test executable
-add_executable(query
-    test/test_query_performance.cpp
-    src/query/query_engine.cpp
-    src/query/field_analyzer.cpp
-    src/query/query_parser.cpp
-    src/query/chunk_selector.cpp
-    src/query/selective_decompressor.cpp
-    src/query/trie_traverser.cpp
-    src/query/result_rebuilder.cpp
-    src/query/path_cache.cpp
-    src/field_analyzer.cpp
-    src/field_parser.cpp
-    src/variable_dictionary.cpp
-    src/timestamp_dictionary.cpp
-    src/logtype_dictionary.cpp
-    src/field_dictionary_manager.cpp 
-    src/trie.cpp
-    src/louds.cpp
-    src/loudsTotrie.cpp
-    src/reconstruct.cpp
-    src/compress.cpp
-    src/compress_type_aware.cpp
-    src/chunked_type_aware_compress.cpp
-    vendor/simdjson/simdjson.cpp
-    include/compression/core/compression_utils.cpp
-    include/compression/algorithms/rle_compression.cpp
-    include/compression/algorithms/varint_compression.cpp
-    include/compression/algorithms/delta_compression.cpp
-    include/compression/algorithms/bitpacking_compression.cpp
-    include/compression/algorithms/dictionary_compression.cpp
-    include/compression/backends/zstd_backend.cpp
-    include/compression/backends/brotli_backend.cpp
-    include/compression/backends/lzma_backend.cpp
-    include/compression/backends/lz4_backend.cpp
-    include/compression/backends/snappy_backend.cpp
-    include/compression/type_aware/type_aware_compressor.cpp
-    include/compression/type_aware/layer_compressor.cpp
-    include/compression/type_aware/metadata_compressor.cpp
-    include/compression/factory/compression_factory.cpp
-)
+# add_executable(query
+#     test/test_query_performance.cpp
+#     src/query/query_engine.cpp
+#     src/query/exact_match.cpp
+#     src/query/field_analyzer.cpp
+#     src/query/query_parser.cpp
+#     src/query/chunk_selector.cpp
+#     src/query/selective_decompressor.cpp
+#     src/query/trie_traverser.cpp
+#     src/query/result_rebuilder.cpp
+#     src/query/path_cache.cpp
+#     src/field_analyzer.cpp
+#     src/field_parser.cpp
+#     src/variable_dictionary.cpp
+#     src/timestamp_dictionary.cpp
+#     src/logtype_dictionary.cpp
+#     src/field_dictionary_manager.cpp 
+#     src/trie.cpp
+#     src/louds.cpp
+#     src/loudsTotrie.cpp
+#     src/reconstruct.cpp
+#     src/compress.cpp
+#     src/compress_type_aware.cpp
+#     src/chunked_type_aware_compress.cpp
+#     vendor/simdjson/simdjson.cpp
+#     include/compression/core/compression_utils.cpp
+#     include/compression/algorithms/rle_compression.cpp
+#     include/compression/algorithms/varint_compression.cpp
+#     include/compression/algorithms/delta_compression.cpp
+#     include/compression/algorithms/bitpacking_compression.cpp
+#     include/compression/algorithms/dictionary_compression.cpp
+#     include/compression/backends/zstd_backend.cpp
+#     include/compression/backends/brotli_backend.cpp
+#     include/compression/backends/lzma_backend.cpp
+#     include/compression/backends/lz4_backend.cpp
+#     include/compression/backends/snappy_backend.cpp
+#     include/compression/type_aware/layer_compressor.cpp
+#     include/compression/type_aware/metadata_compressor.cpp
+#     include/compression/factory/compression_factory.cpp
+# )
 
-# Parallel query test executable
-add_executable(parallel_query
-    test/test_parallel_query_engine.cpp
-    src/query/query_engine.cpp
-    src/query/field_analyzer.cpp
-    src/query/query_parser.cpp
-    src/query/chunk_selector.cpp
-    src/query/selective_decompressor.cpp
-    src/query/trie_traverser.cpp
-    src/query/result_rebuilder.cpp
-    src/query/path_cache.cpp
-    src/field_analyzer.cpp
-    src/field_parser.cpp
-    src/variable_dictionary.cpp
-    src/timestamp_dictionary.cpp
-    src/logtype_dictionary.cpp
-    src/field_dictionary_manager.cpp 
-    src/trie.cpp
-    src/louds.cpp
-    src/loudsTotrie.cpp
-    src/reconstruct.cpp
-    src/compress.cpp
-    src/compress_type_aware.cpp
-    src/chunked_type_aware_compress.cpp
-    vendor/simdjson/simdjson.cpp
-    include/compression/core/compression_utils.cpp
-    include/compression/algorithms/rle_compression.cpp
-    include/compression/algorithms/varint_compression.cpp
-    include/compression/algorithms/delta_compression.cpp
-    include/compression/algorithms/bitpacking_compression.cpp
-    include/compression/algorithms/dictionary_compression.cpp
-    include/compression/backends/zstd_backend.cpp
-    include/compression/backends/brotli_backend.cpp
-    include/compression/backends/lzma_backend.cpp
-    include/compression/backends/lz4_backend.cpp
-    include/compression/backends/snappy_backend.cpp
-    include/compression/type_aware/type_aware_compressor.cpp
-    include/compression/type_aware/layer_compressor.cpp
-    include/compression/type_aware/metadata_compressor.cpp
-    include/compression/factory/compression_factory.cpp
-)
+# # Parallel query test executable
+# add_executable(parallel_query
+#     test/test_parallel_query_engine.cpp
+#     src/query/query_engine.cpp
+#     src/query/field_analyzer.cpp
+#     src/query/query_parser.cpp
+#     src/query/chunk_selector.cpp
+#     src/query/selective_decompressor.cpp
+#     src/query/trie_traverser.cpp
+#     src/query/result_rebuilder.cpp
+#     src/query/path_cache.cpp
+#     src/field_analyzer.cpp
+#     src/field_parser.cpp
+#     src/variable_dictionary.cpp
+#     src/timestamp_dictionary.cpp
+#     src/logtype_dictionary.cpp
+#     src/field_dictionary_manager.cpp 
+#     src/trie.cpp
+#     src/louds.cpp
+#     src/loudsTotrie.cpp
+#     src/reconstruct.cpp
+#     src/compress.cpp
+#     src/compress_type_aware.cpp
+#     src/chunked_type_aware_compress.cpp
+#     vendor/simdjson/simdjson.cpp
+#     include/compression/core/compression_utils.cpp
+#     include/compression/algorithms/rle_compression.cpp
+#     include/compression/algorithms/varint_compression.cpp
+#     include/compression/algorithms/delta_compression.cpp
+#     include/compression/algorithms/bitpacking_compression.cpp
+#     include/compression/algorithms/dictionary_compression.cpp
+#     include/compression/backends/zstd_backend.cpp
+#     include/compression/backends/brotli_backend.cpp
+#     include/compression/backends/lzma_backend.cpp
+#     include/compression/backends/lz4_backend.cpp
+#     include/compression/backends/snappy_backend.cpp
+#     include/compression/type_aware/layer_compressor.cpp
+#     include/compression/type_aware/metadata_compressor.cpp
+#     include/compression/factory/compression_factory.cpp
+# )
 
 # Raw JSON baseline query test executable
 add_executable(baseline_query
@@ -219,15 +220,15 @@ add_executable(baseline_query
 )
 
 # Field type statistics test executable
-add_executable(field_type_statistics
-    test/test_field_type_statistics.cpp
-    src/field_parser.cpp
-    src/field_dictionary_manager.cpp
-    src/variable_dictionary.cpp
-    src/timestamp_dictionary.cpp
-    src/logtype_dictionary.cpp
-    vendor/simdjson/simdjson.cpp
-)
+# add_executable(field_type_statistics
+#     test/test_field_type_statistics.cpp
+#     src/field_parser.cpp
+#     src/field_dictionary_manager.cpp
+#     src/variable_dictionary.cpp
+#     src/timestamp_dictionary.cpp
+#     src/logtype_dictionary.cpp
+#     vendor/simdjson/simdjson.cpp
+# )
 
 # 链接库
 target_link_libraries(json2
@@ -245,17 +246,17 @@ target_link_libraries(parameterized_query
         ${ZSTD_LIBRARIES}
         sdsl
 )
-target_link_libraries(query
-    PRIVATE
-        ${ZSTD_LIBRARIES}
-        sdsl
-)
+# target_link_libraries(query
+#     PRIVATE
+#         ${ZSTD_LIBRARIES}
+#         sdsl
+# )
 
-target_link_libraries(parallel_query
-    PRIVATE
-        ${ZSTD_LIBRARIES}
-        sdsl
-)
+# target_link_libraries(parallel_query
+#     PRIVATE
+#         ${ZSTD_LIBRARIES}
+#         sdsl
+# )
 
 # Link libraries for baseline query
 target_link_libraries(baseline_query
@@ -265,17 +266,65 @@ target_link_libraries(baseline_query
 )
 
 # Link libraries for field type statistics
-target_link_libraries(field_type_statistics
-    PRIVATE
-        ${ZSTD_LIBRARIES}
-        sdsl
-)
+# target_link_libraries(field_type_statistics
+#     PRIVATE
+#         ${ZSTD_LIBRARIES}
+#         sdsl
+# )
+
+# Query engine validation test executable
+# add_executable(query_engine_validation
+#     test/test_query_engine_validation.cpp
+#     src/query/query_engine.cpp
+#     src/query/field_analyzer.cpp
+#     src/query/query_parser.cpp
+#     src/query/chunk_selector.cpp
+#     src/query/selective_decompressor.cpp
+#     src/query/trie_traverser.cpp
+#     src/query/result_rebuilder.cpp
+#     src/query/path_cache.cpp
+#     src/field_analyzer.cpp
+#     src/field_parser.cpp
+#     src/variable_dictionary.cpp
+#     src/timestamp_dictionary.cpp
+#     src/logtype_dictionary.cpp
+#     src/field_dictionary_manager.cpp 
+#     src/trie.cpp
+#     src/louds.cpp
+#     src/loudsTotrie.cpp
+#     src/reconstruct.cpp
+#     src/compress.cpp
+#     src/compress_type_aware.cpp
+#     src/chunked_type_aware_compress.cpp
+#     vendor/simdjson/simdjson.cpp
+#     include/compression/core/compression_utils.cpp
+#     include/compression/algorithms/rle_compression.cpp
+#     include/compression/algorithms/varint_compression.cpp
+#     include/compression/algorithms/delta_compression.cpp
+#     include/compression/algorithms/bitpacking_compression.cpp
+#     include/compression/algorithms/dictionary_compression.cpp
+#     include/compression/backends/zstd_backend.cpp
+#     include/compression/backends/brotli_backend.cpp
+#     include/compression/backends/lzma_backend.cpp
+#     include/compression/backends/lz4_backend.cpp
+#     include/compression/backends/snappy_backend.cpp
+#     include/compression/type_aware/layer_compressor.cpp
+#     include/compression/type_aware/metadata_compressor.cpp
+#     include/compression/factory/compression_factory.cpp
+# )
+
+# target_link_libraries(query_engine_validation
+#     PRIVATE
+#         ${ZSTD_LIBRARIES}
+#         sdsl
+# )
 
 target_include_directories(json2 PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
 target_include_directories(chunked_compressor PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
 target_include_directories(parameterized_query PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
-target_include_directories(query PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
-target_include_directories(parallel_query PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
+# target_include_directories(query PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
+# target_include_directories(parallel_query PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
+# target_include_directories(query_engine_validation PRIVATE ${LZ4_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS})
 
 # Include directories
 target_include_directories(json2 PRIVATE 
@@ -293,11 +342,17 @@ target_include_directories(parameterized_query PRIVATE
     vendor/nlohmann
     vendor/simdjson
 )
-target_include_directories(query PRIVATE 
-    include
-    vendor/nlohmann
-    vendor/simdjson
-)
+# target_include_directories(query PRIVATE 
+#     include
+#     vendor/nlohmann
+#     vendor/simdjson
+# )
+
+# target_include_directories(query_engine_validation PRIVATE 
+#     include
+#     vendor/nlohmann
+#     vendor/simdjson
+# )
 
 target_include_directories(json2 PUBLIC
     "${PROJECT_BINARY_DIR}"
@@ -314,22 +369,22 @@ target_include_directories(parameterized_query PUBLIC
     "${PROJECT_SOURCE_DIR}/include"
     "${PROJECT_SOURCE_DIR}/vendor"
 )
-target_include_directories(query PUBLIC
-    "${PROJECT_BINARY_DIR}"
-    "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/vendor"
-)
-target_include_directories(parallel_query PRIVATE 
-    include
-    vendor/nlohmann
-    vendor/simdjson
-)
+# target_include_directories(query PUBLIC
+#     "${PROJECT_BINARY_DIR}"
+#     "${PROJECT_SOURCE_DIR}/include"
+#     "${PROJECT_SOURCE_DIR}/vendor"
+# )
+# target_include_directories(parallel_query PRIVATE 
+#     include
+#     vendor/nlohmann
+#     vendor/simdjson
+# )
 
-target_include_directories(parallel_query PUBLIC
-    "${PROJECT_BINARY_DIR}"
-    "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/vendor"
-)
+# target_include_directories(parallel_query PUBLIC
+#     "${PROJECT_BINARY_DIR}"
+#     "${PROJECT_SOURCE_DIR}/include"
+#     "${PROJECT_SOURCE_DIR}/vendor"
+# )
 
 # Include directories for baseline query
 target_include_directories(baseline_query PRIVATE 
@@ -345,14 +400,20 @@ target_include_directories(baseline_query PUBLIC
 )
 
 # Include directories for field type statistics
-target_include_directories(field_type_statistics PRIVATE 
-    include
-    vendor/nlohmann
-    vendor/simdjson
-)
+# target_include_directories(field_type_statistics PRIVATE 
+#     include
+#     vendor/nlohmann
+#     vendor/simdjson
+# )
 
-target_include_directories(field_type_statistics PUBLIC
-    "${PROJECT_BINARY_DIR}"
-    "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/vendor"
-)
+# target_include_directories(field_type_statistics PUBLIC
+#     "${PROJECT_BINARY_DIR}"
+#     "${PROJECT_SOURCE_DIR}/include"
+#     "${PROJECT_SOURCE_DIR}/vendor"
+# )
+
+# target_include_directories(query_engine_validation PUBLIC
+#     "${PROJECT_BINARY_DIR}"
+#     "${PROJECT_SOURCE_DIR}/include"
+#     "${PROJECT_SOURCE_DIR}/vendor"
+# )

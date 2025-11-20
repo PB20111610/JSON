@@ -4,7 +4,6 @@
 #include "../include/timestamp_dictionary.h"
 #include "../include/logtype_dictionary.h"
 #include "../test/test_config_utils.h"
-#include "../include/compression/type_aware/type_aware_compressor.h"
 #include <iostream>
 #include <optional>
 #include <variant>
@@ -15,6 +14,7 @@
 #include <ctime>
 #include <iomanip>
 #include <sstream>
+#include <filesystem>
 
 #ifdef _MSC_VER
 #include <time.h>
@@ -28,6 +28,14 @@ namespace query {
 
 // Define the static compression configuration - reference the same config as the test
 const compression::TypeAwareCompressionConfig QueryEngine::DEFAULT_COMPRESSION_CONFIG = json2::getTestConfig().type_aware_config;
+
+// Constructor
+QueryEngine::QueryEngine(const QueryConfig& config) : config_(config) {}
+
+// Set the data directory for granular data extraction
+void QueryEngine::setDataDirectory(const std::string& data_dir) {
+    data_dir_ = data_dir;
+}
 
 // Helper function to decompress data with config
 std::vector<uint8_t> decompressWithConfigWrapper(const std::vector<uint8_t>& compressed_data, 
@@ -155,38 +163,49 @@ std::optional<NodeValue> QueryEngine::encodeTargetValueWithDictionary(
 json2::query::FieldFilterResult QueryEngine::checkFieldExistenceAndType(
     const std::string& field_name,
     FieldType expected_type,
-    const GranularCompressedData& granular_data) {
+    const GranularCompressedData& granular_data,
+    const std::vector<FieldKey>* field_order) {
     
     FieldFilterResult result;
     result.exists = false;
     result.type_matches = false;
     result.actual_type = FieldType::STRING; // Default value
+    result.field_index = -1; // Initialize field index
     
     try {
-        // Step 1: Only decompress metadata to check field existence and type
-        if (granular_data.metadata.empty()) {
-            result.error_message = "Metadata is empty";
-            return result;
+        std::vector<FieldKey> local_field_order;
+        
+        // Use provided field_order or decompress metadata
+        if (field_order != nullptr) {
+            local_field_order = *field_order;
+        } else {
+            // Step 1: Only decompress metadata to check field existence and type
+            if (granular_data.metadata.empty()) {
+                result.error_message = "Metadata is empty";
+                return result;
+            }
+            
+            // Decompress metadata using the proper type-aware decompression function
+            std::vector<uint8_t> metadata_raw = decompressWithConfigWrapper(granular_data.metadata, 
+                                                                          compression::FieldType::STRING, 
+                                                                          DEFAULT_COMPRESSION_CONFIG);
+            
+            if (metadata_raw.empty()) {
+                result.error_message = "Failed to decompress metadata";
+                return result;
+            }
+            
+            local_field_order = Compressor::deserializeMetadata(metadata_raw);
         }
-        
-        // Decompress metadata using the proper type-aware decompression function
-        std::vector<uint8_t> metadata_raw = decompressWithConfigWrapper(granular_data.metadata, 
-                                                                      compression::FieldType::STRING, 
-                                                                      DEFAULT_COMPRESSION_CONFIG);
-        
-        if (metadata_raw.empty()) {
-            result.error_message = "Failed to decompress metadata";
-            return result;
-        }
-        
-        std::vector<FieldKey> field_order = Compressor::deserializeMetadata(metadata_raw);
         
         // Step 2: Check if field exists and matches type
-        for (const auto& field_key : field_order) {
-            if (field_key.name == field_name) {
+        for (size_t i = 0; i < local_field_order.size(); ++i) {
+            if (local_field_order[i].name == field_name) {
                 result.exists = true;
-                result.actual_type = field_key.type;
-                result.type_matches = (field_key.type == expected_type);
+                result.actual_type = local_field_order[i].type;
+                result.type_matches = (local_field_order[i].type == expected_type);
+                result.field_index = static_cast<int>(i); // Set field index
+                result.field_key = local_field_order[i];  // Set field key
                 break;
             }
         }
@@ -198,6 +217,7 @@ json2::query::FieldFilterResult QueryEngine::checkFieldExistenceAndType(
         
     } catch (const std::exception& e) {
         result.error_message = "Error checking field existence: " + std::string(e.what());
+        return result;
     }
     
     return result;
@@ -209,21 +229,17 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
     FieldType field_type,
     const std::string& target_value,
     const std::string& comparison_op,
-    const GranularCompressedData& granular_data) {
+    const GranularCompressedData& granular_data,
+    const FieldDictionaryManager* dict_manager) {
     
     ValueFilterResult result;
     result.match_found = false;
     result.count = 0;
     
     try {
-        // Debug output for function entry
-        std::cout << "DEBUG: filterLayerValues called for field '" << field_name 
-                  << "' with type " << static_cast<int>(field_type) << std::endl;
-        
         // Get the field index from metadata
         if (granular_data.metadata.empty()) {
             result.error_message = "Metadata is empty";
-            std::cout << "DEBUG: Metadata is empty" << std::endl;
             return result;
         }
         
@@ -234,7 +250,6 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
         
         if (metadata_raw.empty()) {
             result.error_message = "Failed to decompress metadata";
-            std::cout << "DEBUG: Failed to decompress metadata" << std::endl;
             return result;
         }
         
@@ -251,12 +266,8 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
         
         if (field_index == -1) {
             result.error_message = "Field not found in metadata: " + field_name;
-            std::cout << "DEBUG: Field not found in metadata: " << field_name << std::endl;
             return result;
         }
-        
-        std::cout << "DEBUG: Field '" << field_name << "' found at index " << field_index 
-                  << " with type " << static_cast<int>(field_order[field_index].type) << std::endl;
         
         // Map field type to compression type
         compression::FieldType compression_field_type;
@@ -281,11 +292,8 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                 break;
             default:
                 result.error_message = "Unsupported field type for layer filtering";
-                std::cout << "DEBUG: Unsupported field type: " << static_cast<int>(field_type) << std::endl;
                 return result;
         }
-        
-        std::cout << "DEBUG: Mapped to compression field type " << static_cast<int>(compression_field_type) << std::endl;
         
         // Get the compressed layer data based on storage method
         std::vector<uint8_t> compressed_layer;
@@ -295,7 +303,6 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                 result.error_message = "Layer data not available for field: " + field_name + 
                                      " (field_index: " + std::to_string(field_index) + 
                                      ", available layers: " + std::to_string(granular_data.layer_data_by_level.size()) + ")";
-                std::cout << "DEBUG: Layer data not available for field: " << field_name << std::endl;
                 return result;
             }
             compressed_layer = granular_data.layer_data_by_level[field_index];
@@ -303,7 +310,6 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
             // Layers are stored combined in layer_data_combined
             if (granular_data.layer_data_combined.empty()) {
                 result.error_message = "Combined layer data is empty for field: " + field_name;
-                std::cout << "DEBUG: Combined layer data is empty for field: " << field_name << std::endl;
                 return result;
             }
             
@@ -319,7 +325,6 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                 
                 if (static_cast<size_t>(field_index) >= layer_count) {
                     result.error_message = "Layer index out of range in combined data: " + field_name;
-                    std::cout << "DEBUG: Layer index out of range in combined data: " << field_name << std::endl;
                     return result;
                 }
                 
@@ -328,7 +333,6 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                 if (!layer_stream.read(reinterpret_cast<char*>(layer_sizes.data()), 
                                       layer_count * sizeof(uint32_t))) {
                     result.error_message = "Failed to read layer sizes from combined data";
-                    std::cout << "DEBUG: Failed to read layer sizes from combined data" << std::endl;
                     return result;
                 }
                 
@@ -341,7 +345,6 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                 // Read the target layer data
                 if (offset + layer_sizes[field_index] > granular_data.layer_data_combined.size()) {
                     result.error_message = "Layer data size mismatch in combined data";
-                    std::cout << "DEBUG: Layer data size mismatch in combined data" << std::endl;
                     return result;
                 }
                 
@@ -350,18 +353,14 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                     granular_data.layer_data_combined.begin() + offset + layer_sizes[field_index]);
             } catch (const std::exception& e) {
                 result.error_message = "Failed to extract layer from combined data: " + std::string(e.what());
-                std::cout << "DEBUG: Failed to extract layer from combined data: " << e.what() << std::endl;
                 return result;
             }
         }
         
         if (compressed_layer.empty()) {
             result.error_message = "Compressed layer data is empty for field: " + field_name;
-            std::cout << "DEBUG: Compressed layer data is empty for field: " << field_name << std::endl;
             return result;
         }
-        
-        std::cout << "DEBUG: Successfully extracted compressed layer data, size: " << compressed_layer.size() << std::endl;
         
         // Create selective decompressor
         SelectiveDecompressor decompressor;
@@ -381,40 +380,21 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
             }
         }
         
-        std::cout << "DEBUG: Layer size determined as: " << layer_size << std::endl;
-        
         // Perform accurate filtering by iterating through layer values
         size_t match_count = 0;
         std::vector<std::string> matched_records;
         std::vector<size_t> matched_indices; // Store matched indices
         
         // For dictionary-encoded fields, encode the target value once before the loop
-        std::optional<NodeValue> encoded_target = encodeTargetValueWithDictionary(target_value, field_type, granular_data);
-        
-        if (field_type == FieldType::TIMESTAMP || field_type == FieldType::LOGTYPE) {
-            if (encoded_target.has_value()) {
-                std::cout << "DEBUG: Successfully encoded target value for field type " << static_cast<int>(field_type) << std::endl;
-                // Additional debug output for TIMESTAMP to show encoding type
-                if (field_type == FieldType::TIMESTAMP) {
-                    if (std::holds_alternative<TemplateEncodedTimestamp>(*encoded_target)) {
-                        std::cout << "DEBUG: TIMESTAMP encoded as TemplateEncodedTimestamp (template format)" << std::endl;
-                    }
-                }
-                // Additional debug output for LOGTYPE to show encoding type
-                if (field_type == FieldType::LOGTYPE) {
-                    if (std::holds_alternative<EncodedLog>(*encoded_target)) {
-                        std::cout << "DEBUG: LOGTYPE encoded as EncodedLog (template format)" << std::endl;
-                    }
-                }
-            } else {
-                std::cout << "DEBUG: Failed to encode target value for field type " << static_cast<int>(field_type) << std::endl;
-            }
+        std::optional<NodeValue> encoded_target;
+        if (dict_manager != nullptr) {
+            encoded_target = encodeTargetValueWithDictionary(target_value, field_type, *dict_manager);
+        } else {
+            encoded_target = encodeTargetValueWithDictionary(target_value, field_type, granular_data);
         }
-        
+
         // Use the actual layer size if available, otherwise use a reasonable default
-        size_t max_values_to_check = layer_size > 0 ? layer_size : 100000; // Increased limit for better accuracy
-        
-        std::cout << "DEBUG: Starting iteration through layer values, max_values_to_check: " << max_values_to_check << std::endl;
+        size_t max_values_to_check = layer_size > 0 ? layer_size : 100000; // Increased limit for better accuracy;
         
         // For all types, we'll iterate with bounds checking
         for (size_t i = 0; i < max_values_to_check; ++i) {
@@ -427,53 +407,8 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                 current_value = decompressor.decompressLayerValueAt(
                     compressed_layer, i, compression_field_type, DEFAULT_COMPRESSION_CONFIG, layer_size);
                 
-                // Debug output for timestamp and logtype fields
+                // Process timestamp and logtype fields
                 if (field_type == FieldType::TIMESTAMP || field_type == FieldType::LOGTYPE) {
-                    std::cout << "DEBUG: Field '" << field_name << "' at index " << i << " - ";
-                    if (field_type == FieldType::TIMESTAMP && std::holds_alternative<TemplateEncodedTimestamp>(current_value)) {
-                        const auto& ts_value = std::get<TemplateEncodedTimestamp>(current_value);
-                        std::cout << "Timestamp value: template_id=" << ts_value.template_id;
-                        std::cout << ", var_codes=[";
-                        for (size_t j = 0; j < ts_value.var_codes.size(); ++j) {
-                            if (j > 0) std::cout << ",";
-                            std::cout << ts_value.var_codes[j];
-                        }
-                        std::cout << "]" << std::endl;
-                    } else if (field_type == FieldType::LOGTYPE && std::holds_alternative<EncodedLog>(current_value)) {
-                        const auto& log_value = std::get<EncodedLog>(current_value);
-                        std::cout << "LogType value: template_id=" << log_value.template_id;
-                        std::cout << ", var_codes=[";
-                        for (size_t j = 0; j < log_value.var_codes.size(); ++j) {
-                            if (j > 0) std::cout << ",";
-                            std::cout << log_value.var_codes[j];
-                        }
-                        std::cout << "]" << std::endl;
-                    } else {
-                        std::cout << "Unknown value type or variant mismatch" << std::endl;
-                    }
-                    
-                    // If we have an encoded target, also show its value
-                    if (encoded_target.has_value()) {
-                        if (field_type == FieldType::TIMESTAMP && std::holds_alternative<TemplateEncodedTimestamp>(*encoded_target)) {
-                            const auto& ts_value = std::get<TemplateEncodedTimestamp>(*encoded_target);
-                            std::cout << "DEBUG: Target Timestamp value: template_id=" << ts_value.template_id;
-                            std::cout << ", var_codes=[";
-                            for (size_t j = 0; j < ts_value.var_codes.size(); ++j) {
-                                if (j > 0) std::cout << ",";
-                                std::cout << ts_value.var_codes[j];
-                            }
-                            std::cout << "]" << std::endl;
-                        } else if (field_type == FieldType::LOGTYPE && std::holds_alternative<EncodedLog>(*encoded_target)) {
-                            const auto& log_value = std::get<EncodedLog>(*encoded_target);
-                            std::cout << "DEBUG: Target LogType value: template_id=" << log_value.template_id;
-                            std::cout << ", var_codes=[";
-                            for (size_t j = 0; j < log_value.var_codes.size(); ++j) {
-                                if (j > 0) std::cout << ",";
-                                std::cout << log_value.var_codes[j];
-                            }
-                            std::cout << "]" << std::endl;
-                        }
-                    }
                 }
                 
                 // Compare with target value based on comparison operator
@@ -567,8 +502,6 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                             // Direct comparison of TemplateEncodedTimestamp structures
                             is_match = (std::get<TemplateEncodedTimestamp>(current_value) == std::get<TemplateEncodedTimestamp>(*encoded_target));
                             
-                            std::cout << "DEBUG: Detailed TIMESTAMP comparison at index " << i << std::endl;
-                            std::cout << "DEBUG: Comparison result: " << (is_match ? "MATCH" : "NO MATCH") << std::endl;
                         }
                         break;
                     }
@@ -578,8 +511,6 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                             // Direct comparison of EncodedLog structures
                             is_match = (std::get<EncodedLog>(current_value) == std::get<EncodedLog>(*encoded_target));
                             
-                            std::cout << "DEBUG: Detailed LOGTYPE comparison at index " << i << std::endl;
-                            std::cout << "DEBUG: Comparison result: " << (is_match ? "MATCH" : "NO MATCH") << std::endl;
                         }
                         break;
                     }
@@ -596,17 +527,13 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
                 
             } catch (const std::out_of_range& e) {
                 // Reached end of layer data
-                std::cout << "DEBUG: Reached end of layer data at index " << i << std::endl;
                 break;
             } catch (const std::exception& e) {
                 // Continue with next index in case of other errors
-                std::cout << "DEBUG: Exception at index " << i << ": " << e.what() << std::endl;
                 continue;
             }
         }
          
-        std::cout << "DEBUG: Finished iteration, match_count: " << match_count << std::endl;
-        
         result.match_found = (match_count > 0);
         result.count = match_count;
         result.matched_records = matched_records;
@@ -614,7 +541,263 @@ json2::query::ValueFilterResult QueryEngine::filterLayerValues(
         
     } catch (const std::exception& e) {
         result.error_message = "Error filtering layer values: " + std::string(e.what());
-        std::cout << "DEBUG: Exception in filterLayerValues: " << e.what() << std::endl;
+    }
+    
+    return result;
+}
+
+// Implementation of filterLayerValuesInRange for efficient range queries
+json2::query::ValueFilterResult QueryEngine::filterLayerValuesInRange(
+    const std::string& field_name,
+    FieldType field_type,
+    const std::string& min_value,
+    const std::string& max_value,
+    const GranularCompressedData& granular_data,
+    const FieldDictionaryManager* dict_manager) {
+    
+    ValueFilterResult result;
+    result.match_found = false;
+    result.count = 0;
+    
+    // Only support numeric types for range filtering
+    if (field_type != FieldType::INT64 && field_type != FieldType::DOUBLE && field_type != FieldType::BOOL) {
+        result.error_message = "Range filtering only supported for numeric types (INT64, DOUBLE, BOOL)";
+        return result;
+    }
+    
+    try {
+        // Get the field index from metadata
+        if (granular_data.metadata.empty()) {
+            result.error_message = "Metadata is empty";
+            return result;
+        }
+        
+        // Decompress metadata using the proper type-aware decompression function
+        std::vector<uint8_t> metadata_raw = decompressWithConfigWrapper(granular_data.metadata, 
+                                                                      compression::FieldType::STRING, 
+                                                                      DEFAULT_COMPRESSION_CONFIG);
+        
+        if (metadata_raw.empty()) {
+            result.error_message = "Failed to decompress metadata";
+            return result;
+        }
+        
+        std::vector<FieldKey> field_order = Compressor::deserializeMetadata(metadata_raw);
+        
+        // Get the field index
+        int field_index = -1;
+        for (size_t i = 0; i < field_order.size(); ++i) {
+            if (field_order[i].name == field_name) {
+                field_index = static_cast<int>(i);
+                break;
+            }
+        }
+        
+        if (field_index == -1) {
+            result.error_message = "Field not found in metadata: " + field_name;
+            return result;
+        }
+        
+        // Map field type to compression type
+        compression::FieldType compression_field_type;
+        switch (field_type) {
+            case FieldType::INT64:
+                compression_field_type = compression::FieldType::INT64;
+                break;
+            case FieldType::DOUBLE:
+                compression_field_type = compression::FieldType::DOUBLE;
+                break;
+            case FieldType::BOOL:
+                compression_field_type = compression::FieldType::BOOL;
+                break;
+            default:
+                result.error_message = "Unsupported field type for layer filtering";
+                return result;
+        }
+        
+        // Get the compressed layer data based on storage method
+        std::vector<uint8_t> compressed_layer;
+        if (granular_data.use_layer_separation) {
+            // Layers are stored separately in layer_data_by_level
+            if (static_cast<size_t>(field_index) >= granular_data.layer_data_by_level.size()) {
+                result.error_message = "Layer data not available for field: " + field_name + 
+                                     " (field_index: " + std::to_string(field_index) + 
+                                     ", available layers: " + std::to_string(granular_data.layer_data_by_level.size()) + ")";
+                return result;
+            }
+            compressed_layer = granular_data.layer_data_by_level[field_index];
+        } else {
+            // Layers are stored combined in layer_data_combined
+            if (granular_data.layer_data_combined.empty()) {
+                result.error_message = "Combined layer data is empty for field: " + field_name;
+                return result;
+            }
+            
+            // For combined storage, we need to extract the specific layer
+            // This requires parsing the combined data structure
+            try {
+                std::istringstream layer_stream(std::string(granular_data.layer_data_combined.begin(), 
+                                                           granular_data.layer_data_combined.end()));
+                
+                // Read layer count
+                uint32_t layer_count;
+                layer_stream.read(reinterpret_cast<char*>(&layer_count), sizeof(layer_count));
+                
+                if (static_cast<size_t>(field_index) >= layer_count) {
+                    result.error_message = "Layer index out of range in combined data: " + field_name;
+                    return result;
+                }
+                
+                // Read layer sizes
+                std::vector<uint32_t> layer_sizes(layer_count);
+                if (!layer_stream.read(reinterpret_cast<char*>(layer_sizes.data()), 
+                                      layer_count * sizeof(uint32_t))) {
+                    result.error_message = "Failed to read layer sizes from combined data";
+                    return result;
+                }
+                
+                // Skip to the target layer
+                size_t offset = sizeof(layer_count) + layer_count * sizeof(uint32_t);
+                for (int i = 0; i < field_index; ++i) {
+                    offset += layer_sizes[i];
+                }
+                
+                // Read the target layer data
+                if (offset + layer_sizes[field_index] > granular_data.layer_data_combined.size()) {
+                    result.error_message = "Layer data size mismatch in combined data";
+                    return result;
+                }
+                
+                compressed_layer = std::vector<uint8_t>(
+                    granular_data.layer_data_combined.begin() + offset,
+                    granular_data.layer_data_combined.begin() + offset + layer_sizes[field_index]);
+            } catch (const std::exception& e) {
+                result.error_message = "Failed to extract layer from combined data: " + std::string(e.what());
+                return result;
+            }
+        }
+        
+        if (compressed_layer.empty()) {
+            result.error_message = "Compressed layer data is empty for field: " + field_name;
+            return result;
+        }
+        
+        // Create selective decompressor
+        SelectiveDecompressor decompressor;
+        
+        // Determine layer size for decompression
+        size_t layer_size = 0;
+        if (!granular_data.layer_sizes.empty()) {
+            try {
+                std::vector<uint8_t> layer_sizes_raw = decompressWithConfigWrapper(
+                    granular_data.layer_sizes, compression::FieldType::STRING, DEFAULT_COMPRESSION_CONFIG);
+                if (layer_sizes_raw.size() >= sizeof(uint32_t) * (field_index + 1)) {
+                    const uint32_t* layer_sizes_data = reinterpret_cast<const uint32_t*>(layer_sizes_raw.data());
+                    layer_size = layer_sizes_data[field_index];
+                }
+            } catch (...) {
+                // If we can't get layer size, we'll estimate it during decompression
+            }
+        }
+        
+        // Perform accurate filtering by iterating through layer values in a single pass
+        size_t match_count = 0;
+        std::vector<std::string> matched_records;
+        std::vector<size_t> matched_indices; // Store matched indices
+        
+        // Parse target values based on field type
+        NodeValue min_node_value;
+        NodeValue max_node_value;
+        try {
+            switch (field_type) {
+                case FieldType::INT64: {
+                    int64_t min_val = std::stoll(min_value);
+                    int64_t max_val = std::stoll(max_value);
+                    min_node_value = min_val;
+                    max_node_value = max_val;
+                    break;
+                }
+                case FieldType::DOUBLE: {
+                    double min_val = std::stod(min_value);
+                    double max_val = std::stod(max_value);
+                    min_node_value = min_val;
+                    max_node_value = max_val;
+                    break;
+                }
+                case FieldType::BOOL: {
+                    bool min_val = (min_value == "true");
+                    bool max_val = (max_value == "true");
+                    min_node_value = min_val;
+                    max_node_value = max_val;
+                    break;
+                }
+                default:
+                    result.error_message = "Unsupported field type for value parsing";
+                    return result;
+            }
+        } catch (const std::exception& e) {
+            result.error_message = "Failed to parse target values: " + std::string(e.what());
+            return result;
+        }
+
+        // Use the actual layer size if available, otherwise use a reasonable default
+        size_t max_values_to_check = layer_size > 0 ? layer_size : 100000; // Increased limit for better accuracy;
+        
+        // For all types, we'll iterate with bounds checking
+        for (size_t i = 0; i < max_values_to_check; ++i) {
+            try {
+                // Try to get the value at index i
+                NodeValue current_value;
+                
+                // Use direct random access for all field types
+                current_value = decompressor.decompressLayerValueAt(
+                    compressed_layer, i, compression_field_type, DEFAULT_COMPRESSION_CONFIG, layer_size);
+                
+                // Compare with target value based on comparison operator
+                bool is_match = false;
+                
+                // Perform range comparison based on the actual types
+                if (std::holds_alternative<int64_t>(current_value) && std::holds_alternative<int64_t>(min_node_value) && std::holds_alternative<int64_t>(max_node_value)) {
+                    int64_t current_val = std::get<int64_t>(current_value);
+                    int64_t min_val = std::get<int64_t>(min_node_value);
+                    int64_t max_val = std::get<int64_t>(max_node_value);
+                    is_match = (current_val >= min_val && current_val <= max_val);
+                } else if (std::holds_alternative<double>(current_value) && std::holds_alternative<double>(min_node_value) && std::holds_alternative<double>(max_node_value)) {
+                    double current_val = std::get<double>(current_value);
+                    double min_val = std::get<double>(min_node_value);
+                    double max_val = std::get<double>(max_node_value);
+                    is_match = (current_val >= min_val && current_val <= max_val);
+                } else if (std::holds_alternative<bool>(current_value) && std::holds_alternative<bool>(min_node_value) && std::holds_alternative<bool>(max_node_value)) {
+                    int current_val = static_cast<int>(std::get<bool>(current_value));
+                    int min_val = static_cast<int>(std::get<bool>(min_node_value));
+                    int max_val = static_cast<int>(std::get<bool>(max_node_value));
+                    is_match = (current_val >= min_val && current_val <= max_val);
+                }
+                
+                if (is_match) {
+                    match_count++;
+                    matched_indices.push_back(i); // Store the index of the match
+                    // For demonstration, we'll add a record with the index
+                    matched_records.push_back("{\"field\": \"" + field_name + "\", \"index\": " + std::to_string(i) + 
+                                            ", \"min_value\": \"" + min_value + "\", \"max_value\": \"" + max_value + "\"}");
+                }
+                
+            } catch (const std::out_of_range& e) {
+                // Reached end of layer data
+                break;
+            } catch (const std::exception& e) {
+                // Continue with next index in case of other errors
+                continue;
+            }
+        }
+         
+        result.match_found = (match_count > 0);
+        result.count = match_count;
+        result.matched_records = matched_records;
+        result.matched_indices = matched_indices; // Store matched indices directly in result
+        
+    } catch (const std::exception& e) {
+        result.error_message = "Error filtering layer values in range: " + std::string(e.what());
     }
     
     return result;
@@ -647,6 +830,251 @@ json2::query::ValueFilterResult QueryEngine::filterFieldAndValues(
     
     // Then filter values based on field type
     return filterLayerValues(field_name, expected_type, target_value, comparison_op, granular_data);
+}
+
+// Helper functions to merge RecordQueryResult objects from multiple blocks
+void QueryEngine::mergeRecordQueryResults(RecordQueryResult& target, const RecordQueryResult& source) const {
+    // Append records from source to target
+    target.records.insert(target.records.end(), source.records.begin(), source.records.end());
+    
+    // Update counts
+    target.count += source.count;
+    target.chunks_accessed += source.chunks_accessed;
+    
+    // Update decompression ratio (weighted average)
+    if (target.chunks_accessed + source.chunks_accessed > 0) {
+        target.decompression_ratio = (target.decompression_ratio * target.chunks_accessed + 
+                                     source.decompression_ratio * source.chunks_accessed) / 
+                                     (target.chunks_accessed + source.chunks_accessed);
+    }
+    
+    // Update query time
+    target.query_time_ms += source.query_time_ms;
+    
+    // Update completion status - only complete if all sources are complete and we haven't hit limits
+    target.is_complete = target.is_complete && source.is_complete;
+    
+    // Propagate error message if source has one and target doesn't
+    // Only propagate error if no records were found in the source
+    if (!source.error_message.empty() && target.error_message.empty() && source.count == 0) {
+        target.error_message = source.error_message;
+    }
+}
+
+// Helper function to extract granular data from a chunk
+GranularCompressedData QueryEngine::extractGranularDataFromChunk(const ChunkedTypeAwareBlock& chunk, size_t chunk_index) const {
+    GranularCompressedData gdata;
+    
+    // If data directory is not set, return empty data
+    if (data_dir_.empty()) {
+        return gdata;
+    }
+    
+    try {
+        // Construct the block directory path
+        char chunk_dir_buf[256];
+        snprintf(chunk_dir_buf, sizeof(chunk_dir_buf), "%s/chunks/chunk_%06zu", data_dir_.c_str(), chunk_index);
+        std::string block_dir = chunk_dir_buf;
+        
+        if (!std::filesystem::exists(block_dir)) {
+            return gdata;
+        }
+        
+        // 读取块元数据
+        std::ifstream block_metadata(block_dir + "/block_metadata.json2", std::ios::binary);
+        if (block_metadata.is_open()) {
+            size_t original_size;
+            double placeholder_ratio;
+            uint32_t config_compression_level;
+            uint8_t flags;
+            
+            block_metadata.read(reinterpret_cast<char*>(&original_size), sizeof(original_size));
+            block_metadata.read(reinterpret_cast<char*>(&placeholder_ratio), sizeof(placeholder_ratio));
+            block_metadata.read(reinterpret_cast<char*>(&config_compression_level), sizeof(config_compression_level));
+            block_metadata.read(reinterpret_cast<char*>(&flags), sizeof(flags));
+            block_metadata.close();
+            
+            gdata.original_size = original_size;
+            gdata.use_layer_separation = (flags & 2) != 0;
+        }
+        
+        // 读取Trie位图
+        std::ifstream trie_file(block_dir + "/louds.json2", std::ios::binary);
+        if (trie_file.is_open()) {
+            uint32_t trie_size;
+            trie_file.read(reinterpret_cast<char*>(&trie_size), sizeof(trie_size));
+            gdata.trie_bitmap.resize(trie_size);
+            trie_file.read(reinterpret_cast<char*>(gdata.trie_bitmap.data()), trie_size);
+            trie_file.close();
+        }
+        
+        // 读取字典数据
+        std::string dict_dir = block_dir + "/dictionaries";
+        
+        // 字符串字典
+        std::ifstream string_file(dict_dir + "/variables.json2", std::ios::binary);
+        if (string_file.is_open()) {
+            uint32_t string_size;
+            string_file.read(reinterpret_cast<char*>(&string_size), sizeof(string_size));
+            gdata.string_dict.resize(string_size);
+            string_file.read(reinterpret_cast<char*>(gdata.string_dict.data()), string_size);
+            string_file.close();
+        }
+        
+        // 时间戳字典
+        std::ifstream ts_file(dict_dir + "/timestamps.json2", std::ios::binary);
+        if (ts_file.is_open()) {
+            uint32_t ts_size;
+            ts_file.read(reinterpret_cast<char*>(&ts_size), sizeof(ts_size));
+            gdata.timestamp_dict.resize(ts_size);
+            ts_file.read(reinterpret_cast<char*>(gdata.timestamp_dict.data()), ts_size);
+            ts_file.close();
+        }
+        
+        // LogType字典
+        std::ifstream log_file(dict_dir + "/logtypes.json2", std::ios::binary);
+        if (log_file.is_open()) {
+            uint32_t log_size;
+            log_file.read(reinterpret_cast<char*>(&log_size), sizeof(log_size));
+            gdata.logtype_dict.resize(log_size);
+            log_file.read(reinterpret_cast<char*>(gdata.logtype_dict.data()), log_size);
+            log_file.close();
+        }
+        
+        // 细粒度压缩的元数据文件
+        std::ifstream granular_metadata_file(block_dir + "/metadata.json2", std::ios::binary);
+        if (granular_metadata_file.is_open()) {
+            uint32_t metadata_size;
+            granular_metadata_file.read(reinterpret_cast<char*>(&metadata_size), sizeof(metadata_size));
+            gdata.metadata.resize(metadata_size);
+            granular_metadata_file.read(reinterpret_cast<char*>(gdata.metadata.data()), metadata_size);
+            granular_metadata_file.close();
+        }
+        
+        // 读取层大小信息（如果存在）
+        std::ifstream layer_sizes_file(block_dir + "/layer_sizes.json2", std::ios::binary);
+        if (layer_sizes_file.is_open()) {
+            uint32_t layer_sizes_size;
+            layer_sizes_file.read(reinterpret_cast<char*>(&layer_sizes_size), sizeof(layer_sizes_size));
+            gdata.layer_sizes.resize(layer_sizes_size);
+            layer_sizes_file.read(reinterpret_cast<char*>(gdata.layer_sizes.data()), layer_sizes_size);
+            layer_sizes_file.close();
+        }
+        
+        // 读取层数据
+        if (gdata.use_layer_separation) {
+            // 按层分别读取
+            size_t layer_idx = 0;
+            while (true) {
+                char layer_file_buf[256];
+                snprintf(layer_file_buf, sizeof(layer_file_buf), "%s/layer_%zu.json2", block_dir.c_str(), layer_idx);
+                std::ifstream layer_stream(layer_file_buf, std::ios::binary);
+                if (!layer_stream.is_open()) {
+                    break;
+                }
+                uint32_t layer_size;
+                if (!layer_stream.read(reinterpret_cast<char*>(&layer_size), sizeof(layer_size))) {
+                    break;
+                }
+                std::vector<uint8_t> layer_data(layer_size);
+                if (!layer_stream.read(reinterpret_cast<char*>(layer_data.data()), layer_size)) {
+                    break;
+                }
+                gdata.layer_data_by_level.push_back(std::move(layer_data));
+                layer_stream.close();
+                layer_idx++;
+            }
+        } else {
+            // 整体读取
+            std::ifstream layers_file(block_dir + "/layers.json2", std::ios::binary);
+            if (layers_file.is_open()) {
+                uint32_t layers_size;
+                layers_file.read(reinterpret_cast<char*>(&layers_size), sizeof(layers_size));
+                gdata.layer_data_combined.resize(layers_size);
+                layers_file.read(reinterpret_cast<char*>(gdata.layer_data_combined.data()), layers_size);
+                layers_file.close();
+            }
+        }
+        
+        // Calculate compressed size
+        gdata.compressed_size = 0;
+        gdata.compressed_size += gdata.trie_bitmap.size();
+        gdata.compressed_size += gdata.string_dict.size();
+        gdata.compressed_size += gdata.timestamp_dict.size();
+        gdata.compressed_size += gdata.logtype_dict.size();
+        
+        if (gdata.use_layer_separation) {
+            for (const auto& layer_data : gdata.layer_data_by_level) {
+                gdata.compressed_size += layer_data.size();
+            }
+        } else {
+            gdata.compressed_size += gdata.layer_data_combined.size();
+        }
+        
+        gdata.compressed_size += gdata.layer_sizes.size();
+        gdata.compressed_size += gdata.metadata.size();
+        
+    } catch (const std::exception& e) {
+        // If there's an error extracting data, return empty granular data
+        GranularCompressedData empty_data;
+        return empty_data;
+    }
+    
+    return gdata;
+}
+
+// Helper function to convert a path to a JSON string representation
+std::string QueryEngine::pathToJSONString(const std::vector<std::string>& path, 
+                                         const std::vector<FieldKey>& field_order) const {
+    std::string record = "{";
+    bool first_field = true;
+    
+    for (size_t i = 0; i < std::min(path.size(), field_order.size()); ++i) {
+        // Skip fields with "null" values
+        if (path[i] == "null") {
+            continue;
+        }
+        
+        if (!first_field) record += ", ";
+        first_field = false;
+        record += "\"" + field_order[i].name + "\": ";
+        
+        // Add quotes for string types
+        bool needs_quotes = (field_order[i].type == FieldType::STRING || 
+                           field_order[i].type == FieldType::TIMESTAMP || 
+                           field_order[i].type == FieldType::LOGTYPE ||
+                           field_order[i].type == FieldType::ARRAY);
+        if (needs_quotes) {
+            record += "\"" + path[i] + "\"";
+        } else {
+            record += path[i];
+        }
+    }
+    
+    record += "}";
+    return record;
+}
+
+// Helper function to map json2::FieldType to compression::FieldType
+compression::FieldType QueryEngine::mapFieldTypeToCompressionType(FieldType json_field_type) const {
+    switch (json_field_type) {
+        case FieldType::INT64:
+            return compression::FieldType::INT64;
+        case FieldType::DOUBLE:
+            return compression::FieldType::DOUBLE;
+        case FieldType::BOOL:
+            return compression::FieldType::BOOL;
+        case FieldType::STRING:
+            return compression::FieldType::STRING;
+        case FieldType::TIMESTAMP:
+            return compression::FieldType::TIMESTAMP;
+        case FieldType::LOGTYPE:
+            return compression::FieldType::LOGTYPE;
+        case FieldType::ARRAY:
+            return compression::FieldType::ARRAY;
+        default:
+            return compression::FieldType::STRING; // Default fallback
+    }
 }
 
 } // namespace query

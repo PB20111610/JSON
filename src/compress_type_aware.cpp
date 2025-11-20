@@ -5,7 +5,6 @@
 #include "compression/backends/zstd_backend.h"
 #include "compression/algorithms/rle_compression.h"
 #include "compression/core/compression_utils.h"
-#include "compression/type_aware/type_aware_compressor.h"
 #include <sstream>
 #include <iostream>
 #include <fstream>

@@ -478,6 +478,18 @@ TemplateEncodedTimestamp DeltaCompression::deltaVarintDecompressTimestampAt(cons
     }
     
     try {
+        // Read the delta compression header first
+        size_t pos = 0;
+        auto [count, compression_type, base_value] = readDeltaHeader(compressed, pos);
+        
+        // Validate index
+        if (index >= count) {
+            throw std::out_of_range("Delta: Index out of range");
+        }
+        
+        // Extract compressed data portion (skip the header)
+        std::vector<uint8_t> data(compressed.begin() + pos, compressed.end());
+        
         // For TIMESTAMP, the data is serialized as a sequence of uint32_t values:
         // [template_id, var_count, var_code1, var_code2, ..., template_id, var_count, var_code1, ...]
         
@@ -487,10 +499,10 @@ TemplateEncodedTimestamp DeltaCompression::deltaVarintDecompressTimestampAt(cons
         
         while (current_index < index) {
             // Read the template_id at the current position
-            int64_t template_id = deltaVarintDecompressAt(compressed, int64_pos);
+            int64_t template_id = deltaVarintDecompressAt(data, int64_pos);
             
             // Read the var_count at the next position
-            int64_t var_count = deltaVarintDecompressAt(compressed, int64_pos + 1);
+            int64_t var_count = deltaVarintDecompressAt(data, int64_pos + 1);
             
             // Move to the start of the next structure
             int64_pos += 2 + var_count;
@@ -499,16 +511,16 @@ TemplateEncodedTimestamp DeltaCompression::deltaVarintDecompressTimestampAt(cons
         
         // Now we're at the requested index, read the structure
         // Read template_id
-        int64_t template_id = deltaVarintDecompressAt(compressed, int64_pos);
+        int64_t template_id = deltaVarintDecompressAt(data, int64_pos);
         
         // Read var_count
-        int64_t var_count = deltaVarintDecompressAt(compressed, int64_pos + 1);
+        int64_t var_count = deltaVarintDecompressAt(data, int64_pos + 1);
         
         // Read var_codes
         std::vector<uint32_t> var_codes;
         var_codes.reserve(static_cast<size_t>(var_count));
         for (int64_t i = 0; i < var_count; ++i) {
-            int64_t code = deltaVarintDecompressAt(compressed, int64_pos + 2 + i);
+            int64_t code = deltaVarintDecompressAt(data, int64_pos + 2 + i);
             var_codes.push_back(static_cast<uint32_t>(code));
         }
         
@@ -525,6 +537,18 @@ EncodedLog DeltaCompression::deltaVarintDecompressLogtypeAt(const std::vector<ui
     }
     
     try {
+        // Read the delta compression header first
+        size_t pos = 0;
+        auto [count, compression_type, base_value] = readDeltaHeader(compressed, pos);
+        
+        // Validate index
+        if (index >= count) {
+            throw std::out_of_range("Delta: Index out of range");
+        }
+        
+        // Extract compressed data portion (skip the header)
+        std::vector<uint8_t> data(compressed.begin() + pos, compressed.end());
+        
         // For LOGTYPE, the data is serialized as a sequence of uint32_t values:
         // [template_id, var_count, var_code1, var_code2, ..., template_id, var_count, var_code1, ...]
         
@@ -534,10 +558,10 @@ EncodedLog DeltaCompression::deltaVarintDecompressLogtypeAt(const std::vector<ui
         
         while (current_index < index) {
             // Read the template_id at the current position
-            int64_t template_id = deltaVarintDecompressAt(compressed, int64_pos);
+            int64_t template_id = deltaVarintDecompressAt(data, int64_pos);
             
             // Read the var_count at the next position
-            int64_t var_count = deltaVarintDecompressAt(compressed, int64_pos + 1);
+            int64_t var_count = deltaVarintDecompressAt(data, int64_pos + 1);
             
             // Move to the start of the next structure
             int64_pos += 2 + var_count;
@@ -546,16 +570,16 @@ EncodedLog DeltaCompression::deltaVarintDecompressLogtypeAt(const std::vector<ui
         
         // Now we're at the requested index, read the structure
         // Read template_id
-        int64_t template_id = deltaVarintDecompressAt(compressed, int64_pos);
+        int64_t template_id = deltaVarintDecompressAt(data, int64_pos);
         
         // Read var_count
-        int64_t var_count = deltaVarintDecompressAt(compressed, int64_pos + 1);
+        int64_t var_count = deltaVarintDecompressAt(data, int64_pos + 1);
         
         // Read var_codes
         std::vector<uint32_t> var_codes;
         var_codes.reserve(static_cast<size_t>(var_count));
         for (int64_t i = 0; i < var_count; ++i) {
-            int64_t code = deltaVarintDecompressAt(compressed, int64_pos + 2 + i);
+            int64_t code = deltaVarintDecompressAt(data, int64_pos + 2 + i);
             var_codes.push_back(static_cast<uint32_t>(code));
         }
         

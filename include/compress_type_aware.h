@@ -1,6 +1,5 @@
 #pragma once
 
-#include "compression/type_aware/type_aware_compressor.h"
 #include "compression/factory/compression_factory.h"
 #include "compress.h"  // Use existing Compressor for all other operations
 #include <memory>

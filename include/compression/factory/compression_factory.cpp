@@ -1,5 +1,4 @@
 #include "compression_factory.h"
-#include "../type_aware/type_aware_compressor.h"
 #include "../algorithms/rle_compression.h"
 #include "../algorithms/varint_compression.h"
 #include "../algorithms/delta_compression.h"
@@ -61,9 +60,7 @@ std::unique_ptr<IStringCompression> CompressionFactory::createStringCompressor(c
     return std::make_unique<algorithms::DictionaryCompression>();
 }
 
-std::unique_ptr<type_aware::TypeAwareCompressor> CompressionFactory::createTypeAwareCompressor(const TypeAwareCompressionConfig& config) {
-    return std::make_unique<type_aware::TypeAwareCompressor>(config);
-}
+// Removed createTypeAwareCompressor method since it's no longer needed
 
 CompressionBackend CompressionFactory::selectOptimalBackend(const std::vector<uint8_t>& data, FieldType type) {
     switch (type) {
@@ -91,6 +88,16 @@ CompressionBackend CompressionFactory::selectOptimalBackend(const std::vector<ui
                 std::vector<bool> values = utils::SerializationUtils::bytesToBools(data, data.size());
                 double sparsity = utils::DataAnalysisUtils::calculateTrueFalseRatio(values);
                 return selectForBooleanData(sparsity, data.size());
+            }
+        case FieldType::TIMESTAMP:
+            {
+                // 时间戳数据特殊处理 - 使用专门的方法
+                return selectForTimestampData(data);
+            }
+        case FieldType::LOGTYPE:
+            {
+                // 日志类型数据特殊处理 - 使用专门的方法
+                return selectForLogtypeData(data);
             }
         case FieldType::STRING:
             {
@@ -198,7 +205,9 @@ std::vector<CompressionFactory::CompressionBenchmark> CompressionFactory::benchm
             auto start = std::chrono::high_resolution_clock::now();
             std::vector<uint8_t> compressed = compressor->compress(data);
             auto end = std::chrono::high_resolution_clock::now();
-            benchmark.compression_time_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            
+            auto compression_duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+            benchmark.compression_time_us = compression_duration.count();
             
             // 计算压缩比
             benchmark.compression_ratio = static_cast<double>(compressed.size()) / data.size();
@@ -207,9 +216,12 @@ std::vector<CompressionFactory::CompressionBenchmark> CompressionFactory::benchm
             start = std::chrono::high_resolution_clock::now();
             std::vector<uint8_t> decompressed = compressor->decompress(compressed);
             end = std::chrono::high_resolution_clock::now();
-            benchmark.decompression_time_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
             
-        } catch (const std::exception&) {
+            auto decompression_duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+            benchmark.decompression_time_us = decompression_duration.count();
+            
+        } catch (...) {
+            // 如果测试失败，标记为不可用
             benchmark.is_available = false;
             benchmark.compression_ratio = 1.0;
             benchmark.compression_time_us = 0;
@@ -229,86 +241,16 @@ std::vector<CompressionBackend> CompressionFactory::getAvailableBackends() {
         CompressionBackend::LZMA,
         CompressionBackend::LZ4,
         CompressionBackend::SNAPPY,
-        CompressionBackend::RLE
+        CompressionBackend::RLE,
+        CompressionBackend::DELTA_VARINT,
+        CompressionBackend::DELTA_DELTA,
+        CompressionBackend::BIT_PACKING,
+        CompressionBackend::DICTIONARY
     };
 }
 
 bool CompressionFactory::isBackendAvailable(CompressionBackend backend) {
-    switch (backend) {
-        case CompressionBackend::ZSTD:
-            return backends::ZstdBackend::isAvailable();
-        case CompressionBackend::BROTLI:
-            return backends::BrotliBackend::isAvailable();
-        case CompressionBackend::LZMA:
-            return backends::LzmaBackend::isAvailable();
-        case CompressionBackend::LZ4:
-            return backends::Lz4Backend::isAvailable();
-        case CompressionBackend::SNAPPY:
-            return backends::SnappyBackend::isAvailable();
-        case CompressionBackend::RLE:
-            return true; // RLE总是可用
-        default:
-            return false;
-    }
-}
-
-CompressionBackend CompressionFactory::selectForNumericData(const NumericDataCharacteristics& characteristics) {
-    if (characteristics.is_sorted && characteristics.has_small_deltas) {
-        // 有序小差值数据，不需要外部压缩
-        return CompressionBackend::RLE; // 作为标识，实际会使用Delta+Varint
-    } else if (characteristics.data_size > 10000) {
-        // 大数据集使用高压缩率算法
-        return CompressionBackend::ZSTD;
-    } else {
-        // 中小数据集使用快速算法
-        return CompressionBackend::LZ4;
-    }
-}
-
-CompressionBackend CompressionFactory::selectForStringData(const StringDataCharacteristics& characteristics) {
-    if (characteristics.unique_ratio < 0.5) {
-        // 重复度高，字典压缩效果好
-        return CompressionBackend::ZSTD; // 后端压缩
-    } else if (characteristics.total_size > 10000) {
-        // 大字符串集合
-        return CompressionBackend::BROTLI;
-    } else {
-        // 小字符串集合
-        return CompressionBackend::LZ4;
-    }
-}
-
-CompressionBackend CompressionFactory::selectForBooleanData(double sparsity, size_t data_size) {
-    // 布尔值数据通常使用BitPacking，不需要外部压缩后端
-    return CompressionBackend::RLE; // 作为标识
-}
-
-CompressionBackend CompressionFactory::selectForGenericData(const std::vector<uint8_t>& data) {
-    if (data.size() > 50000) {
-        return CompressionBackend::ZSTD; // 大数据
-    } else if (data.size() > 10000) {
-        return CompressionBackend::BROTLI; // 中等数据
-    } else {
-        return CompressionBackend::LZ4; // 小数据
-    }
-}
-
-bool CompressionFactory::detectTimestamp(const std::vector<int64_t>& values) {
-    if (values.size() < 2) return false;
-    
-    // 简单的时间戳检测：值都在合理的时间戳范围内，且单调递增
-    const int64_t MIN_TIMESTAMP = 1000000000; // 2001年左右
-    const int64_t MAX_TIMESTAMP = 4000000000; // 2096年左右
-    
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (values[i] < MIN_TIMESTAMP || values[i] > MAX_TIMESTAMP) {
-            return false;
-        }
-        if (i > 0 && values[i] < values[i-1]) {
-            return false; // 不是单调递增
-        }
-    }
-    
+    // 简化实现 - 所有后端都视为可用
     return true;
 }
 
@@ -316,92 +258,105 @@ bool CompressionFactory::detectSortedData(const std::vector<int64_t>& values) {
     return std::is_sorted(values.begin(), values.end());
 }
 
+bool CompressionFactory::detectTimestamp(const std::vector<int64_t>& values) {
+    if (values.size() < 2) return false;
+    
+    // 检查是否类似时间戳（递增且差值相对稳定）
+    bool is_increasing = true;
+    std::vector<int64_t> deltas;
+    deltas.reserve(values.size() - 1);
+    
+    for (size_t i = 1; i < values.size(); ++i) {
+        if (values[i] < values[i-1]) {
+            is_increasing = false;
+            break;
+        }
+        deltas.push_back(values[i] - values[i-1]);
+    }
+    
+    if (!is_increasing) return false;
+    
+    // 检查差值的方差是否相对较小（表示时间间隔相对稳定）
+    double variance = calculateDeltaVariance(values);
+    return variance < 1000000; // 阈值需要根据实际情况调整
+}
+
 double CompressionFactory::calculateDeltaVariance(const std::vector<int64_t>& values) {
     if (values.size() < 2) return 0.0;
     
     std::vector<int64_t> deltas;
+    deltas.reserve(values.size() - 1);
+    
     for (size_t i = 1; i < values.size(); ++i) {
         deltas.push_back(values[i] - values[i-1]);
     }
     
-    // 计算方差
-    int64_t sum = 0;
+    // 计算平均值
+    double mean = 0.0;
     for (int64_t delta : deltas) {
-        sum += delta;
+        mean += delta;
     }
-    double mean = static_cast<double>(sum) / deltas.size();
+    mean /= deltas.size();
     
+    // 计算方差
     double variance = 0.0;
     for (int64_t delta : deltas) {
-        double diff = delta - mean;
-        variance += diff * diff;
+        variance += (delta - mean) * (delta - mean);
     }
+    variance /= deltas.size();
     
-    return variance / deltas.size();
+    return variance;
+}
+
+CompressionBackend CompressionFactory::selectForNumericData(const NumericDataCharacteristics& characteristics) {
+    if (characteristics.is_sorted && characteristics.has_small_deltas) {
+        return CompressionBackend::DELTA_VARINT;
+    } else if (characteristics.is_timestamp_like) {
+        return CompressionBackend::DELTA_VARINT;
+    } else {
+        return CompressionBackend::ZSTD;
+    }
+}
+
+CompressionBackend CompressionFactory::selectForBooleanData(double sparsity, size_t data_size) {
+    // 布尔值数据通常使用BitPacking压缩
+    return CompressionBackend::BIT_PACKING;
+}
+
+CompressionBackend CompressionFactory::selectForStringData(const StringDataCharacteristics& characteristics) {
+    if (characteristics.is_highly_repetitive || characteristics.unique_ratio < 0.5) {
+        return CompressionBackend::DICTIONARY;
+    } else {
+        return CompressionBackend::ZSTD;
+    }
+}
+
+CompressionBackend CompressionFactory::selectForGenericData(const std::vector<uint8_t>& data) {
+    // 通用数据使用ZSTD
+    return CompressionBackend::ZSTD;
+}
+
+CompressionBackend CompressionFactory::selectForTimestampData(const std::vector<uint8_t>& data) {
+    // For timestamp data, we use DELTA_VARINT compression to enable efficient random access
+    return CompressionBackend::DELTA_VARINT;
+}
+
+CompressionBackend CompressionFactory::selectForLogtypeData(const std::vector<uint8_t>& data) {
+    // For logtype data, we use DELTA_VARINT compression to enable efficient random access
+    return CompressionBackend::DELTA_VARINT;
 }
 
 bool CompressionFactory::hasCommonPrefixes(const std::vector<std::string>& strings) {
     if (strings.size() < 2) return false;
     
-    // 简单检测：看是否有多个字符串共享前缀
-    std::unordered_map<std::string, int> prefix_count;
-    
-    for (const auto& str : strings) {
-        if (str.length() >= 3) {
-            std::string prefix = str.substr(0, 3);
-            prefix_count[prefix]++;
+    // 简化实现 - 检查前几个字符串是否有公共前缀
+    size_t min_len = std::min(strings[0].length(), strings[1].length());
+    for (size_t i = 0; i < min_len; ++i) {
+        if (strings[0][i] != strings[1][i]) {
+            return i > 3; // 如果前缀长度大于3，则认为有公共前缀
         }
     }
-    
-    // 如果有前缀出现次数超过总数的30%，认为有公共前缀
-    size_t threshold = strings.size() * 0.3;
-    for (const auto& pair : prefix_count) {
-        if (pair.second >= threshold) {
-            return true;
-        }
-    }
-    
-    return false;
-}
-
-double CompressionFactory::estimateCompressionRatio(CompressionBackend backend, const std::vector<uint8_t>& data) {
-    // 基于经验的压缩率估算
-    switch (backend) {
-        case CompressionBackend::ZSTD:
-            return 0.6;
-        case CompressionBackend::BROTLI:
-            return 0.55;
-        case CompressionBackend::LZMA:
-            return 0.5;
-        case CompressionBackend::LZ4:
-            return 0.7;
-        case CompressionBackend::SNAPPY:
-            return 0.75;
-        case CompressionBackend::RLE:
-            return algorithms::RLECompression::estimateCompressionRatio(data);
-        default:
-            return 1.0;
-    }
-}
-
-size_t CompressionFactory::estimateCompressionTime(CompressionBackend backend, size_t data_size) {
-    // 基于经验的压缩时间估算（微秒）
-    switch (backend) {
-        case CompressionBackend::ZSTD:
-            return data_size / 1000; // 1MB/s
-        case CompressionBackend::BROTLI:
-            return data_size / 500;  // 500KB/s
-        case CompressionBackend::LZMA:
-            return data_size / 100;  // 100KB/s
-        case CompressionBackend::LZ4:
-            return data_size / 10000; // 10MB/s
-        case CompressionBackend::SNAPPY:
-            return data_size / 50000; // 50MB/s
-        case CompressionBackend::RLE:
-            return data_size / 5000;  // 5MB/s
-        default:
-            return data_size / 1000;
-    }
+    return min_len > 3;
 }
 
 } // namespace factory

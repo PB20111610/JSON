@@ -7,7 +7,6 @@
 #include "trie.h"
 #include "field_dictionary_manager.h"
 #include "compress_type_aware.h"
-#include "compression/type_aware/type_aware_compressor.h"
 
 // Forward declare simdjson types
 namespace simdjson {

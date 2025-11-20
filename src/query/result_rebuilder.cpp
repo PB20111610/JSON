@@ -272,6 +272,11 @@ std::string ResultRebuilder::buildJsonObject(const std::unordered_map<std::strin
     
     bool first = true;
     for (const auto& field : field_map) {
+        // 跳过值为"null"的字段
+        if (field.second == "null") {
+            continue;
+        }
+        
         if (!first) {
             ss << ",";
         }
@@ -281,7 +286,7 @@ std::string ResultRebuilder::buildJsonObject(const std::unordered_map<std::strin
         
         // 检查值是否需要引号
         bool needs_quotes = true;
-        if (field.second == "true" || field.second == "false" || field.second == "null") {
+        if (field.second == "true" || field.second == "false") {
             needs_quotes = false;
         } else if (field.second.find_first_not_of("0123456789.-") == std::string::npos) {
             needs_quotes = false;
